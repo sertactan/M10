@@ -284,3 +284,133 @@ CREATE TABLE IF NOT EXISTS dividend_events_source (
 );
 CREATE INDEX IF NOT EXISTS idx_dividend_events_source
 ON dividend_events_source(security_id, source, ex_date);
+
+
+-- Phase 3: provider-isolated fundamental data.
+CREATE TABLE IF NOT EXISTS filing_records_source (
+    filing_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    source TEXT NOT NULL,
+    cik TEXT,
+    form_type TEXT NOT NULL,
+    period_end TEXT,
+    filing_date TEXT NOT NULL,
+    accepted_at TEXT,
+    accession_number TEXT,
+    source_document TEXT,
+    primary_document TEXT,
+    is_amendment INTEGER NOT NULL DEFAULT 0,
+    retrieved_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_filing_records_pit
+ON filing_records_source(security_id, source, accepted_at, filing_date);
+
+CREATE TABLE IF NOT EXISTS fundamental_facts_source (
+    fact_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    metric_name TEXT NOT NULL,
+    provider_metric_name TEXT NOT NULL,
+    value REAL NOT NULL,
+    unit TEXT NOT NULL,
+    period_start TEXT,
+    period_end TEXT NOT NULL,
+    period_kind TEXT NOT NULL,
+    filing_date TEXT,
+    accepted_at TEXT,
+    available_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_document TEXT NOT NULL,
+    accession_number TEXT,
+    retrieved_at TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    validation_status TEXT NOT NULL,
+    family TEXT NOT NULL,
+    form_type TEXT,
+    fiscal_year INTEGER,
+    fiscal_period TEXT,
+    taxonomy TEXT,
+    frame TEXT,
+    statement_type TEXT,
+    is_amendment INTEGER NOT NULL DEFAULT 0,
+    raw_payload_hash TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_fundamental_facts_pit
+ON fundamental_facts_source(
+    security_id, metric_name, period_end, period_kind, available_at, source
+);
+CREATE INDEX IF NOT EXISTS idx_fundamental_accession
+ON fundamental_facts_source(security_id, accession_number, source);
+
+CREATE TABLE IF NOT EXISTS fundamental_estimates_source (
+    estimate_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    metric_name TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    value REAL NOT NULL,
+    unit TEXT,
+    low REAL,
+    high REAL,
+    analyst_count INTEGER,
+    source TEXT NOT NULL,
+    source_document TEXT NOT NULL,
+    available_at TEXT NOT NULL,
+    retrieved_at TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    validation_status TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_estimates_pit
+ON fundamental_estimates_source(security_id, metric_name, period_end, available_at, source);
+
+CREATE TABLE IF NOT EXISTS company_kpi_guidance_source (
+    record_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    metric_name TEXT NOT NULL,
+    period_end TEXT,
+    value REAL,
+    value_low REAL,
+    value_high REAL,
+    unit TEXT,
+    text_value TEXT,
+    source TEXT NOT NULL,
+    source_document TEXT NOT NULL,
+    accession_number TEXT,
+    available_at TEXT NOT NULL,
+    retrieved_at TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    validation_status TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_company_kpi_guidance_pit
+ON company_kpi_guidance_source(security_id, metric_name, period_end, available_at, source);
+
+CREATE TABLE IF NOT EXISTS fundamental_validation_results (
+    validation_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    metric_name TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    period_kind TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    sec_fact_id TEXT NOT NULL REFERENCES fundamental_facts_source(fact_id),
+    secondary_fact_id TEXT NOT NULL REFERENCES fundamental_facts_source(fact_id),
+    secondary_source TEXT NOT NULL,
+    relative_difference REAL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fundamental_validation
+ON fundamental_validation_results(security_id, metric_name, period_end, secondary_source, created_at);
+
+CREATE TABLE IF NOT EXISTS fundamental_sync_runs (
+    sync_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    provider_mode TEXT NOT NULL,
+    filings_loaded INTEGER NOT NULL DEFAULT 0,
+    facts_loaded INTEGER NOT NULL DEFAULT 0,
+    estimates_loaded INTEGER NOT NULL DEFAULT 0,
+    kpis_loaded INTEGER NOT NULL DEFAULT 0,
+    validations_run INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    status TEXT NOT NULL,
+    message TEXT
+);
