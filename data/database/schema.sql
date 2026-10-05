@@ -18,7 +18,16 @@ CREATE TABLE IF NOT EXISTS security_master (
     delisted_date TEXT,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    primary_exchange_mic TEXT,
+    security_type TEXT,
+    currency TEXT,
+    locale TEXT,
+    composite_figi TEXT,
+    share_class_figi TEXT,
+    source_priority INTEGER NOT NULL DEFAULT 99,
+    first_seen TEXT,
+    last_seen TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_security_ticker ON security_master(ticker);
 CREATE INDEX IF NOT EXISTS idx_security_exchange ON security_master(exchange);
@@ -26,9 +35,43 @@ CREATE INDEX IF NOT EXISTS idx_security_exchange ON security_master(exchange);
 CREATE TABLE IF NOT EXISTS ticker_aliases (
     alias TEXT NOT NULL,
     security_id TEXT NOT NULL REFERENCES security_master(security_id),
-    valid_from TEXT,
+    valid_from TEXT NOT NULL DEFAULT '',
     valid_to TEXT,
+    source TEXT NOT NULL DEFAULT 'UNKNOWN',
+    event_type TEXT NOT NULL DEFAULT 'alias',
+    availability_date TEXT,
+    ingested_at TEXT,
     PRIMARY KEY(alias, security_id, valid_from)
+);
+
+CREATE TABLE IF NOT EXISTS universe_snapshot_membership (
+    snapshot_date TEXT NOT NULL,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    exchange TEXT NOT NULL,
+    exchange_mic TEXT NOT NULL,
+    security_type TEXT,
+    source TEXT NOT NULL,
+    availability_date TEXT NOT NULL,
+    ingested_at TEXT NOT NULL,
+    PRIMARY KEY(snapshot_date, security_id, ticker, source)
+);
+CREATE INDEX IF NOT EXISTS idx_universe_snapshot_date
+ON universe_snapshot_membership(snapshot_date, exchange, ticker);
+
+CREATE TABLE IF NOT EXISTS universe_sync_runs (
+    sync_id TEXT PRIMARY KEY,
+    as_of_date TEXT NOT NULL,
+    source_mode TEXT NOT NULL,
+    active_loaded INTEGER NOT NULL DEFAULT 0,
+    delisted_loaded INTEGER NOT NULL DEFAULT 0,
+    sec_enriched INTEGER NOT NULL DEFAULT 0,
+    finnhub_validated INTEGER NOT NULL DEFAULT 0,
+    ticker_events_loaded INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    status TEXT NOT NULL,
+    message TEXT
 );
 
 CREATE TABLE IF NOT EXISTS price_daily (

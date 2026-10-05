@@ -1,0 +1,40 @@
+universe:
+  primary: MASSIVE
+  authoritative_identity: SEC_EDGAR
+  validation_fallback: FINNHUB
+  optional_fallback: FMP
+  exchanges:
+    - XNAS
+    - XNYS
+    - XASE
+  security_types:
+    - CS
+  include_delisted_default: true
+  historical_requires_massive: true
+
+sec_edgar:
+  enabled: true
+  base_url: "https://www.sec.gov"
+  ticker_exchange_path: "/files/company_tickers_exchange.json"
+  user_agent_env: "SEC_USER_AGENT"
+  max_requests_per_second: 8
+  timeout_seconds: 30
+  max_retries: 3
+
+massive:
+  enabled: true
+  base_url: "https://api.massive.com"
+  api_key_env: "MASSIVE_API_KEY"
+  timeout_seconds: 30
+  max_retries: 4
+
+finnhub:
+  enabled: true
+  base_url: "https://finnhub.io/api/v1"
+  api_key_env: "FINNHUB_API_KEY"
+  timeout_seconds: 30
+  max_retries: 3
+
+fmp:
+  enabled: false
+  api_key_env: "FMP_API_KEY"

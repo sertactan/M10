@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from core.config.env import load_local_env
 from core.config.loader import load_yaml
 from core.config.models import ApplicationConfig, ModelConfig
 from data.database.sqlite_store import SQLiteStore
@@ -10,6 +11,7 @@ from data.database.sqlite_store import SQLiteStore
 class AppContainer:
     def __init__(self, root: Path) -> None:
         self.root = root
+        load_local_env(root / ".env")
         self.app_config = load_yaml(root / "config" / "app.yaml", ApplicationConfig)
         self.v12_config = load_yaml(root / "config" / "s153_v12.yaml", ModelConfig)
         self.v14_config = load_yaml(root / "config" / "s153_v14.yaml", ModelConfig)
