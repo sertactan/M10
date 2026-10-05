@@ -26,3 +26,8 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
+
+
+[tool.setuptools.packages.find]
+include = ["app*", "core*", "data*"]
+exclude = ["tests*", "specs*", "config*", "packaging*"]
