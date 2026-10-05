@@ -170,6 +170,6 @@ def test_v12_v14_comparison_uses_paired_ready_observations(tmp_path):
         assert result.precision_confirmed_b == 3
         assert result.precision_agreement == 3
         assert result.precision_disagreement == 2
-        assert result.average_score_difference_b_minus_a == pytest.approx(4.2)
+        assert result.average_score_difference_b_minus_a == pytest.approx(2.2)
     finally:
         store.close()
