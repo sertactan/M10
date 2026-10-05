@@ -52,6 +52,8 @@ def test_phase9_shell_has_required_global_header_and_tabs(qapp):
         assert window.stock_header.price.text() == "—"
         assert window.context_panel.backtest_status.text() == "NOT AVAILABLE"
         assert window.context_panel.forecast_status.text() == "NOT AVAILABLE"
+        assert window.minimumWidth() == 1100
+        assert not window.progress.isVisible()
         assert "background: #0B1220" in APP_QSS
     finally:
         window.close()
@@ -408,5 +410,40 @@ def test_phase9_scanner_dialog_renders_phase7_rows(qapp):
         dialog.exchange.setCurrentText("NASDAQ")
         assert dialog.table.rowCount() == 1
         assert dialog.table.item(0, 0).text() == "AAA"
+    finally:
+        dialog.close()
+
+
+
+def test_phase9_loading_and_error_state_controls(qapp):
+    window = ResearchTerminalWindow()
+    try:
+        window.progress.show()
+        window.run_button.setEnabled(False)
+        window.scanner_button.setEnabled(False)
+        window._analysis_failed("boom")
+        assert not window.progress.isVisible()
+        assert window.run_button.isEnabled()
+        assert window.scanner_button.isEnabled()
+        assert window.status.text() == "ERROR — boom"
+    finally:
+        window.close()
+
+
+def test_phase9_scanner_loading_and_error_state_controls(qapp):
+    dialog = MarketScannerDialog(
+        scanner_service_factory=lambda: None,
+        as_of_date=date(2026, 10, 6),
+    )
+    try:
+        dialog.progress.show()
+        dialog.run_button.setEnabled(False)
+        dialog.exchange.setEnabled(False)
+        dialog._scan_failed("blocked")
+        assert not dialog.progress.isVisible()
+        assert dialog.run_button.isEnabled()
+        assert dialog.exchange.isEnabled()
+        assert dialog.status.text() == "BLOCKED / ERROR — blocked"
+        assert dialog.minimumWidth() == 900
     finally:
         dialog.close()
