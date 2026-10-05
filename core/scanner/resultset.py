@@ -25,11 +25,11 @@ def sort_rows(rows: Iterable[ScanRow], *, field: str, descending: bool = False) 
     if field not in SORTABLE_FIELDS:
         raise ValueError(f"unsupported sort field: {field}")
 
-    def key(row: ScanRow):
-        value = getattr(row, field)
-        return (value is None, value)
-
-    return sorted(rows, key=key, reverse=descending)
+    materialized = list(rows)
+    present = [row for row in materialized if getattr(row, field) is not None]
+    missing = [row for row in materialized if getattr(row, field) is None]
+    present.sort(key=lambda row: getattr(row, field), reverse=descending)
+    return present + missing
 
 
 def filter_rows(
