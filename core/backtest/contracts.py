@@ -13,6 +13,7 @@ class TerminalConsideration:
     effective_date: date
     value_per_share: float
     source_ref: str
+    verified_within_252_session_horizon: bool
 
 
 @dataclass(frozen=True)
