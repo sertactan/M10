@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +12,13 @@ from core.forecast.calibration import (
 )
 from core.forecast.contracts import CalibratedForecast
 from core.forecast.engine import ForecastEngine, ForecastModeError
+from core.forecast.repository_provider import PinnedCalibrationProvider
+from data.database.sqlite_store import SQLiteStore
+from data.repositories.forecast_calibration_repository import (
+    CalibrationEvidenceError,
+    CalibrationProfileUnavailable,
+    ForecastCalibrationRepository,
+)
 from core.scanner.contracts import ScanCandidate
 
 
@@ -154,3 +162,206 @@ def test_forecast_rejects_misordered_scenarios():
             as_of=AS_OF,
             current_date=TODAY,
         )
+
+
+def _insert_backtest_run(store: SQLiteStore, *, run_id: str = "RUN-001", status: str = "COMPLETE"):
+    store.connection.execute(
+        """
+        INSERT INTO backtest_run_manifest (
+            run_id,created_at,s15_spec_version,backtest_spec_version,
+            random_seed,status
+        ) VALUES (?,?,?,?,?,?)
+        """,
+        (
+            run_id,
+            AS_OF.isoformat(),
+            "S15.3_TEST",
+            "PHASE6_TEST",
+            0,
+            status,
+        ),
+    )
+    store.connection.commit()
+
+
+def _calibration(calibration_id: str = "CAL-001") -> CalibratedForecast:
+    return CalibratedForecast(
+        calibration_id=calibration_id,
+        calibration_source="PHASE6_MARKET_PREVALENCE_WALK_FORWARD",
+        calibration_cutoff=AS_OF - timedelta(days=1),
+        sample_size=1250,
+        bull_return_pct=180.0,
+        base_return_pct=65.0,
+        bear_return_pct=-35.0,
+        probability_positive_return_pct=74.0,
+        probability_2x_plus_pct=31.0,
+        probability_5x_plus_pct=8.0,
+        probability_10x_plus_pct=2.0,
+        confidence_pct=82.0,
+        risk="MEDIUM",
+        metadata={},
+    )
+
+
+def _evidence() -> dict:
+    return {
+        "walk_forward_pass": True,
+        "leakage_audit_pass": True,
+        "survivorship_audit_pass": True,
+        "future_outcome_in_feature_matrix": False,
+    }
+
+
+def test_calibration_repository_accepts_only_market_prevalence(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "calibration.sqlite")
+    store.initialize()
+    try:
+        _insert_backtest_run(store)
+        repository = ForecastCalibrationRepository(store)
+        with pytest.raises(CalibrationEvidenceError, match="MARKET_PREVALENCE"):
+            repository.save_validated_profile(
+                run_id="RUN-001",
+                model_version="S15.3_TEST",
+                horizon_months=12,
+                dataset_kind="MATCHED_CHALLENGE",
+                calibration_method="TEST",
+                calibration=_calibration(),
+                evidence=_evidence(),
+            )
+    finally:
+        store.close()
+
+
+def test_calibration_repository_requires_all_audit_pass_flags(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "calibration.sqlite")
+    store.initialize()
+    try:
+        _insert_backtest_run(store)
+        repository = ForecastCalibrationRepository(store)
+        evidence = _evidence()
+        evidence["survivorship_audit_pass"] = False
+        with pytest.raises(CalibrationEvidenceError, match="survivorship_audit_pass"):
+            repository.save_validated_profile(
+                run_id="RUN-001",
+                model_version="S15.3_TEST",
+                horizon_months=12,
+                dataset_kind="MARKET_PREVALENCE",
+                calibration_method="UNBIASED_WALK_FORWARD",
+                calibration=_calibration(),
+                evidence=evidence,
+            )
+    finally:
+        store.close()
+
+
+def test_calibration_repository_rejects_invalid_backtest_run(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "calibration.sqlite")
+    store.initialize()
+    try:
+        _insert_backtest_run(store, status="INVALID_BACKTEST")
+        repository = ForecastCalibrationRepository(store)
+        with pytest.raises(CalibrationEvidenceError, match="INVALID_BACKTEST"):
+            repository.save_validated_profile(
+                run_id="RUN-001",
+                model_version="S15.3_TEST",
+                horizon_months=12,
+                dataset_kind="MARKET_PREVALENCE",
+                calibration_method="UNBIASED_WALK_FORWARD",
+                calibration=_calibration(),
+                evidence=_evidence(),
+            )
+    finally:
+        store.close()
+
+
+def test_pinned_provider_loads_verified_profile_without_refitting(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "calibration.sqlite")
+    store.initialize()
+    try:
+        _insert_backtest_run(store)
+        repository = ForecastCalibrationRepository(store)
+        evidence_hash = repository.save_validated_profile(
+            run_id="RUN-001",
+            model_version="S15.3_TEST",
+            horizon_months=12,
+            dataset_kind="MARKET_PREVALENCE",
+            calibration_method="UNBIASED_WALK_FORWARD",
+            calibration=_calibration(),
+            evidence=_evidence(),
+        )
+        provider = PinnedCalibrationProvider(repository, calibration_id="CAL-001")
+        result = provider.calibrate(
+            v12=SimpleNamespace(),
+            v14=SimpleNamespace(),
+            as_of=AS_OF,
+            horizon_months=12,
+        )
+        assert result.calibration_id == "CAL-001"
+        assert result.metadata["dataset_kind"] == "MARKET_PREVALENCE"
+        assert result.metadata["evidence_hash"] == evidence_hash
+        assert result.probability_10x_plus_pct == 2.0
+    finally:
+        store.close()
+
+
+def test_calibration_repository_detects_tampered_evidence(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "calibration.sqlite")
+    store.initialize()
+    try:
+        _insert_backtest_run(store)
+        repository = ForecastCalibrationRepository(store)
+        repository.save_validated_profile(
+            run_id="RUN-001",
+            model_version="S15.3_TEST",
+            horizon_months=12,
+            dataset_kind="MARKET_PREVALENCE",
+            calibration_method="UNBIASED_WALK_FORWARD",
+            calibration=_calibration(),
+            evidence=_evidence(),
+        )
+        store.connection.execute(
+            """
+            UPDATE forecast_calibration_profiles
+            SET evidence_json='{"tampered":true}'
+            WHERE calibration_id='CAL-001'
+            """
+        )
+        store.connection.commit()
+        with pytest.raises(CalibrationEvidenceError, match="hash mismatch"):
+            repository.load_validated_profile(
+                calibration_id="CAL-001",
+                as_of=AS_OF,
+            )
+    finally:
+        store.close()
+
+
+def test_calibration_profile_after_forecast_as_of_is_unavailable(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "calibration.sqlite")
+    store.initialize()
+    try:
+        _insert_backtest_run(store)
+        repository = ForecastCalibrationRepository(store)
+        future = CalibratedForecast(
+            **{
+                **_calibration().__dict__,
+                "calibration_id": "CAL-FUTURE",
+                "calibration_cutoff": AS_OF + timedelta(days=1),
+            }
+        )
+        repository.save_validated_profile(
+            run_id="RUN-001",
+            model_version="S15.3_TEST",
+            horizon_months=12,
+            dataset_kind="MARKET_PREVALENCE",
+            calibration_method="UNBIASED_WALK_FORWARD",
+            calibration=future,
+            evidence=_evidence(),
+        )
+        with pytest.raises(CalibrationProfileUnavailable):
+            repository.load_validated_profile(
+                calibration_id="CAL-FUTURE",
+                as_of=AS_OF,
+            )
+    finally:
+        store.close()
