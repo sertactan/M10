@@ -236,7 +236,7 @@ class FundamentalRepository:
         groups: dict[tuple, list[dict]] = {}
         for row in rows:
             d = dict(row)
-            key=(d["metric_name"],d["period_start"] or "",d["period_end"],d["period_kind"],d["unit"])
+            key=(d["metric_name"],d["period_end"],d["period_kind"],d["unit"])
             groups.setdefault(key,[]).append(d)
 
         updates=0
@@ -301,3 +301,22 @@ class FundamentalRepository:
             (security_id,_iso(as_of)),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def canonical_guidance_as_of(self, security_id: str, as_of: datetime) -> list[dict]:
+        rows = self.guidance_as_of(security_id, as_of)
+        priority = {"SEC_EDGAR": 1, "COMPANY_IR": 2, "FINNHUB": 3, "FMP": 4}
+        groups: dict[tuple, list[dict]] = {}
+        for row in rows:
+            key = (row["metric_name"], row["period_end"] or "")
+            groups.setdefault(key, []).append(row)
+        out: list[dict] = []
+        for candidates in groups.values():
+            winner = min(
+                candidates,
+                key=lambda x: (
+                    priority.get(x["source"], 999),
+                    -datetime.fromisoformat(x["available_at"]).timestamp(),
+                ),
+            )
+            out.append(winner)
+        return sorted(out, key=lambda x: (x["metric_name"], x["period_end"] or ""))
