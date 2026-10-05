@@ -39,6 +39,11 @@ Phase 9 must not manufacture model output to make the interface look complete.
 - real canonical V1.2 input/model binding
 - V1.4 fail-closed UI state when the canonical Phase 5 specification is unavailable
 - no synthetic consensus/winner/conviction
+- canonical Stock Header bound to `canonical_price_selection` + Parquet
+- real day-over-day change from the last two canonical adjusted-close bars
+- Phase 6 Historical Backtest card bound to persisted `forward_outcomes`
+- Phase 8 Forecast card bound to persisted/hash-validated `forecast_runs`
+- explicit `NOT AVAILABLE` / invalid stored forecast states instead of generated placeholders
 - default application entry now launches the desktop UI
 
 ## No-mock rule
@@ -48,10 +53,7 @@ The UI does not ship random/demo stock scores as production results.
 
 ## Remaining Phase 9 work
 
-- dedicated stock header with canonical price/change
 - V1.4 dual-magnitude detail surface once V1.4 is executable
-- forecast cards bound to Phase 8
-- historical backtest result cards bound to Phase 6
 - historical price chart
 - scanner table bound to Phase 7
 - loading/progress/error refinements
