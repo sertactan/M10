@@ -16,6 +16,8 @@ size and SHA-256 so future phases have a durable reference instead of relying on
 - separate V1.4 input/result contracts
 - V1.4 PIT input loader backed only by `ModelFeatureRepository`
 - `V14SpecificationBinding` manifest
+- cryptographic canonical spec-bundle loader (`manifest.json` + SHA-256 validation)
+- dedicated authoritative drop location: `specs/s153_v14/`
 - immutable lists of required canonical sources and forbidden invented model elements
 - result fields reserved for:
   - route-specific destination
@@ -63,3 +65,16 @@ Until those artifacts are bound, Phase 5 must not invent or modify:
 
 The correct runtime behavior is therefore to fail closed instead of returning a fabricated
 score, probability, route, or destination.
+
+## Next binding operation
+
+The repository now has a deterministic ingestion path for the missing authoritative package:
+
+- place exactly five canonical artifacts under `specs/s153_v14/`;
+- create `manifest.json` from `manifest.template.json`;
+- pin each artifact by SHA-256;
+- run the integrity gate;
+- encode the exact executable formulas and Golden expected outputs from the verified files;
+- only then enable V1.4.
+
+Missing, duplicate, tampered, path-escaping, empty or placeholder bundles are rejected.
