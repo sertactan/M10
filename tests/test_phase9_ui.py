@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from app.ui.acceptance import PHASE9_ACCEPTANCE_ITEMS, UIAcceptanceItem, require_phase9_complete
 from app.ui.analysis_service import DesktopAnalysisView
 from app.ui.main_window import ResearchTerminalWindow
 from app.ui.price_chart import PricePointView
@@ -447,3 +448,23 @@ def test_phase9_scanner_loading_and_error_state_controls(qapp):
         assert dialog.minimumWidth() == 900
     finally:
         dialog.close()
+
+
+
+def test_phase9_acceptance_gate_requires_exact_matrix():
+    items = [
+        UIAcceptanceItem(name=name, passed=True, evidence="tested")
+        for name in PHASE9_ACCEPTANCE_ITEMS
+    ]
+    require_phase9_complete(items)
+    assert len(PHASE9_ACCEPTANCE_ITEMS) == 18
+
+    blocked = list(items)
+    index = PHASE9_ACCEPTANCE_ITEMS.index("V1.4 fail-closed state")
+    blocked[index] = UIAcceptanceItem(
+        name="V1.4 fail-closed state",
+        passed=False,
+        evidence="canonical V1.4 still blocked",
+    )
+    with pytest.raises(RuntimeError, match="V1.4 fail-closed state"):
+        require_phase9_complete(blocked)
