@@ -3,14 +3,22 @@ universe:
   authoritative_identity: SEC_EDGAR
   validation_fallback: FINNHUB
   optional_fallback: FMP
-  exchanges:
-    - XNAS
-    - XNYS
-    - XASE
-  security_types:
-    - CS
+  exchanges: [XNAS, XNYS, XASE]
+  security_types: [CS]
   include_delisted_default: true
   historical_requires_massive: true
+
+prices:
+  provider_priority:
+    - MASSIVE
+    - STOOQ
+    - SIMFIN
+    - YAHOO_COMPAT
+    - MARKETPARQUET
+  forbid_cross_provider_stitching: true
+  yahoo_authoritative: false
+  require_adjusted_for_backtest: true
+  parquet_root: "data/runtime/parquet"
 
 sec_edgar:
   enabled: true
@@ -27,6 +35,28 @@ massive:
   api_key_env: "MASSIVE_API_KEY"
   timeout_seconds: 30
   max_retries: 4
+
+stooq:
+  enabled: true
+  base_url: "https://stooq.com/q/d/l/"
+  bulk_zip_path_env: "STOOQ_BULK_ZIP_PATH"
+  role: "bootstrap"
+
+simfin:
+  enabled: true
+  bulk_price_path_env: "SIMFIN_PRICE_BULK_PATH"
+  role: "secondary"
+
+yahoo_compatible:
+  enabled: true
+  base_url: "https://query1.finance.yahoo.com/v8/finance/chart"
+  role: "fallback_validation_only"
+  authoritative: false
+
+marketparquet:
+  enabled: true
+  root_env: "MARKETPARQUET_ROOT"
+  role: "optional_survivorship_aware_bulk"
 
 finnhub:
   enabled: true
