@@ -77,3 +77,6 @@ python main.py --ingest-ir-json .\guidance.json --ir-ticker AAPL
 - arbitrary web scraping of investor-relations sites
 - LLM extraction of unstructured presentations/releases
 - point-in-time historical analyst-estimate archives not exposed with reliable timestamps by a configured provider
+
+## CI validation
+GitHub Python CI runs compileall and the complete pytest suite for this phase before merge.
