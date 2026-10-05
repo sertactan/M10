@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from threading import Event
+from datetime import timedelta
 
 import pytest
 
@@ -12,6 +13,9 @@ from core.scanner.acceptance import PHASE7_ACCEPTANCE_ITEMS, AcceptanceItem, req
 from core.scanner.contracts import ScanCandidate, ScanMode
 from core.scanner.engine import MarketScanner
 from core.scanner.resultset import export_csv, filter_rows, sort_rows
+from core.features.s153_v12_input_loader import S153V12InputLoader
+from data.database.sqlite_store import SQLiteStore
+from data.repositories.model_feature_repository import ModelFeatureRepository
 
 
 AS_OF = datetime(2025, 3, 1, 21, 0, tzinfo=timezone.utc)
@@ -168,6 +172,55 @@ def test_scanner_worker_keeps_caller_thread_free():
         assert future.result(timeout=5) == "done"
     finally:
         worker.close()
+
+
+def test_phase7_pit_filtering_excludes_future_feature_versions(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "pit.sqlite")
+    store.initialize()
+    try:
+        store.connection.execute(
+            """
+            INSERT INTO security_master (
+                security_id,ticker,name,exchange,market,active,created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?)
+            """,
+            (
+                "SEC_TEST","TEST","Test Inc.","NASDAQ","US",1,
+                AS_OF.isoformat(),AS_OF.isoformat(),
+            ),
+        )
+        store.connection.commit()
+        repository = ModelFeatureRepository(store)
+        repository.save_feature(
+            security_id="SEC_TEST",
+            feature_key="D01",
+            value=21.0,
+            feature_as_of=AS_OF - timedelta(days=1),
+            available_at=AS_OF - timedelta(days=1),
+            source_phase="PHASE3_FUNDAMENTAL",
+            source_ref="before-cutoff",
+            quality_status="CANONICAL",
+            computation_version="test",
+        )
+        repository.save_feature(
+            security_id="SEC_TEST",
+            feature_key="D01",
+            value=99.0,
+            feature_as_of=AS_OF + timedelta(days=1),
+            available_at=AS_OF + timedelta(days=1),
+            source_phase="PHASE3_FUNDAMENTAL",
+            source_ref="future-version",
+            quality_status="CANONICAL",
+            computation_version="test",
+        )
+        loaded = S153V12InputLoader(repository).load(
+            security_id="SEC_TEST",
+            ticker="TEST",
+            as_of=AS_OF,
+        )
+        assert loaded.discovery_factors[1] == 21.0
+    finally:
+        store.close()
 
 
 def test_phase7_acceptance_contract_requires_exact_15_items():
