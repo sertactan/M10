@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from threading import Lock
 
+from core.optimization.cache import BoundedLRUCache
 from core.optimization.parallel_scanner import ParallelMarketScanner
+from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
+from data.storage.parquet_price_store import ParquetPriceStore
 from core.scanner.contracts import ScanCandidate
 
 
@@ -89,3 +92,94 @@ def test_parallel_scanner_rejects_invalid_worker_count():
         assert "workers" in str(exc)
     else:
         raise AssertionError("workers=0 must fail")
+
+
+
+def test_bounded_lru_cache_tracks_hits_misses_and_evictions():
+    cache = BoundedLRUCache(capacity=2)
+    assert cache.get("missing") is None
+    cache.put("a", 1)
+    cache.put("b", 2)
+    assert cache.get("a") == 1
+    cache.put("c", 3)
+    assert cache.get("b") is None
+    stats = cache.stats
+    assert stats.hits == 1
+    assert stats.misses == 2
+    assert stats.evictions == 1
+    assert stats.size == 2
+
+
+def test_parquet_price_cache_is_provenance_aware_and_copy_safe(tmp_path):
+    store = ParquetPriceStore(tmp_path / "pq", cache_capacity=2)
+    now = datetime(2026, 10, 6, tzinfo=timezone.utc)
+    first = [
+        SourcePriceBar(
+            security_id="SEC_A",
+            source="TEST",
+            source_symbol="AAA",
+            trade_date=date(2026, 10, 6),
+            open=10.0,
+            high=11.0,
+            low=9.0,
+            raw_close=10.0,
+            adjusted_close=10.0,
+            volume=100.0,
+            retrieved_at=now,
+            quality_status=PriceQualityStatus.PRIMARY,
+            adjustment_status=AdjustmentStatus.DUAL_RAW_ADJUSTED,
+        )
+    ]
+    store.write_bars(first)
+
+    a = store.read_bars(
+        security_id="SEC_A",
+        source="TEST",
+        source_symbol="AAA",
+        start_date=date(2026, 10, 6),
+        end_date=date(2026, 10, 6),
+    )
+    b = store.read_bars(
+        security_id="SEC_A",
+        source="TEST",
+        source_symbol="AAA",
+        start_date=date(2026, 10, 6),
+        end_date=date(2026, 10, 6),
+    )
+    assert store.cache_stats.hits == 1
+    b.loc[b.index[0], "adjusted_close"] = 999.0
+    c = store.read_bars(
+        security_id="SEC_A",
+        source="TEST",
+        source_symbol="AAA",
+        start_date=date(2026, 10, 6),
+        end_date=date(2026, 10, 6),
+    )
+    assert float(c.iloc[0]["adjusted_close"]) == 10.0
+
+    replacement = [
+        SourcePriceBar(
+            security_id="SEC_A",
+            source="TEST",
+            source_symbol="AAA",
+            trade_date=date(2026, 10, 6),
+            open=12.0,
+            high=13.0,
+            low=11.0,
+            raw_close=12.0,
+            adjusted_close=12.0,
+            volume=120.0,
+            retrieved_at=now,
+            quality_status=PriceQualityStatus.PRIMARY,
+            adjustment_status=AdjustmentStatus.DUAL_RAW_ADJUSTED,
+        )
+    ]
+    store.write_bars(replacement)
+    refreshed = store.read_bars(
+        security_id="SEC_A",
+        source="TEST",
+        source_symbol="AAA",
+        start_date=date(2026, 10, 6),
+        end_date=date(2026, 10, 6),
+    )
+    assert float(refreshed.iloc[0]["adjusted_close"]) == 12.0
