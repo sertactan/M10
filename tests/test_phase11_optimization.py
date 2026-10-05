@@ -3,6 +3,11 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from threading import Lock
 
+from core.optimization.acceptance import (
+    PHASE11_ACCEPTANCE_ITEMS,
+    OptimizationAcceptanceItem,
+    require_phase11_complete,
+)
 from core.optimization.cache import BoundedLRUCache
 from core.optimization.parallel_scanner import ParallelMarketScanner
 from core.optimization.duckdb_analytics import DuckDBAnalyticsMirror
@@ -268,3 +273,13 @@ def test_duckdb_mirror_preserves_ready_model_evidence(tmp_path):
     finally:
         duckdb.close()
         sqlite.close()
+
+
+
+def test_phase11_acceptance_gate_requires_exact_scope():
+    items = [
+        OptimizationAcceptanceItem(name=name, passed=True, evidence="tested")
+        for name in PHASE11_ACCEPTANCE_ITEMS
+    ]
+    require_phase11_complete(items)
+    assert len(PHASE11_ACCEPTANCE_ITEMS) == 6
