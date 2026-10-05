@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 
 from core.models.s153_v12_contracts import S153V12Input, S153V12Result
@@ -26,6 +25,13 @@ from core.scoring.s1_s14 import (
     s2,
     s3,
     s14,
+)
+from core.scoring.s153_v12_final import (
+    core153 as canonical_core153,
+    final_s153,
+    horizon_penalty,
+    magnitude_gap,
+    near_miss_penalty,
 )
 from core.scoring.s153_v12_components import (
     catalyst_score,
@@ -257,8 +263,8 @@ class S153V12Model:
             pir_score=pir_score,
         )
 
-        maggap = (m5_score - m10_score) if m5_score is not None and m10_score is not None else None
-        nmp = min(12.0, 0.50 * max(0.0, maggap - 8.0)) if maggap is not None else None
+        maggap = magnitude_gap(m5_score, m10_score)
+        nmp = near_miss_penalty(maggap)
 
         pv_score = pv(base_features)
         mi_score = market_ignition(base_features)
@@ -281,14 +287,8 @@ class S153V12Model:
         t10_score, t10_legs = t10(time_components)
         t15_score, _t15_legs = t15(time_components)
 
-        hp = min(8.0, 0.40 * max(0.0, 65.0 - t10_score)) if t10_score is not None else None
-        core153 = None
-        if s152 is not None and m10_score is not None and t10_score is not None:
-            core153 = math.exp(
-                0.45 * math.log(max(s152, 1.0))
-                + 0.30 * math.log(max(m10_score, 1.0))
-                + 0.25 * math.log(max(t10_score, 1.0))
-            )
+        hp = horizon_penalty(t10_score)
+        core153 = canonical_core153(s152, m10_score, t10_score)
 
         route_coverage = essential_coverage(primary_route, model_features) if primary_route else 0.0
         missing: list[str] = []
@@ -302,8 +302,8 @@ class S153V12Model:
             missing.append("selected route essential coverage>=70%")
 
         final_score = None
-        if not missing and core153 is not None and nmp is not None and hp is not None:
-            final_score = clip(core153 - nmp - hp)
+        if not missing:
+            final_score = final_s153(core153, nmp, hp)
 
         gate = route_gate(primary_route, model_features) if primary_route else False
         conf = _confidence(base_features)
