@@ -29,8 +29,11 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m pip install .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m pip install "pyinstaller>=6.11"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Windows application
         shell: pwsh
