@@ -6,8 +6,8 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QVBoxLayout
+    QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton,
+    QProgressBar, QTableWidget, QTableWidgetItem, QVBoxLayout
 )
 
 from core.scanner.resultset import export_csv
@@ -46,6 +46,7 @@ class MarketScannerDialog(QDialog):
         self.thread_pool = QThreadPool.globalInstance()
         self.setWindowTitle('Market Scanner')
         self.resize(1100, 700)
+        self.setMinimumSize(900, 560)
 
         root = QVBoxLayout(self)
         controls = QHBoxLayout()
@@ -61,16 +62,27 @@ class MarketScannerDialog(QDialog):
         controls.addWidget(self.export_button)
         self.status = QLabel('READY')
         controls.addWidget(self.status, 1)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setTextVisible(False)
+        self.progress.setFixedWidth(140)
+        self.progress.hide()
+        controls.addWidget(self.progress)
         root.addLayout(controls)
 
         self.table = QTableWidget(0, len(self.COLUMNS))
         self.table.setHorizontalHeaderLabels(list(self.COLUMNS))
         self.table.setSortingEnabled(True)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self.table, 1)
         self.exchange.currentTextChanged.connect(self._render)
 
     def run_scan(self) -> None:
         self.run_button.setEnabled(False)
+        self.export_button.setEnabled(False)
+        self.exchange.setEnabled(False)
+        self.progress.show()
         self.status.setText(f'SCANNING @ {self.as_of_date.isoformat()} …')
         task = ScannerTask(self.scanner_service_factory, self.as_of_date)
         task.signals.completed.connect(self._scan_complete)
@@ -83,13 +95,18 @@ class MarketScannerDialog(QDialog):
         self.status.setText(
             f'{summary.total} rows · NASDAQ {summary.nasdaq} · NYSE {summary.nyse} · AMEX {summary.amex}'
         )
+        self.progress.hide()
         self.run_button.setEnabled(True)
+        self.exchange.setEnabled(True)
         self.export_button.setEnabled(bool(self.rows))
         self._render()
 
     def _scan_failed(self, message: str) -> None:
         self.status.setText(f'BLOCKED / ERROR — {message}')
+        self.progress.hide()
         self.run_button.setEnabled(True)
+        self.exchange.setEnabled(True)
+        self.export_button.setEnabled(bool(self.rows))
 
     def _render(self) -> None:
         exchange = self.exchange.currentText()
