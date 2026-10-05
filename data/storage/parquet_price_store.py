@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from core.optimization.cache import BoundedLRUCache
 from core.prices.models import SourcePriceBar
 
 
@@ -32,8 +33,9 @@ REQUIRED_PRICE_COLUMNS = [
 
 
 class ParquetPriceStore:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, cache_capacity: int = 16) -> None:
         self.root = Path(root)
+        self._read_cache = BoundedLRUCache(capacity=cache_capacity)
 
     @staticmethod
     def bars_to_frame(bars: list[SourcePriceBar]) -> pd.DataFrame:
@@ -94,6 +96,7 @@ class ParquetPriceStore:
     def write_bars(self, bars: list[SourcePriceBar]) -> list[Path]:
         if not bars:
             return []
+        self._read_cache.clear()
         frame = self.bars_to_frame(bars)
         frame["year"] = pd.to_datetime(frame["trade_date"]).dt.year
         written: list[Path] = []
@@ -130,13 +133,39 @@ class ParquetPriceStore:
         start_date,
         end_date,
     ) -> pd.DataFrame:
-        frames: list[pd.DataFrame] = []
+        year_paths: list[Path] = []
+        signatures: list[tuple[str, int, int]] = []
         for year in range(start_date.year, end_date.year + 1):
             path = self._year_path(source, security_id, source_symbol, year)
             if path.exists():
-                frames.append(pd.read_parquet(path))
+                stat = path.stat()
+                year_paths.append(path)
+                signatures.append((str(path), stat.st_mtime_ns, stat.st_size))
+
+        cache_key = (
+            security_id,
+            source,
+            source_symbol,
+            str(start_date),
+            str(end_date),
+            tuple(signatures),
+        )
+        cached = self._read_cache.get(cache_key)
+        if cached is not None:
+            return cached.copy(deep=True)
+
+        frames: list[pd.DataFrame] = [pd.read_parquet(path) for path in year_paths]
         if not frames:
-            return pd.DataFrame(columns=REQUIRED_PRICE_COLUMNS)
+            result = pd.DataFrame(columns=REQUIRED_PRICE_COLUMNS)
+            self._read_cache.put(cache_key, result)
+            return result.copy(deep=True)
+
         frame = pd.concat(frames, ignore_index=True)
         dates = pd.to_datetime(frame["trade_date"]).dt.date
-        return frame[(dates >= start_date) & (dates <= end_date)].sort_values("trade_date")
+        result = frame[(dates >= start_date) & (dates <= end_date)].sort_values("trade_date")
+        self._read_cache.put(cache_key, result.copy(deep=True))
+        return result.copy(deep=True)
+
+    @property
+    def cache_stats(self):
+        return self._read_cache.stats
