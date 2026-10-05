@@ -16,9 +16,12 @@ from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeade
 from core.backtest.contracts import ForwardOutcome
 from core.backtest.outcomes import CanonicalForwardOutcomeEngine
 from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
+from core.forecast.contracts import CalibratedForecast, ForecastResult
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.backtest_repository import BacktestRepository
 from data.repositories.price_repository import PriceRepository
+from data.repositories.forecast_calibration_repository import ForecastCalibrationRepository
+from data.repositories.forecast_run_repository import ForecastRunRepository
 from data.storage.parquet_price_store import ParquetPriceStore
 
 
@@ -218,5 +221,111 @@ def test_phase9_canonical_price_and_backtest_connections(tmp_path):
         assert backtest.status == "READY"
         assert backtest.fm252 == 3.2
         assert backtest.outcome_class == "STRONG_WINNER"
+    finally:
+        store.close()
+
+
+
+def test_phase9_loads_persisted_validated_forecast(tmp_path):
+    store = SQLiteStore(tmp_path / "forecast-ui.sqlite")
+    store.initialize()
+    try:
+        now = datetime(2026, 10, 6, 9, 0, tzinfo=timezone.utc)
+        store.connection.execute(
+            """
+            INSERT INTO security_master (
+                security_id,ticker,name,exchange,market,active,created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?)
+            """,
+            ("SEC_TEST","TEST","Test Inc.","NASDAQ","US",1,now.isoformat(),now.isoformat()),
+        )
+        store.connection.execute(
+            """
+            INSERT INTO backtest_run_manifest (
+                run_id,created_at,s15_spec_version,backtest_spec_version,
+                random_seed,status
+            ) VALUES (?,?,?,?,?,?)
+            """,
+            ("RUN-UI",now.isoformat(),"S15.3_TEST","PHASE6_TEST",0,"COMPLETE"),
+        )
+        store.connection.commit()
+
+        calibration = CalibratedForecast(
+            calibration_id="CAL-UI",
+            calibration_source="PHASE6_MARKET_PREVALENCE_WALK_FORWARD",
+            calibration_cutoff=datetime(2026, 10, 5, tzinfo=timezone.utc),
+            sample_size=1000,
+            bull_return_pct=120.0,
+            base_return_pct=45.0,
+            bear_return_pct=-30.0,
+            probability_positive_return_pct=70.0,
+            probability_2x_plus_pct=25.0,
+            probability_5x_plus_pct=7.0,
+            probability_10x_plus_pct=2.0,
+            confidence_pct=80.0,
+            risk="MEDIUM",
+            metadata={},
+        )
+        calibration_repo = ForecastCalibrationRepository(store)
+        evidence_hash = calibration_repo.save_validated_profile(
+            run_id="RUN-UI",
+            model_version="S15.3_TEST",
+            horizon_months=12,
+            dataset_kind="MARKET_PREVALENCE",
+            calibration_method="UNBIASED_WALK_FORWARD",
+            calibration=calibration,
+            evidence={
+                "walk_forward_pass": True,
+                "leakage_audit_pass": True,
+                "survivorship_audit_pass": True,
+                "future_outcome_in_feature_matrix": False,
+            },
+        )
+        result = ForecastResult(
+            security_id="SEC_TEST",
+            ticker="TEST",
+            as_of=now,
+            horizon_months=12,
+            v12_score=80.0,
+            v12_status="READY",
+            v12_route="F10",
+            v12_destination=None,
+            v14_score=85.0,
+            v14_status="READY",
+            v14_route="EARLY_ASYMMETRIC",
+            v14_destination="3X-5X",
+            bull_return_pct=120.0,
+            base_return_pct=45.0,
+            bear_return_pct=-30.0,
+            probability_positive_return_pct=70.0,
+            probability_2x_plus_pct=25.0,
+            probability_5x_plus_pct=7.0,
+            probability_10x_plus_pct=2.0,
+            confidence_pct=80.0,
+            risk="MEDIUM",
+            calibration_id="CAL-UI",
+            calibration_source="PHASE6_MARKET_PREVALENCE_WALK_FORWARD",
+            calibration_cutoff=datetime(2026, 10, 5, tzinfo=timezone.utc),
+            calibration_sample_size=1000,
+            calibration_metadata={"evidence_hash": evidence_hash},
+        )
+        receipt = ForecastRunRepository(store).save(
+            result=result,
+            v12_model_version="S15.3_V1.2",
+            v14_model_version="S15.3_V1.4",
+            data_snapshot_hash="a" * 64,
+            model_config_hash="b" * 64,
+        )
+
+        fake_app = SimpleNamespace(sqlite=store)
+        from app.ui.analysis_service import DesktopAnalysisService
+        view = DesktopAnalysisService(tmp_path)._load_forecast(
+            fake_app, "SEC_TEST", date(2026, 10, 6)
+        )
+        assert view.status == "VALIDATED FORECAST"
+        assert view.analysis_id == receipt.analysis_id
+        assert view.base_return_pct == 45.0
+        assert view.probability_10x_plus_pct == 2.0
+        assert view.calibration_id == "CAL-UI"
     finally:
         store.close()
