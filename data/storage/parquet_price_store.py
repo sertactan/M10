@@ -69,12 +69,24 @@ class ParquetPriceStore:
         payload = stable.to_csv(index=False).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()
 
-    def _year_path(self, source: str, security_id: str, year: int) -> Path:
+    @staticmethod
+    def _safe_partition(value: str) -> str:
+        return (
+            value.replace("/", "_")
+            .replace("\\", "_")
+            .replace("=", "_")
+            .replace(":", "_")
+        )
+
+    def _year_path(
+        self, source: str, security_id: str, source_symbol: str, year: int
+    ) -> Path:
         return (
             self.root
             / "prices"
-            / f"source={source}"
-            / f"security_id={security_id}"
+            / f"source={self._safe_partition(source)}"
+            / f"security_id={self._safe_partition(security_id)}"
+            / f"source_symbol={self._safe_partition(source_symbol)}"
             / f"year={year}"
             / "bars.parquet"
         )
@@ -89,7 +101,8 @@ class ParquetPriceStore:
             part = part.drop(columns=["year"])
             source = str(part.iloc[0]["source"])
             security_id = str(part.iloc[0]["security_id"])
-            path = self._year_path(source, security_id, int(year))
+            source_symbol = str(part.iloc[0]["source_symbol"])
+            path = self._year_path(source, security_id, source_symbol, int(year))
             path.parent.mkdir(parents=True, exist_ok=True)
             if path.exists():
                 try:
@@ -113,12 +126,13 @@ class ParquetPriceStore:
         *,
         security_id: str,
         source: str,
+        source_symbol: str,
         start_date,
         end_date,
     ) -> pd.DataFrame:
         frames: list[pd.DataFrame] = []
         for year in range(start_date.year, end_date.year + 1):
-            path = self._year_path(source, security_id, year)
+            path = self._year_path(source, security_id, source_symbol, year)
             if path.exists():
                 frames.append(pd.read_parquet(path))
         if not frames:
