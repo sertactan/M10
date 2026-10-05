@@ -13,8 +13,20 @@ class DuckDBPriceCatalog:
         self.parquet_root = Path(parquet_root)
 
     def refresh_view(self) -> bool:
-        pattern = self.parquet_root / "prices" / "source=*" / "security_id=*" / "year=*" / "bars.parquet"
-        if not list((self.parquet_root / "prices").glob("source=*/security_id=*/year=*/bars.parquet")):
+        pattern = (
+            self.parquet_root
+            / "prices"
+            / "source=*"
+            / "security_id=*"
+            / "source_symbol=*"
+            / "year=*"
+            / "bars.parquet"
+        )
+        if not list(
+            (self.parquet_root / "prices").glob(
+                "source=*/security_id=*/source_symbol=*/year=*/bars.parquet"
+            )
+        ):
             return False
         conn = self.duckdb.connect()
         glob_text = str(pattern).replace("'", "''")
