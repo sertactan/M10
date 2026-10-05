@@ -46,6 +46,10 @@ Phase 9 must not manufacture model output to make the interface look complete.
 - explicit `NOT AVAILABLE` / invalid stored forecast states instead of generated placeholders
 - canonical historical adjusted-close chart on V1.2 and V1.4 pages
 - analysis-date marker on the historical chart
+- separate Market Scanner dialog bound to the Phase 7 scanner engine
+- scanner runs off the UI thread
+- sortable scanner result table, exchange filter and CSV export action
+- production scanner remains fail-closed while V1.4 is blocked
 - default application entry now launches the desktop UI
 
 ## No-mock rule
@@ -56,7 +60,6 @@ The UI does not ship random/demo stock scores as production results.
 ## Remaining Phase 9 work
 
 - V1.4 dual-magnitude detail surface once V1.4 is executable
-- scanner table bound to Phase 7
 - loading/progress/error refinements
 - responsive layout polish
 - final UI acceptance tests
