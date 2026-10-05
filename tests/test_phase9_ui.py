@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.ui.analysis_service import DesktopAnalysisView
 from app.ui.main_window import ResearchTerminalWindow
+from app.ui.price_chart import PricePointView
 from app.ui.theme import APP_QSS
 from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeaderView
 from core.backtest.contracts import ForwardOutcome
@@ -106,6 +107,10 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
             horizon_sessions_available=252,
         ),
         forecast=ForecastView(status="NOT AVAILABLE"),
+        price_points=[
+            PricePointView(trade_date=date(2026, 10, 5), adjusted_close=10.0),
+            PricePointView(trade_date=date(2026, 10, 6), adjusted_close=11.0),
+        ],
         v12=ModelView(
             model_name="S15.3 V1.2",
             status="READY",
@@ -130,6 +135,8 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
         assert window.context_panel.backtest_status.text() == "READY"
         assert window.context_panel.backtest_values["FM252"].text() == "3.20x"
         assert window.context_panel.forecast_status.text() == "NOT AVAILABLE"
+        assert len(window.v12_page.price_chart.chart.series()) == 2
+        assert len(window.v14_page.price_chart.chart.series()) == 2
         assert window.v12_page.score.text() == "81.2 / 100"
         assert window.v12_page.route.text() == "F10"
         assert window.v14_page.status.text() == "BLOCKED_CANONICAL_SPEC"
@@ -213,11 +220,14 @@ def test_phase9_canonical_price_and_backtest_connections(tmp_path):
         service = DesktopAnalysisService(tmp_path)
         stock = service._load_stock(fake_app, row, date(2026, 10, 6))
         backtest = service._load_backtest(fake_app, "SEC_TEST", date(2026, 10, 6))
+        price_points = service._load_price_points(fake_app, "SEC_TEST", date(2026, 10, 6))
 
         assert stock.status == "CANONICAL PRICE"
         assert stock.price == 11.0
         assert stock.change_pct == pytest.approx(10.0)
         assert stock.price_date == "2026-10-06"
+        assert len(price_points) == 2
+        assert price_points[-1].adjusted_close == 11.0
         assert backtest.status == "READY"
         assert backtest.fm252 == 3.2
         assert backtest.outcome_class == "STRONG_WINNER"
