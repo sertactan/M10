@@ -21,10 +21,12 @@ Master-prompt scope:
 - bounded provenance-aware LRU cache
 - Parquet price-window caching keyed by file mtime/size provenance
 - copy-safe cached DataFrames and write-triggered cache invalidation
+- DuckDB analytical mirror for READY backtest/model evidence
+- DuckDB parity queries for paired models and route performance
+- Parquet predicate pushdown for date windows
+- atomic Parquet writes
 - current/historical scanner behavior preserved
 
 Remaining Phase 11 work:
 
-- DuckDB analytical paths
-- Parquet read/write optimization
 - performance/acceptance benchmarks
