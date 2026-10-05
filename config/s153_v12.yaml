@@ -1,7 +1,34 @@
 model_id: "S15.3_V1.2"
 display_name: "S15.3 V1.2"
-enabled: false
-canonical_formula_version: "PENDING_PHASE_4_CANONICAL_BINDING"
-status: "NOT_IMPLEMENTED_PHASE_4"
-weights: {}
-thresholds: {}
+enabled: true
+canonical_formula_version: "MERIDYEN_S15.3_CANONICAL_FINAL_v1.0"
+status: "IMPLEMENTED_PHASE_4_CANONICAL_KERNEL"
+weights:
+  core_s152: 0.45
+  core_m10: 0.30
+  core_t10: 0.25
+  s152_rb: 0.55
+  s152_df10: 0.15
+  s152_x: 0.10
+  s152_h10: 0.10
+  s152_xr: 0.10
+  s152_pir_penalty: 0.10
+  m_df: 0.30
+  m_mch: 0.15
+  m_etrq: 0.15
+  m_rer: 0.15
+  m_cmag: 0.10
+  m_fcvx: 0.05
+  m_hmg: 0.10
+thresholds:
+  discovery: 65
+  strong_score: 75
+  strong_m10: 65
+  strong_t10: 65
+  precision_score: 80
+  precision_m10: 70
+  precision_t10: 70
+  precision_df10: 60
+  precision_xr: 99
+  precision_confidence: 70
+  route_essential_coverage: 70
