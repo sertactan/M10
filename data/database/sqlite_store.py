@@ -23,7 +23,37 @@ class SQLiteStore:
             schema_path = Path(__file__).with_name("schema.sql")
         sql = Path(schema_path).read_text(encoding="utf-8")
         self.connection.executescript(sql)
+        self._apply_compatibility_migrations()
         self.connection.commit()
+
+    def _column_names(self, table: str) -> set[str]:
+        return {row["name"] for row in self.connection.execute(f"PRAGMA table_info({table})")}
+
+    def _ensure_column(self, table: str, column: str, definition: str) -> None:
+        if column not in self._column_names(table):
+            self.connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+    def _apply_compatibility_migrations(self) -> None:
+        for column, definition in {
+            "primary_exchange_mic": "TEXT",
+            "security_type": "TEXT",
+            "currency": "TEXT",
+            "locale": "TEXT",
+            "composite_figi": "TEXT",
+            "share_class_figi": "TEXT",
+            "source_priority": "INTEGER NOT NULL DEFAULT 99",
+            "first_seen": "TEXT",
+            "last_seen": "TEXT",
+        }.items():
+            self._ensure_column("security_master", column, definition)
+
+        for column, definition in {
+            "source": "TEXT NOT NULL DEFAULT 'UNKNOWN'",
+            "event_type": "TEXT NOT NULL DEFAULT 'alias'",
+            "availability_date": "TEXT",
+            "ingested_at": "TEXT",
+        }.items():
+            self._ensure_column("ticker_aliases", column, definition)
 
     def close(self) -> None:
         if self._conn is not None:
