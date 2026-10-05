@@ -18,11 +18,13 @@ Master-prompt scope:
 - one canonical scorer + SQLite connection per worker thread
 - worker contexts closed after scan
 - production model semantics unchanged
+- bounded provenance-aware LRU cache
+- Parquet price-window caching keyed by file mtime/size provenance
+- copy-safe cached DataFrames and write-triggered cache invalidation
 - current/historical scanner behavior preserved
 
 Remaining Phase 11 work:
 
-- cache layer
 - DuckDB analytical paths
 - Parquet read/write optimization
 - performance/acceptance benchmarks
