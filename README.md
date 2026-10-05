@@ -107,6 +107,19 @@ validation_status
 
 See `PHASE5_STATUS.md` for the required canonical artifacts and the no-invention gate.
 
+
+### Phase 6 — Historical Backtest Engine 🚧 dependent / started
+- branch is based on Phase 5; it cannot merge ahead of V1.4
+- no new market/fundamental provider
+- canonical Phase 2 price selection only
+- PIT model outputs must come from Phase 4 V1.2 + Phase 5 V1.4
+- canonical anchor-session / adjusted-close / next-252-session / FM252 outcome core
+- canonical winner/near-miss/failure classes
+- PARTIAL / CENSORED handling without silent imputation
+- cross-provider price stitching rejected
+- feature/outcome firewall and reproducible outcome hashes
+- benchmark + complete trading-calendar/corporate-action + Golden Backtest specs remain fail-closed if absent
+
 ## Historical price provider priority
 
 1. **Massive** — primary professional historical/current market data
