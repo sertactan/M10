@@ -73,6 +73,12 @@ Phase 6 adds:
 
 Existing `backtest_results` remains untouched for compatibility.
 
+## Canonical bundle ingestion gate
+
+The repository now includes `core/backtest/spec_bundle.py` and a dedicated drop location at `specs/phase6_backtest/`.
+
+A complete Phase 6 source package must contain exactly the six required authoritative artifacts and a `manifest.json` that pins every artifact by SHA-256. Missing, duplicate, empty, path-escaping, tampered, invalid-hash, placeholder, or incomplete bundles are rejected. Verification does not authorize guessed benchmark rules or Golden expected values; executable behavior must still be copied exactly from the verified artifacts.
+
 ## Activation gate
 
 Production/full Phase 6 remains fail-closed until:
