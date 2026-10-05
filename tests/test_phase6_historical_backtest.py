@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+import hashlib
+import json
 
 import pytest
 
@@ -8,7 +11,8 @@ from core.backtest.contracts import TerminalConsideration
 from core.backtest.engine import HistoricalBacktestEngine
 from core.backtest.metrics import prediction_error_class
 from core.backtest.outcomes import CanonicalForwardOutcomeEngine
-from core.backtest.spec_manifest import Phase6SpecificationBinding
+from core.backtest.spec_bundle import Phase6SpecBundleError, load_verified_bundle
+from core.backtest.spec_manifest import REQUIRED_BACKTEST_SOURCES, Phase6SpecificationBinding
 from core.models.s153_v12_contracts import S153V12Input
 from core.models.s153_v14 import V14CanonicalSpecificationMissing
 from core.models.s153_v14_contracts import S153V14Input
@@ -206,3 +210,63 @@ def test_full_backtest_cannot_bypass_incomplete_phase5() -> None:
             v14_input=v14,
             bars=_series([20.0] * 252),
         )
+
+
+def _write_phase6_bundle(tmp_path: Path) -> Path:
+    artifacts = []
+    for index, name in enumerate(REQUIRED_BACKTEST_SOURCES, start=1):
+        filename = f"phase6_artifact_{index}.md"
+        body = f"# {name}\n\nauthoritative-test-content-{index}\n"
+        path = tmp_path / filename
+        path.write_text(body, encoding="utf-8")
+        artifacts.append({
+            "name": name,
+            "path": filename,
+            "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+        })
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({
+            "bundle_id": "PHASE6_CANONICAL_TEST_BUNDLE",
+            "artifacts": artifacts,
+        }),
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_phase6_verified_bundle_requires_all_six_artifacts(tmp_path: Path) -> None:
+    bundle = load_verified_bundle(_write_phase6_bundle(tmp_path))
+    assert bundle.bundle_id == "PHASE6_CANONICAL_TEST_BUNDLE"
+    assert len(bundle.artifacts) == 6
+    binding = bundle.to_binding()
+    assert binding.complete is True
+    assert all("#sha256=" in value for value in (
+        binding.historical_backtest_specification,
+        binding.pit_controls_specification,
+        binding.corporate_action_adjustment_specification,
+        binding.trading_calendar_specification,
+        binding.benchmark_specification,
+        binding.golden_backtest_test_cases,
+    ))
+
+
+def test_phase6_verified_bundle_rejects_tampered_artifact(tmp_path: Path) -> None:
+    root = _write_phase6_bundle(tmp_path)
+    (root / "phase6_artifact_5.md").write_text("tampered", encoding="utf-8")
+    with pytest.raises(Phase6SpecBundleError, match="hash mismatch"):
+        load_verified_bundle(root)
+
+
+def test_phase6_verified_bundle_rejects_incomplete_manifest(tmp_path: Path) -> None:
+    root = _write_phase6_bundle(tmp_path)
+    payload = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    payload["artifacts"] = payload["artifacts"][:-1]
+    (root / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(Phase6SpecBundleError, match="incomplete"):
+        load_verified_bundle(root)
+
+
+def test_phase6_manifest_template_cannot_activate_bundle() -> None:
+    root = Path(__file__).resolve().parents[1] / "specs" / "phase6_backtest"
+    with pytest.raises(Phase6SpecBundleError):
+        load_verified_bundle(root)
