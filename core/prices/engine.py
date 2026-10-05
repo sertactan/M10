@@ -67,11 +67,18 @@ class HistoricalPriceEngine:
         )
 
         if validate_with_fallback:
-            await self._validate_selected_with_fallback(security, start, end, selection.source)
+            await self._validate_selected_with_fallback(
+                security, start, end, selection.source, selection.source_symbol
+            )
         return selection
 
     async def _validate_selected_with_fallback(
-        self, security: Security, start: date, end: date, selected_source: str
+        self,
+        security: Security,
+        start: date,
+        end: date,
+        selected_source: str,
+        selected_source_symbol: str,
     ) -> None:
         # Validation is intentionally separate from selection: no rows are stitched.
         candidates = ["YAHOO_COMPAT", "SIMFIN", "MARKETPARQUET", "STOOQ"]
@@ -98,12 +105,18 @@ class HistoricalPriceEngine:
 
         try:
             fa = self.repository.parquet.read_bars(
-                security_id=security.security_id, source=selected_source,
-                start_date=start, end_date=end,
+                security_id=security.security_id,
+                source=selected_source,
+                source_symbol=selected_source_symbol,
+                start_date=start,
+                end_date=end,
             )
             fb = self.repository.parquet.read_bars(
-                security_id=security.security_id, source=other_descriptor.source,
-                start_date=start, end_date=end,
+                security_id=security.security_id,
+                source=other_descriptor.source,
+                source_symbol=other_descriptor.source_symbol,
+                start_date=start,
+                end_date=end,
             )
             from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
             import pandas as pd
