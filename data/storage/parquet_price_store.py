@@ -117,10 +117,18 @@ class ParquetPriceStore:
                 part.sort_values(["trade_date", "retrieved_at"])
                 .drop_duplicates(["trade_date", "source", "source_symbol"], keep="last")
             )
+            temp_path = path.with_suffix(".tmp.parquet")
             try:
-                part.to_parquet(path, index=False)
+                part.to_parquet(temp_path, index=False)
+                temp_path.replace(path)
             except (ImportError, ModuleNotFoundError) as exc:
+                if temp_path.exists():
+                    temp_path.unlink()
                 raise ParquetUnavailable("Install pyarrow or fastparquet to use historical storage") from exc
+            except Exception:
+                if temp_path.exists():
+                    temp_path.unlink()
+                raise
             written.append(path)
         return written
 
@@ -154,7 +162,20 @@ class ParquetPriceStore:
         if cached is not None:
             return cached.copy(deep=True)
 
-        frames: list[pd.DataFrame] = [pd.read_parquet(path) for path in year_paths]
+        frames: list[pd.DataFrame] = []
+        for path in year_paths:
+            try:
+                frame = pd.read_parquet(
+                    path,
+                    columns=REQUIRED_PRICE_COLUMNS,
+                    filters=[
+                        ("trade_date", ">=", start_date),
+                        ("trade_date", "<=", end_date),
+                    ],
+                )
+            except (TypeError, ValueError, NotImplementedError):
+                frame = pd.read_parquet(path, columns=REQUIRED_PRICE_COLUMNS)
+            frames.append(frame)
         if not frames:
             result = pd.DataFrame(columns=REQUIRED_PRICE_COLUMNS)
             self._read_cache.put(cache_key, result)
