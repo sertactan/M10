@@ -1,0 +1,7 @@
+model_id: "S15.3_V1.2"
+display_name: "S15.3 V1.2"
+enabled: false
+canonical_formula_version: "PENDING_PHASE_4_CANONICAL_BINDING"
+status: "NOT_IMPLEMENTED_PHASE_4"
+weights: {}
+thresholds: {}

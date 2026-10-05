@@ -1,0 +1,8 @@
+app_name: "S15.3 Research Terminal"
+market: "US"
+strict_pit: true
+allow_mock_data: false
+database:
+  sqlite_path: "data/runtime/operational.db"
+  duckdb_path: "data/runtime/analytics.duckdb"
+  parquet_root: "data/runtime/parquet"
