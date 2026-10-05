@@ -5,6 +5,9 @@ from threading import Lock
 
 from core.optimization.cache import BoundedLRUCache
 from core.optimization.parallel_scanner import ParallelMarketScanner
+from core.optimization.duckdb_analytics import DuckDBAnalyticsMirror
+from data.database.duckdb_store import DuckDBStore
+from data.database.sqlite_store import SQLiteStore
 from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
 from data.storage.parquet_price_store import ParquetPriceStore
 from core.scanner.contracts import ScanCandidate
@@ -183,3 +186,84 @@ def test_parquet_price_cache_is_provenance_aware_and_copy_safe(tmp_path):
         end_date=date(2026, 10, 6),
     )
     assert float(refreshed.iloc[0]["adjusted_close"]) == 12.0
+
+
+
+def test_duckdb_mirror_preserves_ready_model_evidence(tmp_path):
+    sqlite = SQLiteStore(tmp_path / "ops.sqlite")
+    sqlite.initialize()
+    duckdb = DuckDBStore(tmp_path / "analytics.duckdb")
+    try:
+        now = datetime(2026, 10, 6, tzinfo=timezone.utc).isoformat()
+        sqlite.connection.execute(
+            """
+            INSERT INTO security_master (
+                security_id,ticker,name,exchange,market,active,created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?)
+            """,
+            ("SEC_A","AAA","AAA Inc.","NASDAQ","US",1,now,now),
+        )
+        sqlite.connection.execute(
+            """
+            INSERT INTO forward_outcomes (
+                observation_id,security_id,as_of_date_requested,anchor_session,
+                anchor_lag_calendar_days,entry_adjusted_close,horizon_sessions_available,
+                fm252,max_multiple_observed,outcome_class,time_to_2x_sessions,
+                time_to_3x_sessions,time_to_5x_sessions,time_to_7x_sessions,
+                time_to_10x_sessions,outcome_status,diagnostics_json,outcome_hash,created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                "SEC_A|2024-01-02","SEC_A","2024-01-02","2024-01-02",
+                0,10.0,252,12.0,12.0,"TRUE_10X",
+                None,None,None,None,None,"READY","{}","a"*64,now,
+            ),
+        )
+        for version, score in (("S15.3_V1.2",80.0),("S15.3_V1.4",84.0)):
+            sqlite.connection.execute(
+                """
+                INSERT INTO backtest_predictions (
+                    observation_id,model_version,score,precision_confirmed,
+                    status,score_hash,created_at
+                ) VALUES (?,?,?,?,?,?,?)
+                """,
+                ("SEC_A|2024-01-02",version,score,1,"READY","b"*64,now),
+            )
+        sqlite.connection.execute(
+            """
+            INSERT INTO analysis_runs (
+                analysis_id,ticker,security_id,analysis_date,mode,model_version,
+                data_snapshot_hash,model_config_hash,score,route,destination,prediction,
+                status,created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                "A1","AAA","SEC_A","2024-01-02","HISTORICAL","S15.3_V1.2",
+                "c"*64,"d"*64,80.0,"F10",None,None,"READY",now,
+            ),
+        )
+        sqlite.connection.execute(
+            """
+            INSERT INTO backtest_results (
+                analysis_id,entry_price,return_1m,return_3m,return_6m,return_12m,
+                max_gain_12m,max_drawdown_12m,result_class,outcome_status
+            ) VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            ("A1",10.0,None,None,None,950.0,None,None,"TRUE_10X","READY"),
+        )
+        sqlite.connection.commit()
+
+        mirror = DuckDBAnalyticsMirror(duckdb)
+        stats = mirror.refresh_from_sqlite(sqlite)
+        assert stats.forward_outcomes == 1
+        assert stats.backtest_predictions == 2
+        assert mirror.paired_model_rows(
+            model_a="S15.3_V1.2",
+            model_b="S15.3_V1.4",
+        ) == [("SEC_A|2024-01-02",80.0,84.0,1,1,12.0)]
+        assert mirror.route_performance_rows(model_version="S15.3_V1.2") == [
+            ("F10",1,80.0,950.0)
+        ]
+    finally:
+        duckdb.close()
+        sqlite.close()
