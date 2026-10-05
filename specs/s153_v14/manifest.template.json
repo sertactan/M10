@@ -1,0 +1,30 @@
+{
+  "bundle_id": "PENDING_AUTHORITATIVE_V1_4_BUNDLE",
+  "artifacts": [
+    {
+      "name": "S15.3 V1.4 Canonical Specification",
+      "path": "REPLACE_WITH_CANONICAL_SPEC_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "V1.4 Factor / DNA Definitions",
+      "path": "REPLACE_WITH_FACTOR_DNA_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "V1.4 Router and Gate Specification",
+      "path": "REPLACE_WITH_ROUTER_GATE_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "Dual-Magnitude / Destination Specification",
+      "path": "REPLACE_WITH_DUAL_MAGNITUDE_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "Golden Test Cases",
+      "path": "REPLACE_WITH_GOLDEN_TEST_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    }
+  ]
+}
