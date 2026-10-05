@@ -17,7 +17,8 @@ from core.features.s153_v12_input_loader import S153V12InputLoader
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.model_feature_repository import ModelFeatureRepository
 from data.repositories.security_repository import SecurityRepository
-from core.scanner.production import RepositoryCandidateSource
+from core.scanner.production import CanonicalDualModelScorer, RepositoryCandidateSource
+from core.models.s153_v14 import V14CanonicalSpecificationMissing
 
 
 AS_OF = datetime(2025, 3, 1, 21, 0, tzinfo=timezone.utc)
@@ -273,6 +274,17 @@ def test_phase7_pit_filtering_excludes_future_feature_versions(tmp_path: Path):
             as_of=AS_OF,
         )
         assert loaded.discovery_factors[1] == 21.0
+    finally:
+        store.close()
+
+
+def test_production_scanner_does_not_fake_v14_scoring(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "production-gate.sqlite")
+    store.initialize()
+    try:
+        scorer = CanonicalDualModelScorer(ModelFeatureRepository(store))
+        with pytest.raises(V14CanonicalSpecificationMissing):
+            scorer.score(candidate(1, "NASDAQ"), AS_OF)
     finally:
         store.close()
 
