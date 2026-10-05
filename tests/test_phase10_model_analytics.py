@@ -4,6 +4,11 @@ from datetime import datetime, timezone
 
 import pytest
 
+from core.analytics.acceptance import (
+    PHASE10_ACCEPTANCE_ITEMS,
+    AnalyticsAcceptanceItem,
+    require_phase10_complete,
+)
 from core.analytics.contracts import ScoreBucket
 from core.analytics.model_analytics import AnalyticsInputError, ModelAnalytics
 from data.database.sqlite_store import SQLiteStore
@@ -173,3 +178,22 @@ def test_v12_v14_comparison_uses_paired_ready_observations(tmp_path):
         assert result.average_score_difference_b_minus_a == pytest.approx(2.2)
     finally:
         store.close()
+
+
+
+def test_phase10_acceptance_gate_requires_exact_scope():
+    items = [
+        AnalyticsAcceptanceItem(name=name, passed=True, evidence="tested")
+        for name in PHASE10_ACCEPTANCE_ITEMS
+    ]
+    require_phase10_complete(items)
+    assert len(PHASE10_ACCEPTANCE_ITEMS) == 6
+
+    blocked = list(items)
+    blocked[0] = AnalyticsAcceptanceItem(
+        name="Score buckets",
+        passed=False,
+        evidence="missing",
+    )
+    with pytest.raises(RuntimeError, match="Score buckets"):
+        require_phase10_complete(blocked)
