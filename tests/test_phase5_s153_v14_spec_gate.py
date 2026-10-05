@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import hashlib
+import json
 
 import pytest
 
@@ -12,6 +14,7 @@ from core.models.s153_v14 import (
     V14CanonicalSpecificationMissing,
 )
 from core.models.s153_v14_contracts import S153V14Input
+from core.models.s153_v14_spec_bundle import V14SpecBundleError, load_verified_bundle
 from core.models.s153_v14_spec_manifest import (
     FORBIDDEN_TO_INVENT_OR_MODIFY,
     MASTER_PROMPT_SHA256,
@@ -92,3 +95,62 @@ def test_v14_rejects_naive_as_of_before_spec_gate() -> None:
     )
     with pytest.raises(ValueError, match="timezone-aware"):
         S153V14Model().analyze(data)
+
+
+def _write_verified_bundle(tmp_path: Path) -> Path:
+    names = list(REQUIRED_CANONICAL_SOURCES)
+    artifacts = []
+    for index, name in enumerate(names, start=1):
+        filename = f"artifact_{index}.md"
+        body = f"# {name}\n\nauthoritative-test-content-{index}\n"
+        path = tmp_path / filename
+        path.write_text(body, encoding="utf-8")
+        artifacts.append({
+            "name": name,
+            "path": filename,
+            "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+        })
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({
+            "bundle_id": "S153_V14_CANONICAL_TEST_BUNDLE",
+            "artifacts": artifacts,
+        }),
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_verified_bundle_requires_all_five_artifacts_and_hashes(tmp_path: Path) -> None:
+    bundle = load_verified_bundle(_write_verified_bundle(tmp_path))
+    assert bundle.bundle_id == "S153_V14_CANONICAL_TEST_BUNDLE"
+    assert len(bundle.artifacts) == 5
+    binding = bundle.to_binding()
+    assert binding.complete is True
+    assert all("#sha256=" in value for value in (
+        binding.canonical_specification,
+        binding.factor_dna_definitions,
+        binding.router_gate_specification,
+        binding.dual_magnitude_destination_specification,
+        binding.golden_test_cases,
+    ))
+
+
+def test_verified_bundle_rejects_tampered_artifact(tmp_path: Path) -> None:
+    root = _write_verified_bundle(tmp_path)
+    (root / "artifact_3.md").write_text("tampered", encoding="utf-8")
+    with pytest.raises(V14SpecBundleError, match="hash mismatch"):
+        load_verified_bundle(root)
+
+
+def test_verified_bundle_rejects_incomplete_manifest(tmp_path: Path) -> None:
+    root = _write_verified_bundle(tmp_path)
+    payload = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    payload["artifacts"] = payload["artifacts"][:-1]
+    (root / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(V14SpecBundleError, match="incomplete"):
+        load_verified_bundle(root)
+
+
+def test_manifest_template_cannot_activate_phase5() -> None:
+    with pytest.raises(V14SpecBundleError):
+        load_verified_bundle(ROOT / "specs" / "s153_v14")
