@@ -203,3 +203,37 @@ def test_phase2_schema_tables_exist(tmp_path: Path) -> None:
         "split_events_source", "dividend_events_source",
     } <= names
     store.close()
+
+
+def test_parquet_partition_isolates_source_symbol(tmp_path: Path) -> None:
+    store = ParquetPriceStore(tmp_path)
+    a = store._year_path("MASSIVE", "SEC_META", "FB", 2021)
+    b = store._year_path("MASSIVE", "SEC_META", "META", 2023)
+    assert a != b
+    assert "source_symbol=FB" in str(a)
+    assert "source_symbol=META" in str(b)
+
+
+@pytest.mark.asyncio
+async def test_stooq_symbol_validation_uses_recent_window(monkeypatch) -> None:
+    provider = StooqPriceProvider()
+    seen = {}
+
+    async def fake_history(security, start, end):
+        seen["days"] = (end - start).days
+        return [
+            SourcePriceBar(
+                security.security_id,
+                "STOOQ",
+                "test.us",
+                end,
+                1, 1, 1, 1, 1, 1,
+                NOW,
+                PriceQualityStatus.BOOTSTRAP,
+                AdjustmentStatus.RAW_ONLY,
+            )
+        ]
+
+    monkeypatch.setattr(provider, "get_history", fake_history)
+    assert await provider.validate_symbol(SEC)
+    assert seen["days"] == 15
