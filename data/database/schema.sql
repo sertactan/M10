@@ -528,3 +528,32 @@ CREATE INDEX IF NOT EXISTS idx_forecast_calibration_lookup
 ON forecast_calibration_profiles(
     model_version,horizon_months,dataset_kind,calibration_cutoff,status
 );
+
+
+-- Phase 8: reproducible forward forecast run records.
+CREATE TABLE IF NOT EXISTS forecast_runs (
+    analysis_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    analysis_date TEXT NOT NULL,
+    horizon_months INTEGER NOT NULL,
+    v12_model_version TEXT NOT NULL,
+    v14_model_version TEXT NOT NULL,
+    v12_score REAL,
+    v14_score REAL,
+    v12_route TEXT,
+    v14_route TEXT,
+    v12_destination TEXT,
+    v14_destination TEXT,
+    calibration_id TEXT NOT NULL REFERENCES forecast_calibration_profiles(calibration_id),
+    calibration_cutoff TEXT NOT NULL,
+    calibration_sample_size INTEGER NOT NULL,
+    calibration_evidence_hash TEXT NOT NULL,
+    data_snapshot_hash TEXT NOT NULL,
+    model_config_hash TEXT NOT NULL,
+    forecast_payload_json TEXT NOT NULL,
+    forecast_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forecast_runs_security_date
+ON forecast_runs(security_id,analysis_date);
