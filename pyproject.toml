@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "s153-research-terminal"
+version = "0.0.1"
+description = "PIT-safe desktop research terminal for S15.3 V1.2 and V1.4"
+requires-python = ">=3.11"
+dependencies = [
+  "PySide6>=6.8",
+  "duckdb>=1.1",
+  "pyarrow>=18",
+  "pandas>=2.2",
+  "pydantic>=2.10",
+  "PyYAML>=6.0",
+  "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.8", "mypy>=1.13"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
