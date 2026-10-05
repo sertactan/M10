@@ -5,6 +5,7 @@ from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 from app.bootstrap import AppContainer
+from app.ui.price_chart import PricePointView
 from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeaderView
 from core.features.s153_v12_input_loader import S153V12InputLoader
 from core.features.s153_v14_input_loader import S153V14InputLoader
@@ -22,6 +23,7 @@ class DesktopAnalysisView:
     stock: StockHeaderView
     backtest: BacktestView
     forecast: ForecastView
+    price_points: list[PricePointView]
     v12: ModelView
     v14: ModelView
     v12_components: dict[str, object]
@@ -97,6 +99,46 @@ class DesktopAnalysisService:
             price_date=price_date,
             price_source=f"{selection['purpose']} · {selection['source']}",
         )
+
+    def _load_price_points(self, app: AppContainer, security_id: str, as_of_date: date) -> list[PricePointView]:
+        selection = app.sqlite.connection.execute(
+            """
+            SELECT *
+            FROM canonical_price_selection
+            WHERE security_id=?
+              AND start_date<=?
+              AND end_date>=?
+            ORDER BY selected_at DESC
+            LIMIT 1
+            """,
+            (security_id, as_of_date.isoformat(), as_of_date.isoformat()),
+        ).fetchone()
+        if selection is None:
+            return []
+        parquet = ParquetPriceStore(self.root / app.app_config.database.parquet_root)
+        start = date.fromisoformat(selection['start_date'])
+        end = min(as_of_date, date.fromisoformat(selection['end_date']))
+        frame = parquet.read_bars(
+            security_id=security_id,
+            source=selection['source'],
+            source_symbol=selection['source_symbol'],
+            start_date=start,
+            end_date=end,
+        )
+        if frame.empty:
+            return []
+        points: list[PricePointView] = []
+        for item in frame.sort_values('trade_date').to_dict(orient='records'):
+            trade_date = item['trade_date']
+            if not isinstance(trade_date, date):
+                trade_date = date.fromisoformat(str(trade_date)[:10])
+            points.append(
+                PricePointView(
+                    trade_date=trade_date,
+                    adjusted_close=float(item['adjusted_close']),
+                )
+            )
+        return points
 
     @staticmethod
     def _load_backtest(app: AppContainer, security_id: str, as_of_date: date) -> BacktestView:
@@ -182,6 +224,7 @@ class DesktopAnalysisService:
             stock = self._load_stock(app, row, as_of_date)
             backtest = self._load_backtest(app, row['security_id'], as_of_date)
             forecast = self._load_forecast(app, row['security_id'], as_of_date)
+            price_points = self._load_price_points(app, row['security_id'], as_of_date)
             features = ModelFeatureRepository(app.sqlite)
 
             v12_input = S153V12InputLoader(features).load(
@@ -230,6 +273,7 @@ class DesktopAnalysisService:
                 stock=stock,
                 backtest=backtest,
                 forecast=forecast,
+                price_points=price_points,
                 v12=v12_view,
                 v14=v14_view,
                 v12_components=dict(v12_result.components),
