@@ -8,16 +8,6 @@ from core.prices.models import SourcePriceBar
 from core.prices.policy import PriceSelectionPolicy
 
 
-OUTCOME_CLASSES = (
-    ("TRUE_10X", 10.0, None),
-    ("NEAR_MISS_10X", 7.0, 10.0),
-    ("MAJOR_WINNER", 5.0, 7.0),
-    ("STRONG_WINNER", 3.0, 5.0),
-    ("MODERATE_WINNER", 2.0, 3.0),
-    ("FAILURE", 0.0, 2.0),
-)
-
-
 def _classify_fm252(value: float) -> str:
     if value >= 10.0:
         return "TRUE_10X"
@@ -126,21 +116,34 @@ class CanonicalForwardOutcomeEngine:
             )
 
         forward = [b for b in ordered if b.trade_date > anchor.trade_date][:252]
-        closes = [float(b.adjusted_close) for b in forward if float(b.adjusted_close) > 0]
+        bar_closes = [float(b.adjusted_close) for b in forward if float(b.adjusted_close) > 0]
+        outcome_values = list(bar_closes)
 
         terminal_in_horizon = False
         if terminal_consideration is not None:
-            horizon_last = forward[-1].trade_date if forward else anchor.trade_date
+            # Exact trading-session placement of a non-session terminal date belongs
+            # to the authoritative Trading Calendar / Corporate Action specs.
+            # We therefore use terminal consideration for terminal value / FM252,
+            # but do not fabricate a time_to_kX session index from it.
+            horizon_last = forward[-1].trade_date if forward else terminal_consideration.effective_date
             if anchor.trade_date < terminal_consideration.effective_date <= horizon_last:
-                closes.append(float(terminal_consideration.value_per_share))
+                outcome_values.append(float(terminal_consideration.value_per_share))
                 terminal_in_horizon = True
 
-        max_multiple = max(closes) / entry if closes else None
+        max_multiple = max(outcome_values) / entry if outcome_values else None
 
         if terminal_value_unknown:
             status = "CENSORED"
             fm252 = None
             outcome_class = None
+        elif terminal_in_horizon:
+            # The canonical historical spec says reliable terminal consideration
+            # is added to the outcome series; unknown terminal value is censored.
+            # A known terminal therefore closes the observable path without
+            # inventing post-delisting prices.
+            status = "READY"
+            fm252 = max_multiple
+            outcome_class = _classify_fm252(fm252) if fm252 is not None else None
         elif len(forward) < 252:
             status = "PARTIAL"
             fm252 = None
@@ -160,11 +163,11 @@ class CanonicalForwardOutcomeEngine:
             fm252=fm252,
             max_multiple_observed=max_multiple,
             outcome_class=outcome_class,
-            time_to_2x_sessions=_time_to_multiple(closes, entry, 2.0),
-            time_to_3x_sessions=_time_to_multiple(closes, entry, 3.0),
-            time_to_5x_sessions=_time_to_multiple(closes, entry, 5.0),
-            time_to_7x_sessions=_time_to_multiple(closes, entry, 7.0),
-            time_to_10x_sessions=_time_to_multiple(closes, entry, 10.0),
+            time_to_2x_sessions=_time_to_multiple(bar_closes, entry, 2.0),
+            time_to_3x_sessions=_time_to_multiple(bar_closes, entry, 3.0),
+            time_to_5x_sessions=_time_to_multiple(bar_closes, entry, 5.0),
+            time_to_7x_sessions=_time_to_multiple(bar_closes, entry, 7.0),
+            time_to_10x_sessions=_time_to_multiple(bar_closes, entry, 10.0),
             outcome_status=status,
             diagnostics={
                 "source": anchor.source,
@@ -173,6 +176,11 @@ class CanonicalForwardOutcomeEngine:
                 "terminal_source_ref": (
                     terminal_consideration.source_ref
                     if terminal_in_horizon and terminal_consideration is not None
+                    else None
+                ),
+                "terminal_time_to_multiple_status": (
+                    "NOT_COMPUTED_PENDING_TRADING_CALENDAR_SPEC"
+                    if terminal_in_horizon
                     else None
                 ),
             },
