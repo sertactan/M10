@@ -20,9 +20,27 @@ prices:
   require_adjusted_for_backtest: true
   parquet_root: "data/runtime/parquet"
 
+fundamentals:
+  regulatory_priority:
+    - SEC_EDGAR
+    - FINNHUB
+    - SIMFIN
+    - FMP
+  authoritative_regulatory_source: SEC_EDGAR
+  analyst_estimates_source: FINNHUB
+  company_guidance_precedence:
+    - SEC_EDGAR
+    - COMPANY_IR
+    - FINNHUB
+    - FMP
+  secondary_may_overwrite_sec: false
+  accepted_timestamp_required_for_exact_intraday_pit: true
+  conservative_missing_acceptance: true
+
 sec_edgar:
   enabled: true
   base_url: "https://www.sec.gov"
+  data_base_url: "https://data.sec.gov"
   ticker_exchange_path: "/files/company_tickers_exchange.json"
   user_agent_env: "SEC_USER_AGENT"
   max_requests_per_second: 8
@@ -45,7 +63,8 @@ stooq:
 simfin:
   enabled: true
   bulk_price_path_env: "SIMFIN_PRICE_BULK_PATH"
-  role: "secondary"
+  bulk_fundamentals_path_env: "SIMFIN_FUNDAMENTALS_PATH"
+  role: "secondary_bootstrap"
 
 yahoo_compatible:
   enabled: true
@@ -66,5 +85,7 @@ finnhub:
   max_retries: 3
 
 fmp:
-  enabled: false
+  enabled: true
+  base_url: "https://financialmodelingprep.com/stable"
   api_key_env: "FMP_API_KEY"
+  role: "fallback_validation"
