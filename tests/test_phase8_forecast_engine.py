@@ -6,6 +6,11 @@ from pathlib import Path
 
 import pytest
 
+from core.forecast.acceptance import (
+    PHASE8_ACCEPTANCE_ITEMS,
+    ForecastAcceptanceItem,
+    require_phase8_complete,
+)
 from core.forecast.calibration import (
     ForecastCalibrationInvalid,
     ForecastCalibrationUnavailable,
@@ -512,3 +517,21 @@ def test_forecast_run_detects_calibration_provenance_tamper(tmp_path: Path):
             )
     finally:
         store.close()
+
+
+def test_phase8_acceptance_contract_fails_closed_when_v14_is_blocked():
+    assert len(PHASE8_ACCEPTANCE_ITEMS) == 17
+    items = [
+        ForecastAcceptanceItem(name=name, passed=True, evidence="test evidence")
+        for name in PHASE8_ACCEPTANCE_ITEMS
+    ]
+    require_phase8_complete(items)
+
+    idx = PHASE8_ACCEPTANCE_ITEMS.index("V1.4 canonical scoring")
+    items[idx] = ForecastAcceptanceItem(
+        name="V1.4 canonical scoring",
+        passed=False,
+        evidence="Phase 5 authoritative V1.4 specification is not yet executable",
+    )
+    with pytest.raises(RuntimeError, match="V1.4 canonical scoring"):
+        require_phase8_complete(items)
