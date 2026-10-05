@@ -174,6 +174,8 @@ class StooqPriceProvider:
 
     async def validate_symbol(self, security: Security) -> bool:
         try:
-            return bool(await self.get_daily_bar(security, date.today()))
+            end = date.today()
+            start = end - timedelta(days=15)
+            return bool(await self.get_history(security, start, end))
         except Exception:
             return False
