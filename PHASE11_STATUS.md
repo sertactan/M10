@@ -29,4 +29,7 @@ Master-prompt scope:
 
 Remaining Phase 11 work:
 
-- performance/acceptance benchmarks
+
+## Final acceptance gate
+
+The exact Phase 11 completion matrix is encoded in `core/optimization/acceptance.py`.
