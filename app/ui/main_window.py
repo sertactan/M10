@@ -128,6 +128,8 @@ class ResearchTerminalWindow(QMainWindow):
         self.context_panel.set_forecast(result.forecast)
         self.v12_page.set_model(result.v12, result.v12_components)
         self.v14_page.set_model(result.v14, result.v14_components)
+        self.v12_page.set_price_series(result.price_points, result.as_of.date())
+        self.v14_page.set_price_series(result.price_points, result.as_of.date())
         self.compare_page.set_comparison(
             ComparisonView(v12=result.v12, v14=result.v14)
         )
