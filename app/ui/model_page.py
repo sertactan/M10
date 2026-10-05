@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.ui.price_chart import HistoricalPriceChart, PricePointView
 from app.ui.view_models import ModelView
 
 
@@ -62,6 +63,8 @@ class ModelPage(QWidget):
         self.components.setHorizontalHeaderLabels(["Metric", "Value"])
         self.components.setAlternatingRowColors(True)
         root.addWidget(self.components, 1)
+        self.price_chart = HistoricalPriceChart()
+        root.addWidget(self.price_chart)
 
     def set_model(self, view: ModelView, components: dict[str, object] | None = None) -> None:
         self.status.setText(view.status)
@@ -78,3 +81,6 @@ class ModelPage(QWidget):
         for row, (name, value) in enumerate(items):
             self.components.setItem(row, 0, QTableWidgetItem(str(name)))
             self.components.setItem(row, 1, QTableWidgetItem(_fmt(value)))
+
+    def set_price_series(self, points: list[PricePointView], analysis_date) -> None:
+        self.price_chart.set_series(points, analysis_date)
