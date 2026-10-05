@@ -3,21 +3,14 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Protocol, Sequence
 
-from core.contracts.entities import FinancialFact, PriceBar, Security
+from core.contracts.entities import FinancialFact, Security
+from data.providers.price_base import PriceProvider
 
 
 class SecurityUniverseProvider(Protocol):
     name: str
 
     async def list_us_securities(self, as_of: date) -> Sequence[Security]: ...
-
-
-class PriceProvider(Protocol):
-    name: str
-
-    async def daily_prices(
-        self, security: Security, start: date, end: date
-    ) -> Sequence[PriceBar]: ...
 
 
 class FundamentalsProvider(Protocol):
@@ -38,3 +31,6 @@ class MarketProvider(Protocol):
     name: str
 
     async def snapshot_as_of(self, market: str, as_of: datetime) -> dict: ...
+
+
+__all__ = ["PriceProvider", "SecurityUniverseProvider", "FundamentalsProvider", "CorporateActionsProvider", "MarketProvider"]
