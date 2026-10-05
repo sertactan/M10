@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Mapping
 
@@ -37,8 +37,12 @@ class ForecastResult:
     horizon_months: int
     v12_score: float | None
     v12_status: str
+    v12_route: str | None
+    v12_destination: str | None
     v14_score: float | None
     v14_status: str
+    v14_route: str | None
+    v14_destination: str | None
     bull_return_pct: float
     base_return_pct: float
     bear_return_pct: float
@@ -52,4 +56,5 @@ class ForecastResult:
     calibration_source: str
     calibration_cutoff: datetime
     calibration_sample_size: int
+    calibration_metadata: Mapping[str, object] = field(default_factory=dict)
     disclosure: str = FORECAST_DISCLOSURE
