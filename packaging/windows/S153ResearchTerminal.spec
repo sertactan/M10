@@ -1,10 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+
+project_root = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
+
 a = Analysis(
-    ["main.py"],
-    pathex=[],
+    [os.path.join(project_root, "main.py")],
+    pathex=[project_root],
     binaries=[],
-    datas=[("config", "config")],
+    datas=[(os.path.join(project_root, "config"), "config")],
     hiddenimports=["PySide6.QtCharts"],
     hookspath=[],
     hooksconfig={},
