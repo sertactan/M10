@@ -106,6 +106,18 @@ class ResearchTerminalWindow(QMainWindow):
         layout.addWidget(self.run_button)
         return frame
 
+    def _open_scanner(self) -> None:
+        if self.scanner_service_factory is None:
+            self.status.setText('Scanner backend is not connected')
+            return
+        dialog = MarketScannerDialog(
+            scanner_service_factory=self.scanner_service_factory,
+            as_of_date=self.analysis_date.date().toPython(),
+            parent=self,
+        )
+        dialog.setModal(False)
+        dialog.show()
+        self._scanner_dialog = dialog
     def _run_analysis(self) -> None:
         ticker = self.ticker.text().strip().upper()
         if not ticker:
