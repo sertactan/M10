@@ -95,6 +95,18 @@ validation_status
 - no new market/fundamental provider
 - run reproducibility with data/config hashes
 
+### Phase 5 — S15.3 V1.4 Dual-Magnitude Architecture 🚧 started / fail-closed
+- separate `S153V14Model` and V1.4 contracts
+- canonical PIT input loader reusing the Phase 1-3 normalized feature layer
+- no new market/fundamental provider
+- output contract reserved for route-specific destination, dual magnitude, acceleration,
+  large-winner probability, risk-adjusted conviction, confidence and probability buckets
+- no V1.2 score is silently reused as V1.4 model logic
+- V1.4 scoring remains disabled until the authoritative V1.4 specification set is bound
+- tests explicitly reject invented formulas, thresholds, probabilities and destination mappings
+
+See `PHASE5_STATUS.md` for the required canonical artifacts and the no-invention gate.
+
 ## Historical price provider priority
 
 1. **Massive** — primary professional historical/current market data
@@ -200,9 +212,10 @@ SEC-sourced structured KPI records must reference a sec.gov document and accessi
 python main.py --run-v12 AAPL --model-as-of 2025-05-05
 ```
 
-The model reads only PIT canonical model features materialized from Phases 1–3,
+The model reads only PIT canonical model features materialized from Phases 1-3,
 historical controls, or deterministic canonical derivations. Missing factors remain N/A.
 
 ## Next
 
-Phase 5 — S15.3 V1.4 Dual-Magnitude Architecture.
+Complete Phase 5 by binding the authoritative V1.4 canonical specifications and Golden Test Cases.
+Only after that should Phase 6 — Historical Backtester begin.
