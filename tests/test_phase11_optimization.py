@@ -186,6 +186,7 @@ def test_parquet_price_cache_is_provenance_aware_and_copy_safe(tmp_path):
         end_date=date(2026, 10, 6),
     )
     assert float(refreshed.iloc[0]["adjusted_close"]) == 12.0
+    assert not list((tmp_path / "pq").rglob("*.tmp.parquet"))
 
 
 
