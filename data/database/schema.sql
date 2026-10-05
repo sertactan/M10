@@ -414,3 +414,24 @@ CREATE TABLE IF NOT EXISTS fundamental_sync_runs (
     status TEXT NOT NULL,
     message TEXT
 );
+
+
+-- Phase 4: canonical model-feature materialization.
+CREATE TABLE IF NOT EXISTS canonical_model_features (
+    feature_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    feature_key TEXT NOT NULL,
+    value REAL,
+    feature_as_of TEXT NOT NULL,
+    available_at TEXT NOT NULL,
+    source_phase TEXT NOT NULL,
+    source_ref TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    computation_version TEXT NOT NULL,
+    evidence_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_canonical_model_features_pit
+ON canonical_model_features(security_id,feature_key,feature_as_of,available_at);
+CREATE INDEX IF NOT EXISTS idx_canonical_model_features_source
+ON canonical_model_features(source_phase,source_ref);
