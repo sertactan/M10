@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QProgressBar,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -42,6 +43,7 @@ class ResearchTerminalWindow(QMainWindow):
         self.thread_pool = QThreadPool.globalInstance()
         self.setWindowTitle("S15.3 Research Terminal")
         self.resize(1440, 900)
+        self.setMinimumSize(1100, 700)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -61,9 +63,17 @@ class ResearchTerminalWindow(QMainWindow):
         self.tabs.addTab(self.compare_page, "COMPARE")
         root.addWidget(self.tabs, 1)
 
+        footer = QHBoxLayout()
         self.status = QLabel("READY — no analysis loaded")
         self.status.setObjectName("Muted")
-        root.addWidget(self.status)
+        footer.addWidget(self.status, 1)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setTextVisible(False)
+        self.progress.setFixedWidth(160)
+        self.progress.hide()
+        footer.addWidget(self.progress)
+        root.addLayout(footer)
 
     def _build_header(self) -> QFrame:
         frame = QFrame()
@@ -82,6 +92,8 @@ class ResearchTerminalWindow(QMainWindow):
         self.ticker = QLineEdit()
         self.ticker.setPlaceholderText("Ticker e.g. CRMD")
         self.ticker.setMaxLength(12)
+        self.ticker.setMinimumWidth(140)
+        self.ticker.returnPressed.connect(self._run_analysis)
         layout.addWidget(self.ticker, 1)
 
         self.analysis_date = QDateEdit(QDate.currentDate())
@@ -131,6 +143,8 @@ class ResearchTerminalWindow(QMainWindow):
             return
 
         self.run_button.setEnabled(False)
+        self.scanner_button.setEnabled(False)
+        self.progress.show()
         self.status.setText(f"ANALYZING {ticker} @ {as_of.isoformat()} …")
         task = AnalysisTask(
             self.analysis_service_factory,
@@ -155,8 +169,12 @@ class ResearchTerminalWindow(QMainWindow):
         self.status.setText(
             f"LOADED {result.ticker} @ {result.as_of.date().isoformat()}"
         )
+        self.progress.hide()
         self.run_button.setEnabled(True)
+        self.scanner_button.setEnabled(True)
 
     def _analysis_failed(self, message: str) -> None:
         self.status.setText(f"ERROR — {message}")
+        self.progress.hide()
         self.run_button.setEnabled(True)
+        self.scanner_button.setEnabled(True)
