@@ -21,22 +21,49 @@ class PriceRepository:
             raise ValueError(f"One registry series must have one identity/source/symbol: {keys}")
         security_id, source, source_symbol = next(iter(keys))
         ordered = sorted(bars, key=lambda b: b.trade_date)
+        adjustment_statuses = {b.adjustment_status for b in ordered}
+        quality_statuses = {b.quality_status for b in ordered}
+        if len(adjustment_statuses) != 1 or len(quality_statuses) != 1:
+            raise ValueError("One stored provider series must have consistent quality/adjustment status")
+
+        series_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{security_id}|{source}|{source_symbol}"))
+        existing = self.store.connection.execute(
+            "SELECT * FROM price_series_registry WHERE series_id=?",
+            (series_id,),
+        ).fetchone()
+        if existing and existing["adjustment_status"] != ordered[0].adjustment_status.value:
+            raise ValueError(
+                "Adjustment status changed for an existing provider series; "
+                "store it as a separate source series instead of silently mixing semantics"
+            )
+
+        full_start = ordered[0].trade_date
+        full_end = ordered[-1].trade_date
+        if existing:
+            full_start = min(full_start, date.fromisoformat(existing["start_date"]))
+            full_end = max(full_end, date.fromisoformat(existing["end_date"]))
+
         self.parquet.write_bars(ordered)
-        frame = self.parquet.bars_to_frame(ordered)
-        content_hash = self.parquet.content_hash(frame)
+        full_frame = self.parquet.read_bars(
+            security_id=security_id,
+            source=source,
+            source_symbol=source_symbol,
+            start_date=full_start,
+            end_date=full_end,
+        )
+        content_hash = self.parquet.content_hash(full_frame)
         descriptor = PriceSeriesDescriptor(
             security_id=security_id,
             source=source,
             source_symbol=source_symbol,
-            start_date=ordered[0].trade_date,
-            end_date=ordered[-1].trade_date,
-            row_count=len(ordered),
+            start_date=full_start,
+            end_date=full_end,
+            row_count=len(full_frame),
             quality_status=ordered[0].quality_status,
             adjustment_status=ordered[0].adjustment_status,
             retrieved_at=max(b.retrieved_at for b in ordered),
             content_hash=content_hash,
         )
-        series_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{security_id}|{source}|{source_symbol}"))
         self.store.connection.execute(
             """
             INSERT INTO price_series_registry (
@@ -44,9 +71,9 @@ class PriceRepository:
                 quality_status,adjustment_status,retrieved_at,content_hash,parquet_root,updated_at
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(series_id) DO UPDATE SET
-                start_date=MIN(price_series_registry.start_date,excluded.start_date),
-                end_date=MAX(price_series_registry.end_date,excluded.end_date),
-                row_count=MAX(price_series_registry.row_count,excluded.row_count),
+                start_date=excluded.start_date,
+                end_date=excluded.end_date,
+                row_count=excluded.row_count,
                 quality_status=excluded.quality_status,
                 adjustment_status=excluded.adjustment_status,
                 retrieved_at=excluded.retrieved_at,
