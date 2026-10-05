@@ -34,3 +34,6 @@ Each row retains source, source_symbol, raw_close, adjusted_close, retrieved_at 
 - full-market download orchestration / rate-aware batching
 - Windows UI progress/reporting
 - provider-specific live acceptance runs after local keys/bulk archives are configured
+
+## CI validation
+GitHub Python CI runs compileall and the full pytest suite on pull requests.
