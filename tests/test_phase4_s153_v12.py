@@ -50,7 +50,7 @@ def _full_features() -> dict[str, float]:
     # S14 / company quality
     f.update({
         "B_Q":90,"S6":90,"S7":90,"S8":90,"S9":90,"S10":90,
-        "S11":90,"S12":90,"S13":90,
+        "S11":90,"S12":90,"S13":100,
     })
 
     # U / ETRQ / FCVX / RER
