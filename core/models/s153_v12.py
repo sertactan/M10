@@ -65,10 +65,6 @@ def _validate_scores(values: Mapping[str, float | None]) -> None:
         "SUPPORTED_MC_12_B",
         "SUPPORTED_MC_12_R",
         "PLAUSIBLE_CEILING_MC",
-        "DATA_COVERAGE",
-        "SOURCE_QUALITY",
-        "PIT_INTEGRITY",
-        "MODEL_FIT",
     }
     for key, value in values.items():
         if value is None or key in raw_allowed:
