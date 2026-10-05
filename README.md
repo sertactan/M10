@@ -21,7 +21,7 @@ Windows desktop research platform for **S15.3 V1.2** and **S15.3 V1.4 Dual-Magni
 - ticker aliases and ticker-change events
 - historical universe fails closed without a PIT-capable source
 
-### Phase 2 — Historical Price Engine ✅ code-complete
+### Phase 2 — Historical Price Engine ✅
 - common `PriceProvider` interface:
   - `get_history()`
   - `get_daily_bar()`
@@ -47,6 +47,38 @@ raw_close
 adjusted_close
 retrieved_at
 quality_status
+```
+
+
+### Phase 3 — Fundamental / SEC Engine ✅ code-complete
+- SEC EDGAR Submissions + Company Facts/XBRL
+- 10-K / 10-Q / 8-K / 20-F (plus amendments and 40-F/6-K support)
+- filing date + accepted timestamp + accession number + source document
+- amendment/restatement version preservation
+- PIT canonical snapshots
+- SEC regulatory precedence over all secondary providers
+- Finnhub normalized financials, estimates and company metrics
+- SimFin bulk historical fundamentals
+- FMP statement/ratio fallback
+- official SEC / Investor Relations KPI-guidance ingestion
+- TTM and FCF snapshot calculations
+- secondary validation without SEC overwrite
+
+Every fundamental fact retains:
+
+```text
+metric_name
+value
+period_end
+filing_date
+accepted_at
+available_at
+source
+source_document
+accession_number
+retrieved_at
+quality_status
+validation_status
 ```
 
 ## Historical price provider priority
@@ -78,6 +110,7 @@ FMP_API_KEY=
 STOOQ_BULK_ZIP_PATH=
 SIMFIN_PRICE_BULK_PATH=
 MARKETPARQUET_ROOT=
+SIMFIN_FUNDAMENTALS_PATH=
 ```
 
 `.env` is gitignored. Never commit real API keys.
@@ -131,6 +164,22 @@ MARKETPARQUET_ROOT=D:\data\marketparquet\
 
 Then `AUTO` price sync can use those sources according to provider policy if higher-priority sources are unavailable or unsuitable.
 
+## Fundamental sync
+
+```powershell
+python main.py --sync-fundamentals AAPL
+python main.py --sync-fundamentals AAPL --fund-provider SEC_EDGAR
+python main.py --show-fundamentals AAPL --fund-as-of 2025-05-05
+```
+
+For official company guidance / non-standard KPIs, ingest structured records with an official HTTPS document:
+
+```powershell
+python main.py --ingest-ir-json ".\\guidance.json" --ir-ticker AAPL
+```
+
+SEC-sourced structured KPI records must reference a sec.gov document and accession number.
+
 ## Next
 
-Phase 3 — Fundamental / SEC Engine: PIT 10-K/10-Q facts, filing acceptance dates, statement normalization and as-of fundamental snapshots.
+Phase 4 — S15.3 V1.2 canonical scoring engine.
