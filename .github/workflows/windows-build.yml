@@ -13,6 +13,8 @@ on:
       - "main.py"
       - "pyproject.toml"
       - "packaging/windows/**"
+      - "tests/**"
+      - "PHASE12_STATUS.md"
       - ".github/workflows/windows-build.yml"
 
 jobs:
