@@ -50,6 +50,10 @@ Phase 9 must not manufacture model output to make the interface look complete.
 - scanner runs off the UI thread
 - sortable scanner result table, exchange filter and CSV export action
 - production scanner remains fail-closed while V1.4 is blocked
+- indeterminate loading indicators for analysis and scanner jobs
+- controls disabled during background work and restored on success/error
+- Enter-to-run ticker workflow
+- minimum responsive window/dialog sizes and adaptive scanner columns
 - default application entry now launches the desktop UI
 
 ## No-mock rule
@@ -60,6 +64,4 @@ The UI does not ship random/demo stock scores as production results.
 ## Remaining Phase 9 work
 
 - V1.4 dual-magnitude detail surface once V1.4 is executable
-- loading/progress/error refinements
-- responsive layout polish
 - final UI acceptance tests
