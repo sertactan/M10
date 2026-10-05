@@ -12,11 +12,13 @@ from PySide6.QtWidgets import QApplication
 from app.ui.analysis_service import DesktopAnalysisView
 from app.ui.main_window import ResearchTerminalWindow
 from app.ui.price_chart import PricePointView
+from app.ui.scanner_dialog import MarketScannerDialog
 from app.ui.theme import APP_QSS
 from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeaderView
 from core.backtest.contracts import ForwardOutcome
 from core.backtest.outcomes import CanonicalForwardOutcomeEngine
 from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
+from core.scanner.contracts import ScanMode, ScanRow, ScanSummary
 from core.forecast.contracts import CalibratedForecast, ForecastResult
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.backtest_repository import BacktestRepository
@@ -339,3 +341,72 @@ def test_phase9_loads_persisted_validated_forecast(tmp_path):
         assert view.calibration_id == "CAL-UI"
     finally:
         store.close()
+
+
+
+def test_phase9_scanner_button_fails_closed_without_backend(qapp):
+    window = ResearchTerminalWindow()
+    try:
+        window.scanner_button.click()
+        assert window.status.text() == "Scanner backend is not connected"
+    finally:
+        window.close()
+
+
+def test_phase9_scanner_dialog_renders_phase7_rows(qapp):
+    dialog = MarketScannerDialog(
+        scanner_service_factory=lambda: None,
+        as_of_date=date(2026, 10, 6),
+    )
+    try:
+        rows = [
+            ScanRow(
+                security_id="SEC_1",
+                ticker="AAA",
+                exchange="NASDAQ",
+                as_of=datetime(2026, 10, 6, tzinfo=timezone.utc),
+                mode=ScanMode.CURRENT,
+                v12_score=80.0,
+                v12_status="READY",
+                v12_route="F10",
+                v12_destination=None,
+                v14_score=85.0,
+                v14_status="READY",
+                v14_route="EARLY_ASYMMETRIC",
+                v14_destination="3X-5X",
+                delisted=False,
+            ),
+            ScanRow(
+                security_id="SEC_2",
+                ticker="BBB",
+                exchange="NYSE",
+                as_of=datetime(2026, 10, 6, tzinfo=timezone.utc),
+                mode=ScanMode.CURRENT,
+                v12_score=72.0,
+                v12_status="READY",
+                v12_route="Q10",
+                v12_destination=None,
+                v14_score=77.0,
+                v14_status="READY",
+                v14_route="QUALITY",
+                v14_destination="2X-5X",
+                delisted=False,
+            ),
+        ]
+        summary = ScanSummary(
+            mode=ScanMode.CURRENT,
+            as_of=datetime(2026, 10, 6, tzinfo=timezone.utc),
+            total=2,
+            nasdaq=1,
+            nyse=1,
+            amex=0,
+            delisted=0,
+        )
+        dialog._scan_complete((rows, summary))
+        assert dialog.table.rowCount() == 2
+        assert "2 rows" in dialog.status.text()
+        dialog.exchange.setCurrentText("NASDAQ")
+        assert dialog.table.rowCount() == 1
+        assert dialog.table.item(0, 0).text() == "AAA"
+    finally:
+        dialog.close()
