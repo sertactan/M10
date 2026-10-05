@@ -12,6 +12,8 @@ from core.contracts.entities import Security
 from core.contracts.enums import Exchange
 from core.fundamentals.engine import FundamentalEngine
 from core.fundamentals.snapshot import FundamentalSnapshotService
+from core.features.s153_v12_input_loader import S153V12InputLoader
+from core.models.s153_v12 import S153V12Model
 from core.prices.engine import HistoricalPriceEngine
 from core.universe.service import USUniverseService
 from data.providers.company_ir import CompanyInvestorRelationsProvider
@@ -28,6 +30,8 @@ from data.providers.simfin_price import SimFinPriceProvider
 from data.providers.stooq_price import StooqPriceProvider
 from data.providers.yahoo_price import YahooCompatiblePriceProvider
 from data.repositories.fundamental_repository import FundamentalRepository
+from data.repositories.model_feature_repository import ModelFeatureRepository
+from data.repositories.model_run_repository import ModelRunRepository
 from data.repositories.price_repository import PriceRepository
 from data.repositories.security_repository import SecurityRepository
 from data.storage.parquet_price_store import ParquetPriceStore
@@ -216,6 +220,50 @@ def ingest_ir_json(root: Path, ticker: str, json_path: str) -> int:
         app.close()
 
 
+def run_v12(root: Path, ticker: str, as_of_text: str) -> int:
+    app = AppContainer(root)
+    app.initialize()
+    try:
+        security = _load_security(app, ticker)
+        as_of_date = date.fromisoformat(as_of_text)
+        as_of = datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
+        feature_repo = ModelFeatureRepository(app.sqlite)
+        model_input = S153V12InputLoader(feature_repo).load(
+            security_id=security.security_id,
+            ticker=security.ticker,
+            as_of=as_of,
+        )
+        result = S153V12Model().analyze(model_input)
+        analysis_id = ModelRunRepository(app.sqlite).save_v12(
+            model_input,
+            result,
+            config_path=root / "config" / "s153_v12.yaml",
+        )
+        payload = {
+            "analysis_id": analysis_id,
+            "ticker": result.ticker,
+            "as_of": result.as_of.isoformat(),
+            "score": result.score,
+            "status": result.status,
+            "verdict": result.verdict,
+            "primary_route": result.primary_route,
+            "secondary_route": result.secondary_route,
+            "route_gate": result.route_gate,
+            "confidence": result.confidence,
+            "precision_confirmed": result.precision_confirmed,
+            "strong_watch": result.strong_watch,
+            "discovery": result.discovery,
+            "missing_requirements": list(result.missing_requirements),
+            "routes": dict(result.routes),
+            "components": dict(result.components),
+            "flags": dict(result.flags),
+        }
+        print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+        return 0
+    finally:
+        app.close()
+
+
 def ingest_stooq_bulk(root: Path, zip_path: str) -> int:
     app = AppContainer(root)
     app.initialize()
@@ -263,6 +311,9 @@ def main() -> int:
     parser.add_argument("--ingest-ir-json", metavar="JSON", help="Ingest structured official IR KPI/guidance JSON")
     parser.add_argument("--ir-ticker", help="Ticker for --ingest-ir-json")
 
+    parser.add_argument("--run-v12", metavar="TICKER", help="Run canonical S15.3 V1.2 from PIT canonical model features")
+    parser.add_argument("--model-as-of", help="V1.2 analysis date YYYY-MM-DD")
+
     args = parser.parse_args()
     root = Path(__file__).resolve().parent
 
@@ -293,6 +344,10 @@ def main() -> int:
         if not args.ir_ticker:
             parser.error("--ingest-ir-json requires --ir-ticker")
         return ingest_ir_json(root, args.ir_ticker, args.ingest_ir_json)
+    if args.run_v12:
+        if not args.model_as_of:
+            parser.error("--run-v12 requires --model-as-of YYYY-MM-DD")
+        return run_v12(root, args.run_v12, args.model_as_of)
 
     print("UI NOT IMPLEMENTED — Phase 9")
     return 0
