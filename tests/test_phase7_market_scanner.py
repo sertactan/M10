@@ -16,6 +16,8 @@ from core.scanner.resultset import export_csv, filter_rows, sort_rows
 from core.features.s153_v12_input_loader import S153V12InputLoader
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.model_feature_repository import ModelFeatureRepository
+from data.repositories.security_repository import SecurityRepository
+from core.scanner.production import RepositoryCandidateSource
 
 
 AS_OF = datetime(2025, 3, 1, 21, 0, tzinfo=timezone.utc)
@@ -172,6 +174,58 @@ def test_scanner_worker_keeps_caller_thread_free():
         assert future.result(timeout=5) == "done"
     finally:
         worker.close()
+
+
+def test_repository_candidate_source_preserves_historical_delisted_members(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "universe.sqlite")
+    store.initialize()
+    try:
+        now = AS_OF.isoformat()
+        securities = [
+            ("SEC_NQ","NQ","Nasdaq Co","NASDAQ",1,None),
+            ("SEC_NY","NY","Nyse Co","NYSE",1,None),
+            ("SEC_AX","AX","Amex Co","AMEX",1,None),
+            ("SEC_OLD","OLD","Old Co","NASDAQ",0,"2026-01-01"),
+        ]
+        store.connection.executemany(
+            """
+            INSERT INTO security_master (
+                security_id,ticker,name,exchange,market,delisted_date,
+                active,created_at,updated_at,security_type
+            ) VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            [
+                (sid,ticker,name,exchange,"US",delisted,active,now,now,"CS")
+                for sid,ticker,name,exchange,active,delisted in securities
+            ],
+        )
+        snapshot = AS_OF.date().isoformat()
+        store.connection.executemany(
+            """
+            INSERT INTO universe_snapshot_membership (
+                snapshot_date,security_id,ticker,exchange,exchange_mic,
+                security_type,source,availability_date,ingested_at
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            """,
+            [
+                (snapshot,sid,ticker,exchange,exchange,"CS","TEST",now,now)
+                for sid,ticker,_name,exchange,_active,_delisted in securities
+            ],
+        )
+        store.connection.commit()
+
+        source = RepositoryCandidateSource(SecurityRepository(store))
+        current = source.current()
+        assert {c.exchange for c in current} == {"NASDAQ","NYSE","AMEX"}
+        assert {c.ticker for c in current} == {"NQ","NY","AX"}
+
+        historical = source.historical(AS_OF)
+        assert len(historical) == 4
+        old = next(c for c in historical if c.ticker == "OLD")
+        assert old.active is False
+        assert old.delisted_date == "2026-01-01"
+    finally:
+        store.close()
 
 
 def test_phase7_pit_filtering_excludes_future_feature_versions(tmp_path: Path):
