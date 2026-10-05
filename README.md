@@ -133,6 +133,16 @@ See `PHASE5_STATUS.md` for the required canonical artifacts and the no-invention
 - exact 15-item acceptance contract encoded
 - final completion remains blocked by canonical V1.4 production scoring
 
+### Phase 8 — Forecast Engine 🚧 dependent / fail-closed calibration
+- current-date 12M forward forecast orchestration
+- V1.2 + V1.4 canonical scorer dependency
+- bull/base/bear scenario result contract
+- positive / 2X+ / 5X+ / 10X+ calibrated probability contract
+- confidence + risk output
+- calibration cutoff / no-look-ahead validation
+- explicit forecast disclosure
+- no hard-coded or example probability mappings
+
 ## Historical price provider priority
 
 1. **Massive** — primary professional historical/current market data
