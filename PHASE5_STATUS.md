@@ -7,11 +7,16 @@
 Phase 5 does not introduce a new market-data or fundamental-data provider. It consumes the
 same normalized, Point-in-Time canonical feature layer built by Phases 1-3 and used by Phase 4.
 
+The original project/master prompt is pinned in `docs/MASTER_PROMPT_REFERENCE.md` by filename,
+size and SHA-256 so future phases have a durable reference instead of relying on chat history.
+
 ## Added
 
 - separate `S153V14Model` class
 - separate V1.4 input/result contracts
 - V1.4 PIT input loader backed only by `ModelFeatureRepository`
+- `V14SpecificationBinding` manifest
+- immutable lists of required canonical sources and forbidden invented model elements
 - result fields reserved for:
   - route-specific destination
   - dual magnitude
