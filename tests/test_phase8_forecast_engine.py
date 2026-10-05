@@ -19,6 +19,10 @@ from data.repositories.forecast_calibration_repository import (
     CalibrationProfileUnavailable,
     ForecastCalibrationRepository,
 )
+from data.repositories.forecast_run_repository import (
+    ForecastReproducibilityError,
+    ForecastRunRepository,
+)
 from core.scanner.contracts import ScanCandidate
 
 
@@ -162,6 +166,21 @@ def test_forecast_rejects_misordered_scenarios():
             as_of=AS_OF,
             current_date=TODAY,
         )
+
+
+def _insert_security(store: SQLiteStore) -> None:
+    store.connection.execute(
+        """
+        INSERT INTO security_master (
+            security_id,ticker,name,exchange,market,active,created_at,updated_at
+        ) VALUES (?,?,?,?,?,?,?,?)
+        """,
+        (
+            "SEC_TEST","TEST","Test Inc.","NASDAQ","US",1,
+            AS_OF.isoformat(),AS_OF.isoformat(),
+        ),
+    )
+    store.connection.commit()
 
 
 def _insert_backtest_run(store: SQLiteStore, *, run_id: str = "RUN-001", status: str = "COMPLETE"):
@@ -362,6 +381,134 @@ def test_calibration_profile_after_forecast_as_of_is_unavailable(tmp_path: Path)
             repository.load_validated_profile(
                 calibration_id="CAL-FUTURE",
                 as_of=AS_OF,
+            )
+    finally:
+        store.close()
+
+
+def test_forecast_run_is_reproducible_and_deterministic(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "forecast-run.sqlite")
+    store.initialize()
+    try:
+        _insert_security(store)
+        _insert_backtest_run(store)
+        calibration_repository = ForecastCalibrationRepository(store)
+        calibration_repository.save_validated_profile(
+            run_id="RUN-001",
+            model_version="S15.3_TEST",
+            horizon_months=12,
+            dataset_kind="MARKET_PREVALENCE",
+            calibration_method="UNBIASED_WALK_FORWARD",
+            calibration=_calibration(),
+            evidence=_evidence(),
+        )
+        provider = PinnedCalibrationProvider(
+            calibration_repository,
+            calibration_id="CAL-001",
+        )
+        result = ForecastEngine(FakeScorer(), provider).forecast(
+            candidate=CANDIDATE,
+            as_of=AS_OF,
+            current_date=TODAY,
+        )
+        repository = ForecastRunRepository(store)
+        kwargs = {
+            "result": result,
+            "v12_model_version": "S15.3_V1.2",
+            "v14_model_version": "S15.3_V1.4",
+            "data_snapshot_hash": "a" * 64,
+            "model_config_hash": "b" * 64,
+        }
+        first = repository.save(**kwargs)
+        second = repository.save(**kwargs)
+        assert first.analysis_id == second.analysis_id
+        assert first.forecast_hash == second.forecast_hash
+
+        stored = repository.load(first.analysis_id)
+        assert stored["forecast_hash"] == first.forecast_hash
+        assert stored["calibration_evidence_hash"] == first.calibration_evidence_hash
+        assert stored["forecast_payload"]["calibration_id"] == "CAL-001"
+        assert stored["forecast_payload"]["v12_model_version"] == "S15.3_V1.2"
+        assert stored["forecast_payload"]["v14_model_version"] == "S15.3_V1.4"
+    finally:
+        store.close()
+
+
+def test_forecast_run_requires_real_reproducibility_hashes(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "forecast-run.sqlite")
+    store.initialize()
+    try:
+        _insert_security(store)
+        _insert_backtest_run(store)
+        calibration_repository = ForecastCalibrationRepository(store)
+        calibration_repository.save_validated_profile(
+            run_id="RUN-001",
+            model_version="S15.3_TEST",
+            horizon_months=12,
+            dataset_kind="MARKET_PREVALENCE",
+            calibration_method="UNBIASED_WALK_FORWARD",
+            calibration=_calibration(),
+            evidence=_evidence(),
+        )
+        result = ForecastEngine(
+            FakeScorer(),
+            PinnedCalibrationProvider(calibration_repository, calibration_id="CAL-001"),
+        ).forecast(
+            candidate=CANDIDATE,
+            as_of=AS_OF,
+            current_date=TODAY,
+        )
+        with pytest.raises(ForecastReproducibilityError, match="data_snapshot_hash"):
+            ForecastRunRepository(store).save(
+                result=result,
+                v12_model_version="S15.3_V1.2",
+                v14_model_version="S15.3_V1.4",
+                data_snapshot_hash="not-a-hash",
+                model_config_hash="b" * 64,
+            )
+    finally:
+        store.close()
+
+
+def test_forecast_run_detects_calibration_provenance_tamper(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "forecast-run.sqlite")
+    store.initialize()
+    try:
+        _insert_security(store)
+        _insert_backtest_run(store)
+        calibration_repository = ForecastCalibrationRepository(store)
+        calibration_repository.save_validated_profile(
+            run_id="RUN-001",
+            model_version="S15.3_TEST",
+            horizon_months=12,
+            dataset_kind="MARKET_PREVALENCE",
+            calibration_method="UNBIASED_WALK_FORWARD",
+            calibration=_calibration(),
+            evidence=_evidence(),
+        )
+        result = ForecastEngine(
+            FakeScorer(),
+            PinnedCalibrationProvider(calibration_repository, calibration_id="CAL-001"),
+        ).forecast(
+            candidate=CANDIDATE,
+            as_of=AS_OF,
+            current_date=TODAY,
+        )
+        store.connection.execute(
+            """
+            UPDATE forecast_calibration_profiles
+            SET evidence_json='{"tampered":true}'
+            WHERE calibration_id='CAL-001'
+            """
+        )
+        store.connection.commit()
+        with pytest.raises(ForecastReproducibilityError, match="hash mismatch"):
+            ForecastRunRepository(store).save(
+                result=result,
+                v12_model_version="S15.3_V1.2",
+                v14_model_version="S15.3_V1.4",
+                data_snapshot_hash="a" * 64,
+                model_config_hash="b" * 64,
             )
     finally:
         store.close()
