@@ -41,9 +41,7 @@ XBRL_CANONICAL_ALIASES: dict[str, tuple[str, ...]] = {
         "LongTermDebt",
     ),
     "SHARES_OUTSTANDING": (
-        "CommonStocksIncludingAdditionalPaidInCapitalMember",
         "CommonStockSharesOutstanding",
-        "EntityCommonStockSharesOutstanding",
     ),
     "DILUTED_EPS": ("EarningsPerShareDiluted",),
     "BASIC_EPS": ("EarningsPerShareBasic",),
@@ -58,8 +56,15 @@ _ALIAS_LOOKUP = {
     for alias in aliases
 }
 
+_TAXONOMY_ALIAS_LOOKUP = {
+    ("dei", "EntityCommonStockSharesOutstanding"): "SHARES_OUTSTANDING",
+}
+
 
 def canonical_metric(taxonomy: str, tag: str) -> str:
+    direct = _TAXONOMY_ALIAS_LOOKUP.get((taxonomy, tag))
+    if direct:
+        return direct
     if taxonomy == "us-gaap" and tag in _ALIAS_LOOKUP:
         return _ALIAS_LOOKUP[tag]
     return f"XBRL:{taxonomy}:{tag}"
