@@ -64,4 +64,9 @@ The UI does not ship random/demo stock scores as production results.
 ## Remaining Phase 9 work
 
 - V1.4 dual-magnitude detail surface once V1.4 is executable
-- final UI acceptance tests
+
+
+## Final UI acceptance gate
+
+The exact Phase 9 UI acceptance matrix is encoded in `app/ui/acceptance.py`.
+CI success plus this matrix is required for closure. V1.4 remains fail-closed until its canonical Phase 5 dependency is executable.
