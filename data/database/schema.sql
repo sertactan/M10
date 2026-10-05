@@ -495,3 +495,36 @@ CREATE TABLE IF NOT EXISTS backtest_run_manifest (
     dataset_hash TEXT,
     status TEXT NOT NULL
 );
+
+
+-- Phase 8: validated forecast calibration profiles.
+-- Probability calibration is allowed only from unbiased market-prevalence /
+-- walk-forward backtest evidence. This table stores validated upstream outputs;
+-- it does not define or fit a probability formula.
+CREATE TABLE IF NOT EXISTS forecast_calibration_profiles (
+    calibration_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES backtest_run_manifest(run_id),
+    model_version TEXT NOT NULL,
+    horizon_months INTEGER NOT NULL,
+    dataset_kind TEXT NOT NULL,
+    calibration_method TEXT NOT NULL,
+    calibration_cutoff TEXT NOT NULL,
+    sample_size INTEGER NOT NULL,
+    bull_return_pct REAL NOT NULL,
+    base_return_pct REAL NOT NULL,
+    bear_return_pct REAL NOT NULL,
+    probability_positive_return_pct REAL NOT NULL,
+    probability_2x_plus_pct REAL NOT NULL,
+    probability_5x_plus_pct REAL NOT NULL,
+    probability_10x_plus_pct REAL NOT NULL,
+    confidence_pct REAL NOT NULL,
+    risk TEXT NOT NULL,
+    evidence_json TEXT NOT NULL DEFAULT '{}',
+    evidence_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forecast_calibration_lookup
+ON forecast_calibration_profiles(
+    model_version,horizon_months,dataset_kind,calibration_cutoff,status
+);
