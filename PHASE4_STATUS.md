@@ -104,3 +104,6 @@ The run is persisted with:
 - all available intermediate components
 - route scores
 - final flags
+
+## CI validation
+GitHub Python CI runs compileall and the complete pytest suite before Phase 4 is merged.
