@@ -19,13 +19,14 @@ from data.repositories.pit_repository import PITRepository
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_configs_fail_closed_until_canonical_model_phase() -> None:
+def test_model_configs_follow_phase_status() -> None:
     v12 = load_yaml(ROOT / "config" / "s153_v12.yaml", ModelConfig)
     v14 = load_yaml(ROOT / "config" / "s153_v14.yaml", ModelConfig)
-    assert v12.enabled is False
+    assert v12.enabled is True
+    assert v12.status == "IMPLEMENTED_PHASE_4_CANONICAL_KERNEL"
     assert v14.enabled is False
     with pytest.raises(ModelNotImplemented):
-        S153ModelBase(v12).analyze(
+        S153ModelBase(v14).analyze(
             ModelInput(
                 security_id="SEC_TEST",
                 ticker="TEST",
