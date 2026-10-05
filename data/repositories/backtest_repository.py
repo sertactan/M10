@@ -89,3 +89,88 @@ class BacktestRepository:
                 )
             )
         return sorted(bars, key=lambda bar: bar.trade_date)
+
+
+    @staticmethod
+    def _stable_json(value) -> str:
+        import json
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
+    def save_forward_outcome(self, outcome) -> str:
+        import hashlib
+        from datetime import datetime, timezone
+
+        observation_id = f"{outcome.security_id}|{outcome.as_of_date_requested.isoformat()}"
+        payload = {
+            "observation_id": observation_id,
+            "security_id": outcome.security_id,
+            "as_of_date_requested": outcome.as_of_date_requested.isoformat(),
+            "anchor_session": outcome.anchor_session.isoformat() if outcome.anchor_session else None,
+            "anchor_lag_calendar_days": outcome.anchor_lag_calendar_days,
+            "entry_adjusted_close": outcome.entry_adjusted_close,
+            "horizon_sessions_available": outcome.horizon_sessions_available,
+            "fm252": outcome.fm252,
+            "max_multiple_observed": outcome.max_multiple_observed,
+            "outcome_class": outcome.outcome_class,
+            "time_to_2x_sessions": outcome.time_to_2x_sessions,
+            "time_to_3x_sessions": outcome.time_to_3x_sessions,
+            "time_to_5x_sessions": outcome.time_to_5x_sessions,
+            "time_to_7x_sessions": outcome.time_to_7x_sessions,
+            "time_to_10x_sessions": outcome.time_to_10x_sessions,
+            "outcome_status": outcome.outcome_status,
+            "diagnostics": dict(outcome.diagnostics),
+        }
+        outcome_hash = hashlib.sha256(
+            self._stable_json(payload).encode("utf-8")
+        ).hexdigest()
+        self.store.connection.execute(
+            """
+            INSERT INTO forward_outcomes (
+                observation_id,security_id,as_of_date_requested,anchor_session,
+                anchor_lag_calendar_days,entry_adjusted_close,horizon_sessions_available,
+                fm252,max_multiple_observed,outcome_class,time_to_2x_sessions,
+                time_to_3x_sessions,time_to_5x_sessions,time_to_7x_sessions,
+                time_to_10x_sessions,outcome_status,diagnostics_json,outcome_hash,created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(observation_id) DO UPDATE SET
+                anchor_session=excluded.anchor_session,
+                anchor_lag_calendar_days=excluded.anchor_lag_calendar_days,
+                entry_adjusted_close=excluded.entry_adjusted_close,
+                horizon_sessions_available=excluded.horizon_sessions_available,
+                fm252=excluded.fm252,
+                max_multiple_observed=excluded.max_multiple_observed,
+                outcome_class=excluded.outcome_class,
+                time_to_2x_sessions=excluded.time_to_2x_sessions,
+                time_to_3x_sessions=excluded.time_to_3x_sessions,
+                time_to_5x_sessions=excluded.time_to_5x_sessions,
+                time_to_7x_sessions=excluded.time_to_7x_sessions,
+                time_to_10x_sessions=excluded.time_to_10x_sessions,
+                outcome_status=excluded.outcome_status,
+                diagnostics_json=excluded.diagnostics_json,
+                outcome_hash=excluded.outcome_hash,
+                created_at=excluded.created_at
+            """,
+            (
+                observation_id,
+                outcome.security_id,
+                outcome.as_of_date_requested.isoformat(),
+                outcome.anchor_session.isoformat() if outcome.anchor_session else None,
+                outcome.anchor_lag_calendar_days,
+                outcome.entry_adjusted_close,
+                outcome.horizon_sessions_available,
+                outcome.fm252,
+                outcome.max_multiple_observed,
+                outcome.outcome_class,
+                outcome.time_to_2x_sessions,
+                outcome.time_to_3x_sessions,
+                outcome.time_to_5x_sessions,
+                outcome.time_to_7x_sessions,
+                outcome.time_to_10x_sessions,
+                outcome.outcome_status,
+                self._stable_json(dict(outcome.diagnostics)),
+                outcome_hash,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        self.store.connection.commit()
+        return outcome_hash
