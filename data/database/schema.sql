@@ -204,3 +204,83 @@ CREATE TABLE IF NOT EXISTS backtest_results (
     result_class TEXT,
     outcome_status TEXT NOT NULL
 );
+
+
+-- Phase 2: provider-isolated historical price metadata.
+CREATE TABLE IF NOT EXISTS price_series_registry (
+    series_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    source TEXT NOT NULL,
+    source_symbol TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    quality_status TEXT NOT NULL,
+    adjustment_status TEXT NOT NULL,
+    retrieved_at TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    parquet_root TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(security_id, source, source_symbol)
+);
+CREATE INDEX IF NOT EXISTS idx_price_series_lookup
+ON price_series_registry(security_id, source, start_date, end_date);
+
+CREATE TABLE IF NOT EXISTS canonical_price_selection (
+    selection_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    purpose TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_symbol TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    selected_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_price_selection_window
+ON canonical_price_selection(security_id, purpose, start_date, end_date, selected_at);
+
+CREATE TABLE IF NOT EXISTS price_validation_results (
+    validation_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    source_a TEXT NOT NULL,
+    source_b TEXT NOT NULL,
+    overlap_rows INTEGER NOT NULL,
+    median_abs_pct_diff REAL,
+    max_abs_pct_diff REAL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS split_events_source (
+    event_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    source TEXT NOT NULL,
+    source_symbol TEXT NOT NULL,
+    execution_date TEXT NOT NULL,
+    split_from REAL NOT NULL,
+    split_to REAL NOT NULL,
+    retrieved_at TEXT NOT NULL,
+    quality_status TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_split_events_source
+ON split_events_source(security_id, source, execution_date);
+
+CREATE TABLE IF NOT EXISTS dividend_events_source (
+    event_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    source TEXT NOT NULL,
+    source_symbol TEXT NOT NULL,
+    ex_date TEXT NOT NULL,
+    cash_amount REAL NOT NULL,
+    currency TEXT,
+    declaration_date TEXT,
+    record_date TEXT,
+    pay_date TEXT,
+    retrieved_at TEXT NOT NULL,
+    quality_status TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dividend_events_source
+ON dividend_events_source(security_id, source, ex_date);
