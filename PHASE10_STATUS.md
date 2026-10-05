@@ -22,3 +22,8 @@ Scope from the master prompt:
 - READY-only outcome filtering
 
 Phase 10 must remain dependency-aware while canonical V1.4 / Phase 6 production evidence is incomplete.
+
+
+## Final acceptance gate
+
+The exact Phase 10 completion matrix is encoded in `core/analytics/acceptance.py`.
