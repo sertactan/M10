@@ -125,8 +125,10 @@ class CanonicalForwardOutcomeEngine:
             # to the authoritative Trading Calendar / Corporate Action specs.
             # We therefore use terminal consideration for terminal value / FM252,
             # but do not fabricate a time_to_kX session index from it.
-            horizon_last = forward[-1].trade_date if forward else terminal_consideration.effective_date
-            if anchor.trade_date < terminal_consideration.effective_date <= horizon_last:
+            if (
+                terminal_consideration.verified_within_252_session_horizon
+                and terminal_consideration.effective_date > anchor.trade_date
+            ):
                 outcome_values.append(float(terminal_consideration.value_per_share))
                 terminal_in_horizon = True
 
@@ -176,6 +178,11 @@ class CanonicalForwardOutcomeEngine:
                 "terminal_source_ref": (
                     terminal_consideration.source_ref
                     if terminal_in_horizon and terminal_consideration is not None
+                    else None
+                ),
+                "terminal_horizon_verified": (
+                    terminal_consideration.verified_within_252_session_horizon
+                    if terminal_consideration is not None
                     else None
                 ),
                 "terminal_time_to_multiple_status": (
