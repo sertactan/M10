@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -11,7 +12,14 @@ from PySide6.QtWidgets import QApplication
 from app.ui.analysis_service import DesktopAnalysisView
 from app.ui.main_window import ResearchTerminalWindow
 from app.ui.theme import APP_QSS
-from app.ui.view_models import ModelView
+from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeaderView
+from core.backtest.contracts import ForwardOutcome
+from core.backtest.outcomes import CanonicalForwardOutcomeEngine
+from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
+from data.database.sqlite_store import SQLiteStore
+from data.repositories.backtest_repository import BacktestRepository
+from data.repositories.price_repository import PriceRepository
+from data.storage.parquet_price_store import ParquetPriceStore
 
 
 @pytest.fixture(scope="module")
@@ -35,6 +43,9 @@ def test_phase9_shell_has_required_global_header_and_tabs(qapp):
         assert window.v12_page.status.text() == "NOT LOADED"
         assert window.v14_page.score.text() == "—"
         assert window.v14_page.status.text() == "NOT LOADED"
+        assert window.stock_header.price.text() == "—"
+        assert window.context_panel.backtest_status.text() == "NOT AVAILABLE"
+        assert window.context_panel.forecast_status.text() == "NOT AVAILABLE"
         assert "background: #0B1220" in APP_QSS
     finally:
         window.close()
@@ -72,6 +83,26 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
     result = DesktopAnalysisView(
         ticker="TEST",
         as_of=datetime(2026, 10, 6, tzinfo=timezone.utc),
+        stock=StockHeaderView(
+            ticker="TEST",
+            name="Test Inc.",
+            exchange="NASDAQ",
+            status="CANONICAL PRICE",
+            price=11.0,
+            change_pct=10.0,
+            price_date="2026-10-06",
+            price_source="BACKTEST · TEST",
+        ),
+        backtest=BacktestView(
+            status="READY",
+            entry_price=10.0,
+            fm252=3.2,
+            max_multiple_observed=3.2,
+            outcome_class="STRONG_WINNER",
+            anchor_session="2026-10-06",
+            horizon_sessions_available=252,
+        ),
+        forecast=ForecastView(status="NOT AVAILABLE"),
         v12=ModelView(
             model_name="S15.3 V1.2",
             status="READY",
@@ -90,6 +121,12 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
     )
     try:
         window._apply_analysis(result)
+        assert window.stock_header.ticker.text() == "TEST"
+        assert window.stock_header.price.text() == "$11.00"
+        assert window.stock_header.change.text() == "+10.00%"
+        assert window.context_panel.backtest_status.text() == "READY"
+        assert window.context_panel.backtest_values["FM252"].text() == "3.20x"
+        assert window.context_panel.forecast_status.text() == "NOT AVAILABLE"
         assert window.v12_page.score.text() == "81.2 / 100"
         assert window.v12_page.route.text() == "F10"
         assert window.v14_page.status.text() == "BLOCKED_CANONICAL_SPEC"
@@ -98,3 +135,88 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
         assert "LOADED TEST" in window.status.text()
     finally:
         window.close()
+
+
+
+def test_phase9_canonical_price_and_backtest_connections(tmp_path):
+    store = SQLiteStore(tmp_path / "ui.sqlite")
+    store.initialize()
+    try:
+        now = datetime(2026, 10, 6, tzinfo=timezone.utc)
+        store.connection.execute(
+            """
+            INSERT INTO security_master (
+                security_id,ticker,name,exchange,market,active,created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?)
+            """,
+            ("SEC_TEST","TEST","Test Inc.","NASDAQ","US",1,now.isoformat(),now.isoformat()),
+        )
+        store.connection.commit()
+
+        parquet = ParquetPriceStore(tmp_path / "parquet")
+        price_repo = PriceRepository(store, parquet)
+        bars = [
+            SourcePriceBar(
+                security_id="SEC_TEST", source="TEST", source_symbol="TEST",
+                trade_date=date(2026, 10, 5), open=10.0, high=10.5, low=9.5,
+                raw_close=10.0, adjusted_close=10.0, volume=1000.0,
+                retrieved_at=now, quality_status=PriceQualityStatus.PRIMARY,
+                adjustment_status=AdjustmentStatus.DUAL_RAW_ADJUSTED,
+            ),
+            SourcePriceBar(
+                security_id="SEC_TEST", source="TEST", source_symbol="TEST",
+                trade_date=date(2026, 10, 6), open=10.5, high=11.5, low=10.0,
+                raw_close=11.0, adjusted_close=11.0, volume=1200.0,
+                retrieved_at=now, quality_status=PriceQualityStatus.PRIMARY,
+                adjustment_status=AdjustmentStatus.DUAL_RAW_ADJUSTED,
+            ),
+        ]
+        price_repo.save_series(bars)
+        price_repo.select_series(
+            security_id="SEC_TEST",
+            start=date(2026, 10, 5),
+            end=date(2026, 10, 6),
+            source="TEST",
+            source_symbol="TEST",
+            purpose="BACKTEST",
+            reason="phase9-test",
+        )
+
+        outcome = ForwardOutcome(
+            security_id="SEC_TEST",
+            as_of_date_requested=date(2026, 10, 6),
+            anchor_session=date(2026, 10, 6),
+            anchor_lag_calendar_days=0,
+            entry_adjusted_close=11.0,
+            horizon_sessions_available=252,
+            fm252=3.2,
+            max_multiple_observed=3.2,
+            outcome_class="STRONG_WINNER",
+            outcome_status="READY",
+        )
+        BacktestRepository(store, parquet).save_forward_outcome(outcome)
+
+        fake_app = SimpleNamespace(
+            sqlite=store,
+            app_config=SimpleNamespace(
+                database=SimpleNamespace(parquet_root="parquet")
+            ),
+        )
+        row = store.connection.execute(
+            "SELECT security_id,ticker,name,exchange FROM security_master WHERE security_id='SEC_TEST'"
+        ).fetchone()
+
+        from app.ui.analysis_service import DesktopAnalysisService
+        service = DesktopAnalysisService(tmp_path)
+        stock = service._load_stock(fake_app, row, date(2026, 10, 6))
+        backtest = service._load_backtest(fake_app, "SEC_TEST", date(2026, 10, 6))
+
+        assert stock.status == "CANONICAL PRICE"
+        assert stock.price == 11.0
+        assert stock.change_pct == pytest.approx(10.0)
+        assert stock.price_date == "2026-10-06"
+        assert backtest.status == "READY"
+        assert backtest.fm252 == 3.2
+        assert backtest.outcome_class == "STRONG_WINNER"
+    finally:
+        store.close()
