@@ -81,6 +81,20 @@ quality_status
 validation_status
 ```
 
+### Phase 4 — S15.3 V1.2 Canonical Scoring Engine ✅ code-complete
+- canonical Core48 / Control12 / DNA60
+- S1 / S2 / S3 / S14 / Company Quality
+- F10 / I10 / D10 / B10 / R10 / Q10
+- route gates and bottleneck penalty
+- DF5 / DF10 / MCH5 / MCH10
+- M5 / M10 / MAGGAP / NMP
+- T10 / T15 / HP
+- Core15.3 / final S15.3
+- Discovery / Strong Watch / Precision Confirmed
+- PIT canonical feature input layer only
+- no new market/fundamental provider
+- run reproducibility with data/config hashes
+
 ## Historical price provider priority
 
 1. **Massive** — primary professional historical/current market data
@@ -180,6 +194,15 @@ python main.py --ingest-ir-json ".\\guidance.json" --ir-ticker AAPL
 
 SEC-sourced structured KPI records must reference a sec.gov document and accession number.
 
+## Run canonical V1.2
+
+```powershell
+python main.py --run-v12 AAPL --model-as-of 2025-05-05
+```
+
+The model reads only PIT canonical model features materialized from Phases 1–3,
+historical controls, or deterministic canonical derivations. Missing factors remain N/A.
+
 ## Next
 
-Phase 4 — S15.3 V1.2 canonical scoring engine.
+Phase 5 — S15.3 V1.4 Dual-Magnitude Architecture.
