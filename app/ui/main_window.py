@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from app.ui.analysis_worker import AnalysisTask
 from app.ui.compare_page import ComparePage
+from app.ui.context_panels import AnalysisContextPanel, StockHeaderPanel
 from app.ui.model_page import ModelPage
 from app.ui.view_models import ComparisonView
 
@@ -43,6 +44,10 @@ class ResearchTerminalWindow(QMainWindow):
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
         root.addWidget(self._build_header())
+        self.stock_header = StockHeaderPanel()
+        root.addWidget(self.stock_header)
+        self.context_panel = AnalysisContextPanel()
+        root.addWidget(self.context_panel)
 
         self.tabs = QTabWidget()
         self.v12_page = ModelPage("S15.3 V1.2")
@@ -118,6 +123,9 @@ class ResearchTerminalWindow(QMainWindow):
         self.thread_pool.start(task)
 
     def _apply_analysis(self, result) -> None:
+        self.stock_header.set_stock(result.stock)
+        self.context_panel.set_backtest(result.backtest)
+        self.context_panel.set_forecast(result.forecast)
         self.v12_page.set_model(result.v12, result.v12_components)
         self.v14_page.set_model(result.v14, result.v14_components)
         self.compare_page.set_comparison(
