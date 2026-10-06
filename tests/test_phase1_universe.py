@@ -29,11 +29,14 @@ def test_sec_parser_maps_target_exchanges() -> None:
             [1067983, "Berkshire", "BRK-B", "NYSE"],
             [12345, "American Co", "ABC", "NYSE American"],
             [999, "OTC Co", "OTC", "OTC"],
+            [1000, "CBOE Fund", "CBF", "CBOE"],
         ],
     }
     rows = SECEdgarUniverseProvider.parse_ticker_exchange_payload(payload, availability_date=NOW)
-    assert [r.ticker for r in rows] == ["AAPL", "MSFT", "BRK-B", "ABC"]
-    assert rows[-1].exchange is Exchange.AMEX
+    assert [r.ticker for r in rows] == ["AAPL", "MSFT", "BRK-B", "ABC", "OTC", "CBF"]
+    assert rows[3].exchange is Exchange.AMEX
+    assert rows[4].exchange is Exchange.OTC
+    assert rows[5].exchange is Exchange.CBOE
     assert rows[0].cik == "0000320193"
 
 
@@ -151,6 +154,8 @@ async def test_historical_sync_fails_closed_without_massive(tmp_path: Path) -> N
 def test_exchange_mapping_and_cik_normalization() -> None:
     assert exchange_from_mic("XNAS") is Exchange.NASDAQ
     assert exchange_from_mic("XASE") is Exchange.AMEX
+    assert exchange_from_mic("OTCM") is Exchange.OTC
+    assert exchange_from_mic("BATS") is Exchange.CBOE
     assert normalize_cik("320193") == "0000320193"
 
 
