@@ -13,6 +13,9 @@ class Exchange(StrEnum):
     AMEX = "AMEX"
     OTC = "OTC"
     CBOE = "CBOE"
+    JPX = "JPX"
+    BIST = "BIST"
+    HKEX = "HKEX"
 
 
 class DataState(StrEnum):
