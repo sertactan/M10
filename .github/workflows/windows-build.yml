@@ -45,6 +45,12 @@ jobs:
             throw "PyInstaller executable was not produced"
           }
 
+      - name: Smoke test executable
+        shell: pwsh
+        run: |
+          & "dist\S153ResearchTerminal\S153ResearchTerminal.exe" --doctor
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
