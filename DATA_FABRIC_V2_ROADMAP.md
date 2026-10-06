@@ -34,7 +34,7 @@ Acceptance:
 
 ## Phase 1 — Provider Health Router + Circuit Breaker
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Deliverables:
 - Persistent provider health state.
@@ -56,7 +56,7 @@ Acceptance:
 
 ## Phase 2 — Local-First + Last-Known-Good
 
-Status: PLANNED
+Status: CORE COMPLETE
 
 Deliverables:
 - Read local canonical price/fundamental data before any network request.
@@ -68,6 +68,49 @@ Deliverables:
 Acceptance:
 - CRMD analysis can open from cached state with internet disabled.
 - UI reports age/source of cached data.
+
+## Phase 2B — Global Security Master + Offline Seed
+
+Status: IN PROGRESS
+
+Goal:
+- Put a very broad symbol/security reference layer inside M10 without weakening
+  canonical S15.3 evidence rules or creating a paid-data dependency.
+
+Bundled/open layer:
+- SEC EDGAR current US issuer universe is generated at Windows build time and
+  packaged with the installer.
+- SEC coverage includes recognized NASDAQ, NYSE, AMEX, OTC, and CBOE rows.
+- Fresh installs can populate security_master before the first network request.
+
+Broad local-reference layer:
+- Built-in optional sync adapter for the Adanos Free Global Ticker Database.
+- 60k+ collision-safe reference listings across dozens of exchanges/countries.
+- Imported rows are tagged REFERENCE_ONLY and never become authoritative
+  backtest/model evidence merely because they exist in security_master.
+- Existing canonical rows are enriched (ISIN/country/listing metadata) without
+  being downgraded.
+
+Licensing rule:
+- Only data with verified redistribution rights may be physically bundled.
+- Mixed/restricted exchange-derived reference datasets are fetched to the
+  user's local runtime, not committed into or redistributed with the installer.
+- Market-specific official refresh adapters will supersede reference rows when
+  licensing and data contracts permit.
+
+Target official local refresh markets:
+- US: SEC EDGAR plus current exchange reference validation.
+- Japan: JPX/TSE.
+- Turkey: Borsa Istanbul/KAP where permitted for local personal use.
+- Hong Kong: HKEX.
+- Later: LSE and Euronext.
+
+Acceptance:
+- Clean Windows install has a non-empty US security master while offline.
+- OTC and CBOE identifiers are retained in the database.
+- Global reference import is collision-safe.
+- Canonical US rows keep CANONICAL scope after global-reference enrichment.
+- Non-US reference rows can be queried by market/exchange.
 
 ## Phase 3 — Background Data Sync Service
 
