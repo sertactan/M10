@@ -197,6 +197,7 @@ async def _fill_sec_companyfacts_from_api(
     *,
     target_coverage_ratio: float,
     max_concurrency: int = 6,
+    max_new_securities: int | None = None,
 ) -> tuple[int, int]:
     total_row = app.sqlite.connection.execute(
         """
@@ -222,6 +223,8 @@ async def _fill_sec_companyfacts_from_api(
     ).fetchall()
     covered = {str(row["security_id"]) for row in covered_rows}
     target = max(1, int(total * target_coverage_ratio))
+    if max_new_securities is not None:
+        target = min(target, len(covered) + max(1, int(max_new_securities)))
     if len(covered) >= target:
         return len(covered), 0
 
@@ -305,11 +308,13 @@ def fill_sec_companyfacts_from_api(
     app: AppContainer,
     *,
     target_coverage_ratio: float,
+    max_new_securities: int | None = None,
 ) -> tuple[int, int]:
     return asyncio.run(
         _fill_sec_companyfacts_from_api(
             app,
             target_coverage_ratio=target_coverage_ratio,
+            max_new_securities=max_new_securities,
         )
     )
 
@@ -318,6 +323,7 @@ def ensure_sec_companyfacts_bulk(
     app: AppContainer,
     *,
     minimum_coverage_ratio: float = 0.70,
+    fallback_max_new_securities: int | None = None,
 ) -> tuple[int, int]:
     universe = app.sqlite.connection.execute(
         """
@@ -378,6 +384,7 @@ def ensure_sec_companyfacts_bulk(
         securities, facts = fill_sec_companyfacts_from_api(
             app,
             target_coverage_ratio=minimum_coverage_ratio,
+            max_new_securities=fallback_max_new_securities,
         )
         if securities <= current:
             raise RuntimeError(
