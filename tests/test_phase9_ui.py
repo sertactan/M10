@@ -474,3 +474,78 @@ def test_phase9_acceptance_gate_requires_exact_matrix():
     )
     with pytest.raises(RuntimeError, match="V1.4 canonical active state"):
         require_phase9_complete(blocked)
+
+
+def test_phase9_computes_single_ticker_historical_backtest_from_adjusted_cache(tmp_path):
+    store = SQLiteStore(tmp_path / "ui-backtest.sqlite")
+    store.initialize()
+    try:
+        now = datetime(2026, 10, 7, tzinfo=timezone.utc)
+        store.connection.execute(
+            """
+            INSERT INTO security_master (
+                security_id,ticker,name,exchange,market,active,created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?)
+            """,
+            ("SEC_HIST","HIST","History Inc.","NASDAQ","US",1,now.isoformat(),now.isoformat()),
+        )
+        store.connection.commit()
+
+        start = date(2024, 1, 2)
+        bars = []
+        for i in range(300):
+            day = date.fromordinal(start.toordinal() + i)
+            price = 10.0 if i == 0 else 10.0 + i * 0.05
+            if i == 120:
+                price = 25.0
+            bars.append(
+                SourcePriceBar(
+                    security_id="SEC_HIST",
+                    source="YAHOO_COMPAT",
+                    source_symbol="HIST",
+                    trade_date=day,
+                    open=price,
+                    high=price,
+                    low=price,
+                    raw_close=price,
+                    adjusted_close=price,
+                    volume=1000.0,
+                    retrieved_at=now,
+                    quality_status=PriceQualityStatus.FALLBACK_ONLY,
+                    adjustment_status=AdjustmentStatus.DUAL_RAW_ADJUSTED,
+                )
+            )
+
+        parquet = ParquetPriceStore(tmp_path / "parquet")
+        price_repo = PriceRepository(store, parquet)
+        desc = price_repo.save_series(bars)
+        price_repo.select_series(
+            security_id="SEC_HIST",
+            start=desc.start_date,
+            end=desc.end_date,
+            source=desc.source,
+            source_symbol=desc.source_symbol,
+            purpose="UI_LIVE_FALLBACK",
+            reason="historical-ui-test",
+        )
+
+        fake_app = SimpleNamespace(
+            sqlite=store,
+            app_config=SimpleNamespace(database=SimpleNamespace(parquet_root="parquet")),
+            resolve_data_path=lambda configured: tmp_path / configured,
+        )
+
+        from app.ui.analysis_service import DesktopAnalysisService
+        view = DesktopAnalysisService(tmp_path)._load_backtest(
+            fake_app,
+            "SEC_HIST",
+            start,
+        )
+        assert view.status == "READY"
+        assert view.entry_price == pytest.approx(10.0)
+        assert view.horizon_sessions_available == 252
+        assert view.fm252 is not None
+        assert view.max_multiple_observed is not None
+        assert view.time_to_2x_sessions is not None
+    finally:
+        store.close()
