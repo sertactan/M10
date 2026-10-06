@@ -34,6 +34,7 @@ from data.repositories.fundamental_repository import FundamentalRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
 from data.repositories.model_run_repository import ModelRunRepository
 from data.repositories.price_repository import PriceRepository
+from data.repositories.provider_health_repository import ProviderHealthRepository
 from data.repositories.security_repository import SecurityRepository
 from data.storage.parquet_price_store import ParquetPriceStore
 
@@ -125,7 +126,7 @@ async def sync_price(root: Path, ticker: str, start: date, end: date, provider: 
             "YAHOO_COMPAT": YahooCompatiblePriceProvider(),
             "MARKETPARQUET": MarketParquetPriceProvider(os.getenv("MARKETPARQUET_ROOT")),
         }
-        selection = await HistoricalPriceEngine(repo, providers).sync_history(
+        selection = await HistoricalPriceEngine(repo, providers, ProviderHealthRepository(app.sqlite)).sync_history(
             security, start, end, provider=provider, require_adjusted=True
         )
         selected = repo.series_for_window(security.security_id, start, end)
@@ -151,7 +152,7 @@ async def sync_fundamentals(root: Path, ticker: str, provider: str) -> int:
             "SIMFIN": SimFinFundamentalsProvider(os.getenv("SIMFIN_FUNDAMENTALS_PATH")),
             "FMP": FMPFundamentalsProvider(),
         }
-        result = await FundamentalEngine(repository, providers).sync_security(
+        result = await FundamentalEngine(repository, providers, ProviderHealthRepository(app.sqlite)).sync_security(
             security,
             provider_mode=provider,
             include_estimates=True,
