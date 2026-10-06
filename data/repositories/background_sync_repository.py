@@ -66,7 +66,7 @@ class BackgroundSyncRepository:
             INSERT INTO background_sync_tasks (
                 task_id,task_type,dedupe_key,payload_json,priority,status,
                 attempts,max_attempts,run_after,created_at,updated_at
-            ) VALUES (?,?,?,?,?,'PENDING',0,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,'PENDING',0,?,?,?,?)
             """,
             (
                 task_id,
