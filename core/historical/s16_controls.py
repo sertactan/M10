@@ -39,6 +39,8 @@ class S16MatchSnapshot:
     listing_age_days: int
     security_type: str = "CS"
     ipo_route: bool = False
+    supply_kind: str = "FREE_FLOAT"
+    source_quality: str = "PIT_EXACT"
 
 
 @dataclass(frozen=True)
@@ -63,8 +65,13 @@ def _linear_distance(a: float, b: float, scale: float) -> float:
 
 
 def matching_distance(target: S16MatchSnapshot, candidate: S16MatchSnapshot) -> float:
-    """PIT-only distance. Deliberately contains no future-return/outcome field."""
-    terms = {
+    """PIT-only distance with missing categorical legs renormalized away.
+
+    Future-return/outcome fields are deliberately absent. float_shares may be
+    an explicitly tagged shares-outstanding proxy when true PIT free float is
+    unavailable; callers can inspect supply_kind / source_quality.
+    """
+    terms: dict[str, float] = {
         "market_cap": _log_distance(target.market_cap, candidate.market_cap, 2.0),
         "float_shares": _log_distance(target.float_shares, candidate.float_shares, 2.0),
         "price": _log_distance(target.price, candidate.price, 1.5),
@@ -72,14 +79,19 @@ def matching_distance(target: S16MatchSnapshot, candidate: S16MatchSnapshot) -> 
         "volatility20": _linear_distance(target.volatility20, candidate.volatility20, 1.0),
         "mom5": _linear_distance(target.mom5, candidate.mom5, 2.0),
         "mom20": _linear_distance(target.mom20, candidate.mom20, 4.0),
-        "sector": 0.0 if target.sector == candidate.sector else 1.0,
         "listing_age_days": _log_distance(
             max(1.0, target.listing_age_days),
             max(1.0, candidate.listing_age_days),
             2.5,
         ),
     }
-    return sum(MATCH_WEIGHTS[key] * terms[key] for key in MATCH_WEIGHTS)
+    if target.sector and candidate.sector:
+        terms["sector"] = 0.0 if target.sector == candidate.sector else 1.0
+
+    denominator = sum(MATCH_WEIGHTS[key] for key in terms)
+    if denominator <= 0:
+        raise ValueError("no comparable matching fields")
+    return sum(MATCH_WEIGHTS[key] * value for key, value in terms.items()) / denominator
 
 
 def select_controls(
