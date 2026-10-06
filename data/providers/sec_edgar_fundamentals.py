@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from core.contracts.entities import Security
@@ -16,6 +17,7 @@ from core.fundamentals.models import (
     GuidanceKPI,
     PeriodKind,
 )
+from data.cache.sec_json_mirror import SecJsonMirror
 from data.providers.http_json import JsonHttpClient
 from data.providers.price_utils import sha256_payload
 
@@ -74,11 +76,13 @@ class SECEdgarFundamentalsProvider:
         user_agent: str | None = None,
         timeout_seconds: float = 30.0,
         max_retries: int = 3,
+        mirror_root: str | Path | None = None,
     ) -> None:
         self.data_base_url = data_base_url.rstrip("/")
         self.archive_base_url = archive_base_url.rstrip("/")
         self.user_agent = user_agent or os.getenv("SEC_USER_AGENT")
         self.http = JsonHttpClient(timeout_seconds, max_retries)
+        self.mirror = SecJsonMirror(mirror_root) if mirror_root is not None else None
         self._filing_cache: dict[str, list[FilingRecord]] = {}
 
     @property
@@ -96,6 +100,11 @@ class SECEdgarFundamentalsProvider:
             "Accept": "application/json",
         }
 
+    async def _get_json(self, url: str) -> Any:
+        if self.mirror is not None:
+            return (await self.mirror.fetch_json(self.http, url, headers=self._headers())).payload
+        return await self.http.get_json(url, headers=self._headers())
+
     @staticmethod
     def _cik(security: Security) -> str:
         if not security.cik:
@@ -108,9 +117,8 @@ class SECEdgarFundamentalsProvider:
         if cik in self._filing_cache:
             return self._filing_cache[cik]
 
-        payload = await self.http.get_json(
-            f"{self.data_base_url}/submissions/CIK{cik}.json",
-            headers=self._headers(),
+        payload = await self._get_json(
+            f"{self.data_base_url}/submissions/CIK{cik}.json"
         )
         out = self.parse_submissions_payload(
             security.security_id,
@@ -125,9 +133,8 @@ class SECEdgarFundamentalsProvider:
             name = item.get("name")
             if not name:
                 continue
-            additional = await self.http.get_json(
-                f"{self.data_base_url}/submissions/{name}",
-                headers=self._headers(),
+            additional = await self._get_json(
+                f"{self.data_base_url}/submissions/{name}"
             )
             out.extend(
                 self.parse_submissions_payload(
@@ -226,9 +233,8 @@ class SECEdgarFundamentalsProvider:
             for f in filings
             if f.accession_number
         }
-        payload = await self.http.get_json(
-            f"{self.data_base_url}/api/xbrl/companyfacts/CIK{cik}.json",
-            headers=self._headers(),
+        payload = await self._get_json(
+            f"{self.data_base_url}/api/xbrl/companyfacts/CIK{cik}.json"
         )
         return self.parse_companyfacts_payload(
             security.security_id,
