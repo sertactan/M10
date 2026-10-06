@@ -556,3 +556,35 @@ CREATE TABLE IF NOT EXISTS forecast_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_forecast_runs_security_date
 ON forecast_runs(security_id,analysis_date);
+
+
+-- Data Fabric V2 Phase 1: persistent provider health and circuit breaker.
+CREATE TABLE IF NOT EXISTS provider_health_state (
+    provider TEXT PRIMARY KEY,
+    circuit_state TEXT NOT NULL DEFAULT 'CLOSED',
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    cooldown_seconds INTEGER NOT NULL DEFAULT 60,
+    opened_at TEXT,
+    last_attempt_at TEXT,
+    last_success_at TEXT,
+    availability_score REAL NOT NULL DEFAULT 100.0,
+    freshness_score REAL NOT NULL DEFAULT 100.0,
+    data_quality_score REAL NOT NULL DEFAULT 80.0,
+    latency_score REAL NOT NULL DEFAULT 100.0,
+    rate_limit_score REAL NOT NULL DEFAULT 100.0,
+    health_score REAL NOT NULL DEFAULT 100.0,
+    last_message TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS provider_health_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    latency_ms REAL,
+    rate_limited INTEGER NOT NULL DEFAULT 0,
+    message TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_provider_health_events_provider
+ON provider_health_events(provider,event_id);
