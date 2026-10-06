@@ -21,7 +21,7 @@ PHASE9_ACCEPTANCE_ITEMS = (
     "Loading/progress/error states",
     "Responsive minimum layout",
     "No mock production results",
-    "V1.4 fail-closed state",
+    "V1.4 canonical active state",
 )
 
 
