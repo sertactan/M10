@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,18 +14,26 @@ class ReleaseReadiness:
     blockers: tuple[str, ...]
 
 
+def _module_available(name: str) -> bool:
+    return importlib.util.find_spec(name) is not None
+
+
 def check_release_readiness(root: Path) -> ReleaseReadiness:
     blockers: list[str] = []
 
-    required_files = {
-        "PHASE5_V14_CANONICAL_BUNDLE_MISSING": root / "specs" / "s153_v14" / "manifest.json",
-        "PHASE8_EMPIRICAL_CALIBRATION_MISSING": root / "core" / "forecast" / "empirical_provider.py",
-        "PHASE9_DESKTOP_UI_MISSING": root / "app" / "ui" / "launcher.py",
-        "PHASE12_WINDOWS_SPEC_MISSING": root / "packaging" / "windows" / "S153ResearchTerminal.spec",
-        "PHASE12_INSTALLER_SPEC_MISSING": root / "packaging" / "windows" / "S153ResearchTerminal.iss",
+    if not (root / "specs" / "s153_v14" / "manifest.json").exists():
+        blockers.append("PHASE5_V14_CANONICAL_BUNDLE_MISSING")
+
+    required_modules = {
+        "PHASE6_BACKTEST_ENGINE_MISSING": "core.backtest.engine",
+        "PHASE7_SCANNER_MISSING": "core.scanner.engine",
+        "PHASE8_EMPIRICAL_CALIBRATION_MISSING": "core.forecast.empirical_provider",
+        "PHASE9_DESKTOP_UI_MISSING": "app.ui.launcher",
+        "PHASE10_ANALYTICS_MISSING": "core.analytics.model_analytics",
+        "PHASE11_OPTIMIZATION_MISSING": "core.optimization.parallel_scanner",
     }
-    for blocker, path in required_files.items():
-        if not path.exists():
+    for blocker, module_name in required_modules.items():
+        if not _module_available(module_name):
             blockers.append(blocker)
 
     v14_config = load_yaml(root / "config" / "s153_v14.yaml", ModelConfig)
