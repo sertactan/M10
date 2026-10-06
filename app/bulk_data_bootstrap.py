@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
 import shutil
 import tempfile
+import time as monotonic_time
 import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -28,6 +30,10 @@ SEC_COMPANYFACTS_ZIP = (
     "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
 )
 STOOQ_BULK_PAGE = "https://stooq.com/db/h/"
+STOOQ_BULK_DIRECT_URLS = (
+    "https://static.stooq.com/db/h/d_us_txt.zip",
+    "https://stooq.com/db/h/d_us_txt.zip",
+)
 
 
 @dataclass(frozen=True)
@@ -94,11 +100,25 @@ def download_stooq_us_daily_ascii(destination: Path) -> Path:
             "Chrome/154.0.0.0 Safari/537.36"
         )
     }
-    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-        response = client.get(STOOQ_BULK_PAGE, headers=headers)
-        response.raise_for_status()
-        url = discover_stooq_us_daily_ascii_url(response.text)
-    return _download(url, destination, headers=headers, timeout_seconds=300.0)
+    errors: list[str] = []
+
+    # Stooq's catalog page can be protected by JS/CAPTCHA. Prefer the stable
+    # published bulk archive URLs and only use HTML discovery as a fallback.
+    for url in STOOQ_BULK_DIRECT_URLS:
+        try:
+            return _download(url, destination, headers=headers, timeout_seconds=600.0)
+        except Exception as exc:
+            errors.append(f"{url}: {exc}")
+
+    try:
+        with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+            response = client.get(STOOQ_BULK_PAGE, headers=headers)
+            response.raise_for_status()
+            url = discover_stooq_us_daily_ascii_url(response.text)
+        return _download(url, destination, headers=headers, timeout_seconds=600.0)
+    except Exception as exc:
+        errors.append(f"{STOOQ_BULK_PAGE}: {exc}")
+        raise RuntimeError("Stooq bulk download failed: " + " | ".join(errors)) from exc
 
 
 def import_sec_companyfacts_zip(app: AppContainer, zip_path: str | Path) -> tuple[int, int]:
@@ -157,6 +177,143 @@ def import_sec_companyfacts_zip(app: AppContainer, zip_path: str | Path) -> tupl
     return securities, facts_saved
 
 
+class _SecRequestPacer:
+    def __init__(self, interval_seconds: float = 0.13) -> None:
+        self.interval_seconds = interval_seconds
+        self._lock = asyncio.Lock()
+        self._next_allowed = 0.0
+
+    async def wait(self) -> None:
+        async with self._lock:
+            now = monotonic_time.monotonic()
+            delay = max(0.0, self._next_allowed - now)
+            if delay:
+                await asyncio.sleep(delay)
+            self._next_allowed = monotonic_time.monotonic() + self.interval_seconds
+
+
+async def _fill_sec_companyfacts_from_api(
+    app: AppContainer,
+    *,
+    target_coverage_ratio: float,
+    max_concurrency: int = 6,
+) -> tuple[int, int]:
+    total_row = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM security_master
+        WHERE market='US' AND exchange IN ('NASDAQ','NYSE','AMEX') AND active=1
+        """
+    ).fetchone()
+    total = int(total_row["n"] or 0)
+    if total <= 0:
+        return 0, 0
+
+    covered_rows = app.sqlite.connection.execute(
+        """
+        SELECT DISTINCT f.security_id
+        FROM fundamental_facts_source f
+        JOIN security_master s ON s.security_id=f.security_id
+        WHERE f.source='SEC_EDGAR'
+          AND s.market='US'
+          AND s.exchange IN ('NASDAQ','NYSE','AMEX')
+          AND s.active=1
+        """
+    ).fetchall()
+    covered = {str(row["security_id"]) for row in covered_rows}
+    target = max(1, int(total * target_coverage_ratio))
+    if len(covered) >= target:
+        return len(covered), 0
+
+    rows = app.sqlite.connection.execute(
+        """
+        SELECT security_id,cik
+        FROM security_master
+        WHERE market='US'
+          AND exchange IN ('NASDAQ','NYSE','AMEX')
+          AND active=1
+          AND cik IS NOT NULL
+          AND cik<>''
+        ORDER BY ticker
+        """
+    ).fetchall()
+    missing = [
+        row for row in rows
+        if str(row["security_id"]) not in covered
+    ]
+
+    provider = SECEdgarFundamentalsProvider(
+        mirror_root=app.resolve_data_path("sec_mirror/companyfacts")
+    )
+    repository = FundamentalRepository(app.sqlite)
+    canonical = _canonical_metric_names()
+    pacer = _SecRequestPacer()
+    semaphore = asyncio.Semaphore(max_concurrency)
+    saved_facts = 0
+    completed = len(covered)
+    completed_lock = asyncio.Lock()
+
+    async def fetch_one(row) -> tuple[int, int]:
+        nonlocal completed
+        async with semaphore:
+            async with completed_lock:
+                if completed >= target:
+                    return 0, 0
+
+            digits = "".join(ch for ch in str(row["cik"]) if ch.isdigit())
+            if not digits:
+                return 0, 0
+            cik = digits.zfill(10)
+            await pacer.wait()
+            url = f"{provider.data_base_url}/api/xbrl/companyfacts/CIK{cik}.json"
+            try:
+                payload = await provider._get_json(url)
+            except Exception:
+                return 0, 0
+
+            parsed = provider.parse_companyfacts_payload(
+                str(row["security_id"]),
+                cik,
+                payload,
+                filing_map={},
+                retrieved_at=datetime.now(timezone.utc),
+                companyfacts_url=url,
+            )
+            facts = [fact for fact in parsed if fact.metric_name in canonical]
+            if not facts:
+                return 0, 0
+            count = repository.save_facts(facts)
+            async with completed_lock:
+                completed += 1
+            return 1, count
+
+    # Work in bounded batches so the first-run scanner can stop as soon as the
+    # configured coverage threshold is reached instead of downloading every
+    # issuer unnecessarily.
+    batch_size = 64
+    for start in range(0, len(missing), batch_size):
+        if completed >= target:
+            break
+        batch = missing[start:start + batch_size]
+        results = await asyncio.gather(*(fetch_one(row) for row in batch))
+        saved_facts += sum(item[1] for item in results)
+
+    return completed, saved_facts
+
+
+def fill_sec_companyfacts_from_api(
+    app: AppContainer,
+    *,
+    target_coverage_ratio: float,
+) -> tuple[int, int]:
+    return asyncio.run(
+        _fill_sec_companyfacts_from_api(
+            app,
+            target_coverage_ratio=target_coverage_ratio,
+        )
+    )
+
+
 def ensure_sec_companyfacts_bulk(
     app: AppContainer,
     *,
@@ -203,16 +360,30 @@ def ensure_sec_companyfacts_bulk(
             pass
 
     user_agent = resolve_sec_user_agent()
-    _download(
-        SEC_COMPANYFACTS_ZIP,
-        zip_path,
-        headers={
-            "User-Agent": user_agent,
-            "Accept-Encoding": "gzip, deflate",
-        },
-        timeout_seconds=300.0,
-    )
-    securities, facts = import_sec_companyfacts_zip(app, zip_path)
+    try:
+        _download(
+            SEC_COMPANYFACTS_ZIP,
+            zip_path,
+            headers={
+                "User-Agent": user_agent,
+                "Accept-Encoding": "gzip, deflate",
+            },
+            timeout_seconds=300.0,
+        )
+        securities, facts = import_sec_companyfacts_zip(app, zip_path)
+    except Exception as bulk_exc:
+        # Some consumer networks receive 403 on the SEC Archives bulk endpoint
+        # while data.sec.gov's Company Facts API remains available. Fall back to
+        # the per-CIK API with persistent mirror caching and SEC-safe pacing.
+        securities, facts = fill_sec_companyfacts_from_api(
+            app,
+            target_coverage_ratio=minimum_coverage_ratio,
+        )
+        if securities <= current:
+            raise RuntimeError(
+                f"SEC bulk failed ({bulk_exc}); Company Facts API fallback "
+                "could not improve coverage"
+            ) from bulk_exc
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(
         json.dumps(
