@@ -106,7 +106,7 @@ class CanonicalFeatureMaterializer:
     absent. No synthetic 50s/defaults are written.
     """
 
-    VERSION = "canonical-materializer-v1"
+    VERSION = "canonical-materializer-v2"
 
     def __init__(self, app: AppContainer) -> None:
         self.app = app
@@ -249,6 +249,7 @@ class CanonicalFeatureMaterializer:
                 ol_q = pos_score((op_growth - rev_1y) * 100.0, 0.0, 60.0)
                 put("OL_Q", ol_q, operating_income_growth=op_growth, revenue_growth=rev_1y)
                 put("OL_ROUTER", ol_q, source="OL_Q")
+                put("D05", ol_q, canonical="Operating Leverage", source="OL_Q")
 
         def latest_margin_delta(series: list[dict]) -> float | None:
             if len(series) < 2 or len(rev) < 2:
@@ -288,6 +289,7 @@ class CanonicalFeatureMaterializer:
         mi_q = wa({"OM": (0.40, om_q), "GM": (0.30, gm_q), "FCFM": (0.30, fcfm_q)})
         put("MI_Q", mi_q, operating_margin_delta_pp=om_delta, gross_margin_delta_pp=gm_delta, fcf_margin_delta_pp=fcf_margin_delta)
         put("MI_ROUTER", mi_q, source="MI_Q")
+        put("D06", mi_q, canonical="Margin Expansion", source="MI_Q")
 
         fcf_level_q = pos_score(fcf_margin * 100.0, -10.0, 20.0) if fcf_margin is not None else None
         fcf_change_q = pos_score(fcf_margin_delta, 0.0, 20.0) if fcf_margin_delta is not None else None
@@ -315,6 +317,7 @@ class CanonicalFeatureMaterializer:
 
         profitshift = wa({"MI": (0.50, mi_q), "FCFI": (0.30, fcfi_q), "CROSSZERO": (0.20, crosszero)})
         put("PROFITSHIFT", profitshift, source="MI_Q+FCFI_Q+CROSSZERO")
+        put("D38", profitshift, canonical="Profitability Inflection", source="PROFITSHIFT")
 
         # Dilution quality exact fallback thresholds.
         share_vals = [float(x["value"]) for x in shares]
