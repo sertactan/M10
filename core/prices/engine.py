@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from time import perf_counter
 
 from core.contracts.entities import Security
+from core.data_sync.racing import ProviderRaceResult, race_in_canonical_order
 from core.prices.policy import (
     FALLBACK_ONLY_PROVIDER_PRIORITY,
     PriceSelectionPolicy,
@@ -30,11 +32,19 @@ class HistoricalPriceEngine:
         repository: PriceRepository,
         providers: dict[str, object],
         health: ProviderHealthRepository | None = None,
+        provider_concurrency_limits: dict[str, int] | None = None,
+        default_provider_concurrency: int = 2,
     ) -> None:
         self.repository = repository
         self.providers = providers
         self.health = health
         self.policy = PriceSelectionPolicy()
+        self.default_provider_concurrency = max(1, int(default_provider_concurrency))
+        self.provider_concurrency_limits = {
+            name.upper(): max(1, int(limit))
+            for name, limit in (provider_concurrency_limits or {}).items()
+        }
+        self._provider_semaphores: dict[str, asyncio.Semaphore] = {}
 
     def _provider_order(self, provider: str) -> tuple[str, ...]:
         if provider.upper() != "AUTO":
@@ -63,6 +73,50 @@ class HistoricalPriceEngine:
             return candidates
         return self.health.rank(candidates)
 
+    def _provider_semaphore(self, name: str) -> asyncio.Semaphore:
+        key = name.upper()
+        semaphore = self._provider_semaphores.get(key)
+        if semaphore is None:
+            limit = self.provider_concurrency_limits.get(
+                key, self.default_provider_concurrency
+            )
+            semaphore = asyncio.Semaphore(limit)
+            self._provider_semaphores[key] = semaphore
+        return semaphore
+
+    async def _probe_history_provider(
+        self,
+        name: str,
+        security: Security,
+        start: date,
+        end: date,
+    ) -> list:
+        provider = self.providers[name]
+        async with self._provider_semaphore(name):
+            started = perf_counter()
+            try:
+                if not await provider.validate_symbol(security):
+                    raise RuntimeError("symbol validation failed")
+                bars = list(await provider.get_history(security, start, end))
+                if not bars:
+                    raise RuntimeError("provider returned no bars")
+                if self.health is not None:
+                    self.health.record_success(
+                        name,
+                        latency_ms=(perf_counter() - started) * 1000.0,
+                    )
+                return bars
+            except Exception as exc:
+                if self.health is not None:
+                    message = str(exc)
+                    self.health.record_failure(
+                        name,
+                        latency_ms=(perf_counter() - started) * 1000.0,
+                        rate_limited=("429" in message or "rate limit" in message.lower()),
+                        message=message[:500],
+                    )
+                raise
+
     async def sync_history(
         self,
         security: Security,
@@ -73,62 +127,42 @@ class HistoricalPriceEngine:
         provider: str = "AUTO",
         validate_with_fallback: bool = True,
     ):
-        order = self._provider_order(provider)
+        order = tuple(
+            name
+            for name in self._provider_order(provider)
+            if self.providers.get(name) is not None
+            and getattr(self.providers[name], "configured", True) is not False
+            and (self.health is None or self.health.can_attempt(name))
+        )
         downloaded = []
         selection = None
 
-        for name in order:
-            p = self.providers.get(name)
-            if p is None or getattr(p, "configured", True) is False:
-                continue
-            if self.health is not None and not self.health.can_attempt(name):
-                continue
+        def accept(result: ProviderRaceResult[list]) -> bool:
+            nonlocal selection
+            if result.error is not None or result.value is None:
+                return False
 
-            started = perf_counter()
-            try:
-                if not await p.validate_symbol(security):
-                    if self.health is not None:
-                        self.health.record_failure(
-                            name,
-                            latency_ms=(perf_counter() - started) * 1000.0,
-                            message="symbol validation failed",
-                        )
-                    continue
-                bars = list(await p.get_history(security, start, end))
-                if not bars:
-                    if self.health is not None:
-                        self.health.record_failure(
-                            name,
-                            latency_ms=(perf_counter() - started) * 1000.0,
-                            message="provider returned no bars",
-                        )
-                    continue
-                if self.health is not None:
-                    self.health.record_success(
-                        name,
-                        latency_ms=(perf_counter() - started) * 1000.0,
-                    )
-            except Exception as exc:
-                if self.health is not None:
-                    text = str(exc)
-                    self.health.record_failure(
-                        name,
-                        latency_ms=(perf_counter() - started) * 1000.0,
-                        rate_limited=("429" in text or "rate limit" in text.lower()),
-                        message=text[:500],
-                    )
-                continue
-
+            bars = list(result.value)
             self.policy.assert_single_source(bars)
             descriptor = self.repository.save_series(bars)
             downloaded.append(descriptor)
             try:
                 selection = self.policy.select(
-                    downloaded, require_adjusted=require_adjusted, authoritative=True
+                    downloaded,
+                    require_adjusted=require_adjusted,
+                    authoritative=True,
                 )
-                break
+                return True
             except PriceSourceMixingError:
-                continue
+                return False
+
+        await race_in_canonical_order(
+            order,
+            lambda name: self._probe_history_provider(
+                name, security, start, end
+            ),
+            accept,
+        )
 
         if selection is None:
             raise PriceSourceMixingError(
