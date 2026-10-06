@@ -47,8 +47,9 @@ class DesktopAnalysisService:
     def __init__(self, root: Path) -> None:
         self.root = root
 
-    def _load_stock(self, app: AppContainer, row, as_of_date: date) -> StockHeaderView:
-        selection = app.sqlite.connection.execute(
+    @staticmethod
+    def _select_price_window(app: AppContainer, security_id: str, as_of_date: date):
+        exact = app.sqlite.connection.execute(
             """
             SELECT *
             FROM canonical_price_selection
@@ -58,8 +59,31 @@ class DesktopAnalysisService:
             ORDER BY selected_at DESC
             LIMIT 1
             """,
-            (row['security_id'], as_of_date.isoformat(), as_of_date.isoformat()),
+            (security_id, as_of_date.isoformat(), as_of_date.isoformat()),
         ).fetchone()
+        if exact is not None:
+            return exact, False
+
+        cached = app.sqlite.connection.execute(
+            """
+            SELECT *
+            FROM canonical_price_selection
+            WHERE security_id=?
+              AND start_date<=?
+              AND end_date<?
+            ORDER BY end_date DESC, selected_at DESC
+            LIMIT 1
+            """,
+            (security_id, as_of_date.isoformat(), as_of_date.isoformat()),
+        ).fetchone()
+        return cached, cached is not None
+
+    def _load_stock(self, app: AppContainer, row, as_of_date: date) -> StockHeaderView:
+        selection, stale = self._select_price_window(
+            app,
+            row['security_id'],
+            as_of_date,
+        )
         if selection is None:
             return StockHeaderView(
                 ticker=row['ticker'],
@@ -100,26 +124,19 @@ class DesktopAnalysisService:
             ticker=row['ticker'],
             name=row['name'],
             exchange=row['exchange'],
-            status='CANONICAL PRICE',
+            status='CACHED STALE PRICE' if stale else 'CANONICAL PRICE',
             price=price,
             change_pct=change_pct,
             price_date=price_date,
-            price_source=f"{selection['purpose']} · {selection['source']}",
+            price_source=(
+                f"LKG · {selection['purpose']} · {selection['source']}"
+                if stale
+                else f"{selection['purpose']} · {selection['source']}"
+            ),
         )
 
     def _load_price_points(self, app: AppContainer, security_id: str, as_of_date: date) -> list[PricePointView]:
-        selection = app.sqlite.connection.execute(
-            """
-            SELECT *
-            FROM canonical_price_selection
-            WHERE security_id=?
-              AND start_date<=?
-              AND end_date>=?
-            ORDER BY selected_at DESC
-            LIMIT 1
-            """,
-            (security_id, as_of_date.isoformat(), as_of_date.isoformat()),
-        ).fetchone()
+        selection, _stale = self._select_price_window(app, security_id, as_of_date)
         if selection is None:
             return []
         parquet = ParquetPriceStore(app.resolve_data_path(app.app_config.database.parquet_root))
