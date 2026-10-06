@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from app.background_sync import BackgroundSyncRuntime
 from app.ui.analysis_service import DesktopAnalysisService
+from app.ui.data_health_service import DataHealthService
 from app.ui.main_window import ResearchTerminalWindow
 from app.ui.scanner_service import DesktopScannerService
 from app.ui.theme import APP_QSS
@@ -30,6 +31,7 @@ def launch_ui(root: Path) -> int:
     window = ResearchTerminalWindow(
         analysis_service_factory=lambda: DesktopAnalysisService(root),
         scanner_service_factory=lambda: DesktopScannerService(root),
+        data_health_service_factory=lambda: DataHealthService(root),
     )
     width = int(saved.get("window_width", 1440))
     height = int(saved.get("window_height", 900))
