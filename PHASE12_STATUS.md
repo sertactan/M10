@@ -2,7 +2,7 @@
 
 ## Status
 
-**FINAL VALIDATION IN PROGRESS.**
+**COMPLETE — Python CI and Windows production build validated.**
 
 Master-prompt scope:
 
@@ -31,4 +31,4 @@ Master-prompt scope:
 - release-readiness gate covering canonical V1.4, Phase 6–11 modules, strict PIT and no-mock production mode
 - exact Phase 12 acceptance matrix
 
-Final completion requires green Python CI and green Windows executable/installer build.
+Final validation: Python CI PASS; Windows EXE build PASS; packaged `--doctor` smoke test PASS; Inno Setup installer PASS; SHA-256 artifact PASS.
