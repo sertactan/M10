@@ -1,5 +1,7 @@
 # Phase 7 — Market Scanner
 
+**COMPLETE** — canonical V1.2/V1.4 production scanner, PIT/current-historical universes and all scanner mechanics are implemented.
+
 ## Dependency chain
 
 ```text
@@ -9,7 +11,7 @@ main
             └─ Phase 7 — Market Scanner
 ```
 
-Phase 7 is implemented on a dependent branch and must not merge ahead of Phase 5/6.
+Phase 5 and Phase 6 are now canonical and merged. Phase 7 is ready for direct merge to main.
 
 ## Production architecture
 
@@ -70,8 +72,8 @@ Infrastructure tests are not allowed to substitute fake model outputs for produc
 In particular:
 
 - Phase 4 V1.2 is canonical and executable.
-- Phase 5 V1.4 is still fail-closed because the authoritative V1.4 specification set is unavailable.
-- Therefore **V1.4 scoring cannot yet be marked production PASS**.
-- Because all 15 items are mandatory, Phase 7 cannot be marked COMPLETE until V1.4 is canonically executable and the production acceptance matrix is rerun.
+- Phase 5 V1.4 is canonical and executable.
+- V1.4 missing inputs return explicit INCONCLUSIVE results rather than fabricated scores.
+- The 15-item Phase 7 acceptance contract is fully executable.
 
 Test doubles are used only to prove scanner batching/sort/filter/export/background-worker mechanics.
