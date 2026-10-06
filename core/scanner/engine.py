@@ -128,4 +128,6 @@ class MarketScanner:
             nyse=sum(1 for r in rows if r.exchange == "NYSE"),
             amex=sum(1 for r in rows if r.exchange == "AMEX"),
             delisted=sum(1 for r in rows if r.delisted),
+            v12_scored=sum(1 for r in rows if r.v12_score is not None),
+            v14_scored=sum(1 for r in rows if r.v14_score is not None),
         )
