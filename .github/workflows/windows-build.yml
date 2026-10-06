@@ -1,5 +1,8 @@
 name: Windows Production Build
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
@@ -298,3 +301,39 @@ jobs:
           path: |
             dist_installer/S153ResearchTerminal-Setup.exe
             dist_installer/SHA256.txt
+
+      - name: Publish GitHub Release v1.0.0
+        if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo = "${{ github.repository }}"
+          $tag = "v1.0.0"
+          $setup = "dist_installer/S153ResearchTerminal-Setup.exe"
+          $sha = "dist_installer/SHA256.txt"
+          $title = "S15.3 Research Terminal v1.0.0"
+          $notes = @"
+          First production GitHub Release of S15.3 Research Terminal.
+
+          Includes:
+          - Windows Setup installer
+          - SHA256 checksum
+          - strict PIT / fail-closed model behavior
+          - Data Fabric V2 production audit gates
+          - scanner SQLite thread fix
+          - Yahoo query2/query1 fallback hardening
+          - Windows clean-install, recovery, migration and installer smoke tests
+          "@
+
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $setup $sha --clobber --repo $repo
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            gh release edit $tag --title $title --notes $notes --latest --repo $repo
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          else {
+            gh release create $tag $setup $sha --target "${{ github.sha }}" --title $title --notes $notes --latest --repo $repo
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
