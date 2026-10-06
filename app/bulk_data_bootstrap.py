@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import zipfile
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -280,7 +280,7 @@ def ensure_stooq_scanner_bulk(
     if total <= 0:
         return 0, 0
 
-    cutoff = (date.today() - __import__("datetime").timedelta(days=freshness_days)).isoformat()
+    cutoff = (date.today() - timedelta(days=freshness_days)).isoformat()
     covered = app.sqlite.connection.execute(
         """
         SELECT COUNT(DISTINCT p.security_id) AS n
