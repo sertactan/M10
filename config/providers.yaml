@@ -1,6 +1,7 @@
 universe:
-  primary: MASSIVE
-  authoritative_identity: SEC_EDGAR
+  primary: SEC_EDGAR
+  passive_cache: BUNDLED_SEC_SNAPSHOT
+  historical_pit_accelerator: MASSIVE
   validation_fallback: FINNHUB
   optional_fallback: FMP
   exchanges: [XNAS, XNYS, XASE]
@@ -9,12 +10,13 @@ universe:
   historical_requires_massive: true
 
 prices:
-  provider_priority:
+  optional_accelerators:
     - MASSIVE
+  provider_priority:
+    - MARKETPARQUET
     - STOOQ
     - SIMFIN
     - YAHOO_COMPAT
-    - MARKETPARQUET
   forbid_cross_provider_stitching: true
   yahoo_authoritative: false
   require_adjusted_for_backtest: true

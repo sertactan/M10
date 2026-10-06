@@ -5,13 +5,35 @@ from dataclasses import dataclass
 from core.prices.models import AdjustmentStatus, PriceSeriesDescriptor
 
 
+OPTIONAL_ACCELERATOR_PROVIDER_PRIORITY = ("MASSIVE",)
+FREE_PROVIDER_PRIORITY = ("MARKETPARQUET", "STOOQ", "SIMFIN")
+FALLBACK_ONLY_PROVIDER_PRIORITY = ("YAHOO_COMPAT",)
+
 DEFAULT_PROVIDER_PRIORITY = (
-    "MASSIVE",
-    "STOOQ",
-    "SIMFIN",
-    "YAHOO_COMPAT",
-    "MARKETPARQUET",
+    *OPTIONAL_ACCELERATOR_PROVIDER_PRIORITY,
+    *FREE_PROVIDER_PRIORITY,
+    *FALLBACK_ONLY_PROVIDER_PRIORITY,
 )
+
+
+def auto_provider_priority(providers: dict[str, object]) -> tuple[str, ...]:
+    """Build free-first AUTO routing without requiring paid credentials.
+
+    Optional paid providers are accelerators only: they participate when
+    configured, but their absence never changes baseline availability.
+    Fallback-only providers are always kept behind eligible historical sources.
+    """
+
+    def configured(name: str) -> bool:
+        provider = providers.get(name)
+        return provider is not None and getattr(provider, "configured", True) is not False
+
+    accelerators = tuple(
+        name for name in OPTIONAL_ACCELERATOR_PROVIDER_PRIORITY if configured(name)
+    )
+    free = tuple(name for name in FREE_PROVIDER_PRIORITY if configured(name))
+    fallback = tuple(name for name in FALLBACK_ONLY_PROVIDER_PRIORITY if configured(name))
+    return accelerators + free + fallback
 
 
 class PriceSourceMixingError(RuntimeError):
