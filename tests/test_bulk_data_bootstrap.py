@@ -215,3 +215,5 @@ def test_sec_bulk_403_falls_back_to_companyfacts_api(tmp_path: Path, monkeypatch
         assert facts == 7
     finally:
         store.close()
+
+# v1.0.2 bootstrap regression coverage
