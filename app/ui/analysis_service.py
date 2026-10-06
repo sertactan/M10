@@ -10,6 +10,7 @@ from app.data_bootstrap import (
     ensure_price_history_sync,
     ensure_sec_fundamentals_sync,
 )
+from app.feature_materializer import CanonicalFeatureMaterializer
 from app.ui.price_chart import PricePointView
 from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeaderView
 from core.features.s153_v12_input_loader import S153V12InputLoader
@@ -264,6 +265,14 @@ class DesktopAnalysisService:
             except Exception:
                 # Price/UI data remains usable even if SEC is temporarily unavailable.
                 pass
+
+            # Bridge Phase 1-3 canonical data into the model feature layer.
+            # Only deterministic/evidenced factors are written; unavailable
+            # qualitative/analyst/catalyst inputs remain N/A.
+            CanonicalFeatureMaterializer(app).materialize(
+                row,
+                as_of_date=as_of_date,
+            )
 
             as_of = datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
             stock = self._load_stock(app, row, as_of_date)
