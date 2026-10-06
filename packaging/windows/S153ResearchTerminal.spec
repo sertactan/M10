@@ -10,7 +10,8 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(project_root, "config"), "config"),
-        (os.path.join(project_root, "specs", "s153_v14"), os.path.join("specs", "s153_v14")),\n        (os.path.join(project_root, "specs", "s153_v141"), os.path.join("specs", "s153_v141")),
+        (os.path.join(project_root, "specs", "s153_v14"), os.path.join("specs", "s153_v14")),
+        (os.path.join(project_root, "specs", "s153_v141"), os.path.join("specs", "s153_v141")),
         (
             os.path.join(project_root, "data", "database", "schema.sql"),
             os.path.join("data", "database"),
@@ -30,7 +31,8 @@ a = Analysis(
     ],
     hiddenimports=[
         "PySide6.QtCharts",
-        "core.backtest.engine",\n        "core.models.s153_v141",
+        "core.backtest.engine",
+        "core.models.s153_v141",
         "core.scanner.engine",
         "core.forecast.empirical_provider",
         "app.ui.launcher",
