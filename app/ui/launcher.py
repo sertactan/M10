@@ -5,7 +5,8 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from app.background_sync import BackgroundSyncRuntime\nfrom app.ui.analysis_service import DesktopAnalysisService
+from app.background_sync import BackgroundSyncRuntime
+from app.ui.analysis_service import DesktopAnalysisService
 from app.ui.main_window import ResearchTerminalWindow
 from app.ui.scanner_service import DesktopScannerService
 from app.ui.theme import APP_QSS
