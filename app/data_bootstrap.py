@@ -63,11 +63,6 @@ async def ensure_current_universe(app: AppContainer) -> int:
     try:
         records = await provider.list_current_us_securities()
         if not records:
-            health.record_failure(
-                "SEC_EDGAR",
-                latency_ms=(perf_counter() - started) * 1000.0,
-                message="universe provider returned no securities",
-            )
             if existing:
                 return len(existing)
             raise RuntimeError("SEC EDGAR returned an empty US universe")
@@ -133,11 +128,6 @@ async def ensure_price_history(
     try:
         bars = await provider.get_history(security, start, as_of_date)
         if not bars:
-            health.record_failure(
-                "YAHOO_COMPAT",
-                latency_ms=(perf_counter() - started) * 1000.0,
-                message=f"no price history for {security.ticker}",
-            )
             raise RuntimeError(f"No live price history returned for {security.ticker}")
         health.record_success(
             "YAHOO_COMPAT",
