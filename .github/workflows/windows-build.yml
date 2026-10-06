@@ -157,8 +157,8 @@ jobs:
             [System.Text.Encoding]::UTF8.GetBytes("not a sqlite database")
           )
 
-          & $exe --doctor
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $doctor = Start-Process -FilePath $exe -ArgumentList "--doctor" -Wait -PassThru
+          if ($doctor.ExitCode -ne 0) { exit $doctor.ExitCode }
 
           $backups = @(Get-ChildItem -Path (Split-Path $db) -Filter "operational.db.corrupt-*.bak")
           if ($backups.Count -lt 1) {
@@ -234,8 +234,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           $env:S153_RUNTIME_ROOT = $runtime
-          & $exe --doctor
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $doctor = Start-Process -FilePath $exe -ArgumentList "--doctor" -Wait -PassThru
+          if ($doctor.ExitCode -ne 0) { exit $doctor.ExitCode }
 
           $verifyUpgrade = @'
           import sqlite3
