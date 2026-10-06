@@ -70,6 +70,28 @@ def _raw_from_price_frame(
     if avg_volume20 <= 0:
         raise RuntimeError(f"{row['ticker']} {as_of.date()}: non-positive ADV20")
 
+    prev5_volume = sum(volumes[-6:-1]) / 5.0
+    volume_acceleration_raw = (
+        volumes[-1] / prev5_volume if prev5_volume > 0 else 0.0
+    )
+
+    highs = [float(x) for x in frame["high"]]
+    lows = [float(x) for x in frame["low"]]
+    raw_closes = [float(x) for x in frame["raw_close"]]
+    range_pcts = [
+        ((high - low) / close if close > 0 and high >= low else 0.0)
+        for high, low, close in zip(highs, lows, raw_closes)
+    ]
+    prior20_range = sum(range_pcts[-21:-1]) / 20.0
+    range_expansion_raw = (
+        range_pcts[-1] / prior20_range if prior20_range > 0 else 0.0
+    )
+    day_range = highs[-1] - lows[-1]
+    close_location_raw = (
+        min(1.0, max(0.0, (raw_closes[-1] - lows[-1]) / day_range))
+        if day_range > 0 else 0.5
+    )
+
     return S16RawHistoricalObservation(
         security_id=row["security_id"],
         ticker=row["ticker"].upper(),
@@ -84,6 +106,9 @@ def _raw_from_price_frame(
         return_1d=return_1d,
         momentum5=momentum5,
         momentum20=momentum20,
+        volume_acceleration_raw=volume_acceleration_raw,
+        range_expansion_raw=range_expansion_raw,
+        close_location_raw=close_location_raw,
         supply_kind=row.get("supply_kind") or "UNKNOWN_SUPPLY",
         source_quality=row.get("source_quality") or "PIT_PROXY",
         market_cap=(

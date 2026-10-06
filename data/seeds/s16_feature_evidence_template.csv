@@ -1,5 +1,14 @@
 ticker,feature_key,observed_at,available_at,value,source,source_ref,quality_status
 TEST,catalyst,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,85,EXAMPLE,archive://catalyst/TEST/1,EXAMPLE_ONLY
+TEST,catalyst_materiality,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,95,EXAMPLE,archive://catalyst/TEST/materiality,EXAMPLE_ONLY
+TEST,catalyst_surprise,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,80,EXAMPLE,archive://catalyst/TEST/surprise,EXAMPLE_ONLY
+TEST,catalyst_credibility,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,90,EXAMPLE,archive://catalyst/TEST/credibility,EXAMPLE_ONLY
+TEST,catalyst_market_cap_impact,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,85,EXAMPLE,archive://catalyst/TEST/impact,EXAMPLE_ONLY
+TEST,catalyst_novelty,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,70,EXAMPLE,archive://catalyst/TEST/novelty,EXAMPLE_ONLY
+TEST,catalyst_immediacy,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,95,EXAMPLE,archive://catalyst/TEST/immediacy,EXAMPLE_ONLY
+TEST,borrow_pressure,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,75,EXAMPLE,archive://borrow/TEST/1,EXAMPLE_ONLY
+TEST,ftd_pressure,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,65,EXAMPLE,archive://ftd/TEST/1,EXAMPLE_ONLY
+TEST,premarket_turnover,2024-01-15T13:00:00+00:00,2024-01-15T13:00:00+00:00,80,EXAMPLE,archive://premarket/TEST/1,EXAMPLE_ONLY
 TEST,catalyst_proximity,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,70,EXAMPLE,archive://calendar/TEST/1,EXAMPLE_ONLY
 TEST,theme,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,60,EXAMPLE,archive://theme/TEST/1,EXAMPLE_ONLY
 TEST,regime_sympathy,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,65,EXAMPLE,archive://regime/TEST/1,EXAMPLE_ONLY

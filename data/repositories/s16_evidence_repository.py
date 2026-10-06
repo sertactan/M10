@@ -176,6 +176,28 @@ class S16EvidenceRepository:
         ).fetchone()
         return dict(row) if row is not None else None
 
+
+    def short_interest_history_as_of(
+        self,
+        security_id: str,
+        as_of: datetime,
+        *,
+        limit: int = 2,
+    ) -> list[dict]:
+        cutoff = _iso(as_of)
+        rows = self.store.connection.execute(
+            """
+            SELECT *
+            FROM s16_short_interest_source
+            WHERE security_id=?
+              AND available_at<=?
+            ORDER BY settlement_date DESC,available_at DESC,created_at DESC
+            LIMIT ?
+            """,
+            (security_id, cutoff, int(limit)),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def attention_as_of(
         self,
         security_id: str,
