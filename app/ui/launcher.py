@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from app.ui.analysis_service import DesktopAnalysisService
+from app.background_sync import BackgroundSyncRuntime\nfrom app.ui.analysis_service import DesktopAnalysisService
 from app.ui.main_window import ResearchTerminalWindow
 from app.ui.scanner_service import DesktopScannerService
 from app.ui.theme import APP_QSS
@@ -47,6 +47,13 @@ def launch_ui(root: Path) -> int:
     if last_ticker:
         window.ticker.setText(last_ticker)
 
+    background_sync = BackgroundSyncRuntime(root, warm_ticker=last_ticker or None)
+    window.analysis_requested.connect(
+        lambda ticker, _as_of: background_sync.request_ticker_warmup(ticker)
+    )
+
     application.aboutToQuit.connect(persist_window_settings)
+    application.aboutToQuit.connect(background_sync.stop)
     window.show()
+    background_sync.start()
     return application.exec()
