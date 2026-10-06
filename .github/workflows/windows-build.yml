@@ -16,6 +16,7 @@ on:
       - "pyproject.toml"
       - "packaging/windows/**"
       - "tests/**"
+      - "scripts/**"
       - "PHASE12_STATUS.md"
       - ".github/workflows/windows-build.yml"
 
