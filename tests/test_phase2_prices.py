@@ -123,6 +123,37 @@ def test_yahoo_parser_is_fallback_only() -> None:
     assert bars[0].quality_status is PriceQualityStatus.FALLBACK_ONLY
 
 
+@pytest.mark.asyncio
+async def test_yahoo_chart_falls_back_query2_to_query1_with_browser_headers(monkeypatch) -> None:
+    provider = YahooCompatiblePriceProvider()
+    calls = []
+
+    payload = {"chart": {"result": [{
+        "timestamp": [int(datetime(2025, 1, 2, tzinfo=timezone.utc).timestamp())],
+        "indicators": {
+            "quote": [{"open": [10], "high": [11], "low": [9], "close": [10.5], "volume": [1000]}],
+            "adjclose": [{"adjclose": [10.5]}],
+        },
+    }], "error": None}}
+
+    async def fake_get_json(url, *, params=None, headers=None):
+        calls.append((url, headers))
+        if "query2.finance.yahoo.com" in url:
+            raise RuntimeError("HTTP 429 Too Many Requests")
+        return payload
+
+    monkeypatch.setattr(provider.http, "get_json", fake_get_json)
+    bars = await provider.get_history(
+        SEC,
+        date(2025, 1, 1),
+        date(2025, 1, 3),
+    )
+    assert len(bars) == 1
+    assert "query2.finance.yahoo.com" in calls[0][0]
+    assert "query1.finance.yahoo.com" in calls[1][0]
+    assert calls[0][1]["User-Agent"].startswith("Mozilla/5.0")
+
+
 def test_marketparquet_parser_accepts_delisted_symbol() -> None:
     frame = pd.DataFrame([{
         "symbol": "TEST-DELISTED", "date": "2025-01-02", "open": 10,

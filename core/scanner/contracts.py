@@ -56,3 +56,5 @@ class ScanSummary:
     nyse: int
     amex: int
     delisted: int
+    v12_scored: int = 0
+    v14_scored: int = 0

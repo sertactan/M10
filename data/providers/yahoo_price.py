@@ -26,8 +26,24 @@ class YahooCompatiblePriceProvider:
         timeout_seconds: float = 30.0,
         max_retries: int = 2,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
+        primary = base_url.rstrip("/")
+        self.base_urls = [primary]
+        if primary == "https://query1.finance.yahoo.com/v8/finance/chart":
+            self.base_urls = [
+                "https://query2.finance.yahoo.com/v8/finance/chart",
+                "https://query1.finance.yahoo.com/v8/finance/chart",
+            ]
+        self.base_url = self.base_urls[0]
         self.http = JsonHttpClient(timeout_seconds, max_retries)
+        self.headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/154.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json,text/plain,*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
 
     @staticmethod
     def _epoch(d: date, *, exclusive_end: bool = False) -> int:
@@ -37,9 +53,29 @@ class YahooCompatiblePriceProvider:
             dt += timedelta(days=1)
         return int(dt.timestamp())
 
+    async def _get_chart_json(
+        self,
+        ticker: str,
+        *,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        errors: list[str] = []
+        for base_url in self.base_urls:
+            try:
+                return await self.http.get_json(
+                    f"{base_url}/{ticker}",
+                    params=params,
+                    headers=self.headers,
+                )
+            except Exception as exc:
+                errors.append(f"{base_url}: {exc}")
+        raise RuntimeError(
+            f"Yahoo chart hosts unavailable for {ticker}: " + "; ".join(errors)
+        )
+
     async def _chart(self, ticker: str, start: date, end: date) -> dict[str, Any]:
-        return await self.http.get_json(
-            f"{self.base_url}/{ticker}",
+        return await self._get_chart_json(
+            ticker,
             params={
                 "period1": self._epoch(start),
                 "period2": self._epoch(end, exclusive_end=True),
@@ -95,8 +131,8 @@ class YahooCompatiblePriceProvider:
         return rows[0] if rows else None
 
     async def get_market_snapshot(self, security: Security) -> MarketSnapshot | None:
-        payload = await self.http.get_json(
-            f"{self.base_url}/{security.ticker}",
+        payload = await self._get_chart_json(
+            security.ticker,
             params={"range": "5d", "interval": "1d", "includeAdjustedClose": "true"},
         )
         rows = self.parse_chart(security.security_id, security.ticker, payload, retrieved_at=utc_now())
@@ -156,8 +192,9 @@ class YahooCompatiblePriceProvider:
 
     async def validate_symbol(self, security: Security) -> bool:
         try:
-            payload = await self.http.get_json(
-                f"{self.base_url}/{security.ticker}", params={"range": "5d", "interval": "1d"}
+            payload = await self._get_chart_json(
+                security.ticker,
+                params={"range": "5d", "interval": "1d"},
             )
             result = (payload.get("chart") or {}).get("result") or []
             return bool(result)
