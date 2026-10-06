@@ -36,7 +36,7 @@ class ScannerTask(QRunnable):
 
 
 class MarketScannerDialog(QDialog):
-    COLUMNS = ('Ticker','Exchange','V1.2','V1.4','V1.2 Route','V1.4 Route','Delisted')
+    COLUMNS = ('Ticker','Exchange','DNA60','V1.2','V1.4','V1.2 Route','V1.4 Route','Missing','Delisted')
 
     def __init__(self, *, scanner_service_factory: Callable[[], object], as_of_date: date, parent=None) -> None:
         super().__init__(parent)
@@ -142,11 +142,17 @@ class MarketScannerDialog(QDialog):
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(rows))
         for index, row in enumerate(rows):
+            dna60 = row.metadata.get('dna60')
+            missing = row.metadata.get('v12_missing') or ()
             values = (
-                row.ticker, row.exchange,
+                row.ticker,
+                row.exchange,
+                '—' if dna60 is None else f'{float(dna60):.1f}',
                 '—' if row.v12_score is None else f'{row.v12_score:.1f}',
                 '—' if row.v14_score is None else f'{row.v14_score:.1f}',
-                row.v12_route or '—', row.v14_route or '—',
+                row.v12_route or '—',
+                row.v14_route or '—',
+                ', '.join(str(item) for item in missing) if missing else '—',
                 'YES' if row.delisted else 'NO',
             )
             for column, value in enumerate(values):
