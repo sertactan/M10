@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 from app.bootstrap import AppContainer
@@ -23,7 +23,7 @@ from data.storage.parquet_price_store import ParquetPriceStore
 
 
 AS_OF_DATE = date(2026, 10, 6)
-AS_OF = datetime(2026, 10, 6, 23, 59, tzinfo=timezone.utc)
+AS_OF = datetime.combine(AS_OF_DATE, time.max, tzinfo=timezone.utc)
 
 
 def _fact(
