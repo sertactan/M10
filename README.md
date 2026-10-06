@@ -120,6 +120,19 @@ See `PHASE5_STATUS.md` for the required canonical artifacts and the no-invention
 - feature/outcome firewall and reproducible outcome hashes
 - benchmark + complete trading-calendar/corporate-action + Golden Backtest specs remain fail-closed if absent
 
+
+### Phase 7 — Market Scanner 🚧 dependent / implemented, production gate pending
+- current + historical US universe scanner
+- NASDAQ / NYSE / AMEX coverage
+- canonical PIT feature loading
+- production adapter invokes Phase 4 V1.2 + Phase 5 V1.4 only
+- historical delisted securities preserved
+- sort / filter / CSV export
+- 10,000+ security batch path
+- progress callback + background scanner worker
+- exact 15-item acceptance contract encoded
+- final completion remains blocked by canonical V1.4 production scoring
+
 ## Historical price provider priority
 
 1. **Massive** — primary professional historical/current market data
