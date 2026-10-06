@@ -6,8 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import app.bulk_data_bootstrap as bulk_bootstrap
 from app.bulk_data_bootstrap import (
+    STOOQ_BULK_DIRECT_URLS,
     discover_stooq_us_daily_ascii_url,
+    download_stooq_us_daily_ascii,
+    ensure_sec_companyfacts_bulk,
     import_sec_companyfacts_zip,
 )
 from data.database.sqlite_store import SQLiteStore
@@ -140,5 +144,74 @@ def test_sec_companyfacts_bulk_import_keeps_only_canonical_metrics(tmp_path: Pat
         assert [row["metric_name"] for row in rows] == ["REVENUE"]
         assert rows[0]["source"] == "SEC_EDGAR"
         assert rows[0]["validation_status"] == "SEC_CANONICAL"
+    finally:
+        store.close()
+
+
+
+def test_stooq_download_prefers_static_direct_archive(tmp_path: Path, monkeypatch):
+    calls = []
+
+    def fake_download(url, destination, *, headers=None, timeout_seconds=180.0):
+        calls.append(url)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"ZIP")
+        return destination
+
+    monkeypatch.setattr(bulk_bootstrap, "_download", fake_download)
+    target = tmp_path / "d_us_txt.zip"
+    result = download_stooq_us_daily_ascii(target)
+    assert result == target
+    assert calls == [STOOQ_BULK_DIRECT_URLS[0]]
+
+
+def test_sec_bulk_403_falls_back_to_companyfacts_api(tmp_path: Path, monkeypatch):
+    store = SQLiteStore(tmp_path / "fallback.sqlite")
+    store.initialize()
+    try:
+        now = datetime(2026, 10, 6, tzinfo=timezone.utc).isoformat()
+        for i in range(2):
+            store.connection.execute(
+                """
+                INSERT INTO security_master (
+                    security_id,ticker,name,exchange,market,cik,active,created_at,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    f"SEC_{i}",
+                    f"T{i}",
+                    f"Test {i}",
+                    "NASDAQ",
+                    "US",
+                    str(i + 1).zfill(10),
+                    1,
+                    now,
+                    now,
+                ),
+            )
+        store.connection.commit()
+
+        class FakeApp:
+            sqlite = store
+
+            def resolve_data_path(self, value):
+                return tmp_path / value
+
+        def fail_download(*args, **kwargs):
+            raise RuntimeError("403 Forbidden")
+
+        monkeypatch.setattr(bulk_bootstrap, "_download", fail_download)
+        monkeypatch.setattr(
+            bulk_bootstrap,
+            "fill_sec_companyfacts_from_api",
+            lambda app, target_coverage_ratio: (2, 7),
+        )
+
+        securities, facts = ensure_sec_companyfacts_bulk(
+            FakeApp(),
+            minimum_coverage_ratio=0.70,
+        )
+        assert securities == 2
+        assert facts == 7
     finally:
         store.close()
