@@ -38,6 +38,7 @@ from data.repositories.model_run_repository import ModelRunRepository
 from data.repositories.price_repository import PriceRepository
 from data.repositories.provider_health_repository import ProviderHealthRepository
 from data.repositories.security_repository import SecurityRepository
+from data.repositories.validation_repository import ValidationRepository
 from data.storage.parquet_price_store import ParquetPriceStore
 
 
@@ -252,6 +253,27 @@ def show_fundamentals(root: Path, ticker: str, as_of_text: str) -> int:
         app.close()
 
 
+def show_validation(root: Path, ticker: str) -> int:
+    app = AppContainer(root)
+    app.initialize()
+    try:
+        security = _load_security(app, ticker)
+        payload = ValidationRepository(app.sqlite).summary(security.security_id)
+        print(json.dumps(
+            {
+                "ticker": security.ticker,
+                "security_id": security.security_id,
+                **payload,
+            },
+            indent=2,
+            sort_keys=True,
+            default=str,
+        ))
+        return 0
+    finally:
+        app.close()
+
+
 def ingest_ir_json(root: Path, ticker: str, json_path: str) -> int:
     app = AppContainer(root)
     app.initialize()
@@ -365,6 +387,11 @@ def main() -> int:
     parser.add_argument("--fund-provider", default="AUTO", help="AUTO/SEC_EDGAR/FINNHUB/SIMFIN/FMP")
     parser.add_argument("--show-fundamentals", metavar="TICKER", help="Show canonical PIT fundamental snapshot")
     parser.add_argument("--fund-as-of", help="Fundamental snapshot date YYYY-MM-DD")
+    parser.add_argument(
+        "--show-validation",
+        metavar="TICKER",
+        help="Show persisted price/fundamental cross-provider validation diagnostics",
+    )
     parser.add_argument("--ingest-ir-json", metavar="JSON", help="Ingest structured official IR KPI/guidance JSON")
     parser.add_argument("--ir-ticker", help="Ticker for --ingest-ir-json")
 
@@ -402,6 +429,8 @@ def main() -> int:
         if not args.fund_as_of:
             parser.error("--show-fundamentals requires --fund-as-of YYYY-MM-DD")
         return show_fundamentals(root, args.show_fundamentals, args.fund_as_of)
+    if args.show_validation:
+        return show_validation(root, args.show_validation)
     if args.ingest_ir_json:
         if not args.ir_ticker:
             parser.error("--ingest-ir-json requires --ir-ticker")

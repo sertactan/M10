@@ -15,6 +15,15 @@ from data.repositories.price_repository import PriceRepository
 from data.repositories.provider_health_repository import ProviderHealthRepository
 
 
+VALIDATION_PROVIDER_PRIORITY = (
+    "MASSIVE",
+    "MARKETPARQUET",
+    "SIMFIN",
+    "YAHOO_COMPAT",
+    "STOOQ",
+)
+
+
 class HistoricalPriceEngine:
     def __init__(
         self,
@@ -41,6 +50,18 @@ class HistoricalPriceEngine:
         eligible = tuple(name for name in static if name not in fallback_names)
         fallback = tuple(name for name in static if name in fallback_names)
         return self.health.rank(eligible) + self.health.rank(fallback)
+
+    def _validation_provider_order(self, selected_source: str) -> tuple[str, ...]:
+        candidates = tuple(
+            name
+            for name in VALIDATION_PROVIDER_PRIORITY
+            if name != selected_source
+            and self.providers.get(name) is not None
+            and getattr(self.providers[name], "configured", True) is not False
+        )
+        if self.health is None:
+            return candidates
+        return self.health.rank(candidates)
 
     async def sync_history(
         self,
@@ -139,9 +160,9 @@ class HistoricalPriceEngine:
         selected_source_symbol: str,
     ) -> None:
         # Validation is intentionally separate from selection: no rows are stitched.
-        candidates = ["YAHOO_COMPAT", "SIMFIN", "MARKETPARQUET", "STOOQ"]
-        if self.health is not None:
-            candidates = list(self.health.rank(candidates))
+        # A configured Massive feed may validate a free/local primary, and vice
+        # versa. Yahoo may confirm a series but can never become authoritative.
+        candidates = self._validation_provider_order(selected_source)
 
         other_descriptor = None
         for name in candidates:
