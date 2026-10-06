@@ -2,7 +2,7 @@
 
 ## Status
 
-**STARTED on a dependent branch.**
+**BUILD COMPLETE; final production release remains dependency-blocked.**
 
 Master-prompt scope:
 
