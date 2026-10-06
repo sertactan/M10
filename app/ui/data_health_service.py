@@ -90,7 +90,10 @@ class DataHealthService:
             return self._snapshot_from_store(self.store)
         assert self.root is not None
         app = AppContainer(self.root)
-        app.initialize()
+        # Health refresh is local-only and must stay lightweight. Initialize the
+        # SQLite schema directly; do not re-run bundled security seed bootstrap
+        # every five seconds.
+        app.sqlite.initialize()
         try:
             return self._snapshot_from_store(app.sqlite)
         finally:
