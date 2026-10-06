@@ -127,10 +127,15 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
         ),
         v14=ModelView(
             model_name="S15.3 V1.4",
-            status="BLOCKED_CANONICAL_SPEC",
+            status="10X_DISCOVERY",
+            score=76.4,
+            route="F10",
+            destination=None,
+            confidence=78.0,
+            risk=None,
         ),
         v12_components={"Core15.3": 81.2},
-        v14_components={},
+        v14_components={"M10_D": 72.0, "M10_C": 68.0, "DMG": 4.0, "EA10": 71.0},
     )
     try:
         window._apply_analysis(result)
@@ -144,7 +149,9 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
         assert len(window.v14_page.price_chart.chart.series()) == 2
         assert window.v12_page.score.text() == "81.2 / 100"
         assert window.v12_page.route.text() == "F10"
-        assert window.v14_page.status.text() == "BLOCKED_CANONICAL_SPEC"
+        assert window.v14_page.status.text() == "10X_DISCOVERY"
+        assert window.v14_page.score.text() == "76.4 / 100"
+        assert window.v14_page.components.rowCount() == 4
         assert window.compare_page.consensus.text() == "MODEL CONSENSUS: —"
         assert window.compare_page.winner.text() == "Winner: —"
         assert "LOADED TEST" in window.status.text()
@@ -460,11 +467,11 @@ def test_phase9_acceptance_gate_requires_exact_matrix():
     assert len(PHASE9_ACCEPTANCE_ITEMS) == 18
 
     blocked = list(items)
-    index = PHASE9_ACCEPTANCE_ITEMS.index("V1.4 fail-closed state")
+    index = PHASE9_ACCEPTANCE_ITEMS.index("V1.4 canonical execution")
     blocked[index] = UIAcceptanceItem(
-        name="V1.4 fail-closed state",
+        name="V1.4 canonical execution",
         passed=False,
-        evidence="canonical V1.4 still blocked",
+        evidence="canonical V1.4 execution unavailable",
     )
-    with pytest.raises(RuntimeError, match="V1.4 fail-closed state"):
+    with pytest.raises(RuntimeError, match="V1.4 canonical execution"):
         require_phase9_complete(blocked)
