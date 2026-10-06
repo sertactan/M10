@@ -11,6 +11,7 @@ from core.features.s153_v12_input_loader import S153V12InputLoader
 from core.models.s153_v12 import S153V12Model
 from core.models.s153_v12_contracts import S153V12Input
 from core.routes.s153_v12 import route_scores
+from core.scoring.dna60 import dna60
 from core.scoring.s153_v12_final import (
     core153,
     final_s153,
@@ -120,6 +121,18 @@ def _full_features() -> dict[str, float]:
         "DATA_COVERAGE":90,"SOURCE_QUALITY":90,"PIT_INTEGRITY":90,"MODEL_FIT":90,
     })
     return f
+
+
+def test_dna60_renormalizes_when_control12_is_unavailable() -> None:
+    assert dna60(72.0, None) == pytest.approx(72.0)
+
+
+def test_dna60_renormalizes_when_core48_is_unavailable() -> None:
+    assert dna60(None, 64.0) == pytest.approx(64.0)
+
+
+def test_dna60_keeps_canonical_weights_when_both_blocks_exist() -> None:
+    assert dna60(80.0, 60.0) == pytest.approx(74.0)
 
 
 def test_canonical_true_10x_example() -> None:
