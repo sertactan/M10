@@ -109,7 +109,7 @@ async def sync_price(root: Path, ticker: str, start: date, end: date, provider: 
     app.initialize()
     try:
         security = _load_security(app, ticker)
-        parquet = ParquetPriceStore(root / app.app_config.database.parquet_root)
+        parquet = ParquetPriceStore(app.resolve_data_path(app.app_config.database.parquet_root))
         repo = PriceRepository(app.sqlite, parquet)
         providers = {
             "MASSIVE": MassivePriceProvider(),
@@ -270,7 +270,7 @@ def ingest_stooq_bulk(root: Path, zip_path: str) -> int:
     try:
         security_repo = SecurityRepository(app.sqlite)
         price_repo = PriceRepository(
-            app.sqlite, ParquetPriceStore(root / app.app_config.database.parquet_root)
+            app.sqlite, ParquetPriceStore(app.resolve_data_path(app.app_config.database.parquet_root))
         )
         provider = StooqPriceProvider()
         count = 0
