@@ -1,18 +1,32 @@
 from __future__ import annotations
 
 from datetime import date
+from time import perf_counter
 
 from core.contracts.entities import Security
 from core.prices.policy import DEFAULT_PROVIDER_PRIORITY, PriceSelectionPolicy, PriceSourceMixingError
 from core.prices.validation import compare_adjusted_close
 from data.repositories.price_repository import PriceRepository
+from data.repositories.provider_health_repository import ProviderHealthRepository
 
 
 class HistoricalPriceEngine:
-    def __init__(self, repository: PriceRepository, providers: dict[str, object]) -> None:
+    def __init__(
+        self,
+        repository: PriceRepository,
+        providers: dict[str, object],
+        health: ProviderHealthRepository | None = None,
+    ) -> None:
         self.repository = repository
         self.providers = providers
+        self.health = health
         self.policy = PriceSelectionPolicy()
+
+    def _provider_order(self, provider: str) -> tuple[str, ...]:
+        static = (provider.upper(),) if provider.upper() != "AUTO" else DEFAULT_PROVIDER_PRIORITY
+        if self.health is None or provider.upper() != "AUTO":
+            return static
+        return self.health.rank(static)
 
     async def sync_history(
         self,
@@ -24,7 +38,7 @@ class HistoricalPriceEngine:
         provider: str = "AUTO",
         validate_with_fallback: bool = True,
     ):
-        order = (provider.upper(),) if provider.upper() != "AUTO" else DEFAULT_PROVIDER_PRIORITY
+        order = self._provider_order(provider)
         downloaded = []
         selection = None
 
@@ -32,14 +46,44 @@ class HistoricalPriceEngine:
             p = self.providers.get(name)
             if p is None or getattr(p, "configured", True) is False:
                 continue
+            if self.health is not None and not self.health.can_attempt(name):
+                continue
+
+            started = perf_counter()
             try:
                 if not await p.validate_symbol(security):
+                    if self.health is not None:
+                        self.health.record_failure(
+                            name,
+                            latency_ms=(perf_counter() - started) * 1000.0,
+                            message="symbol validation failed",
+                        )
                     continue
                 bars = list(await p.get_history(security, start, end))
-            except Exception:
+                if not bars:
+                    if self.health is not None:
+                        self.health.record_failure(
+                            name,
+                            latency_ms=(perf_counter() - started) * 1000.0,
+                            message="provider returned no bars",
+                        )
+                    continue
+                if self.health is not None:
+                    self.health.record_success(
+                        name,
+                        latency_ms=(perf_counter() - started) * 1000.0,
+                    )
+            except Exception as exc:
+                if self.health is not None:
+                    text = str(exc)
+                    self.health.record_failure(
+                        name,
+                        latency_ms=(perf_counter() - started) * 1000.0,
+                        rate_limited=("429" in text or "rate limit" in text.lower()),
+                        message=text[:500],
+                    )
                 continue
-            if not bars:
-                continue
+
             self.policy.assert_single_source(bars)
             descriptor = self.repository.save_series(bars)
             downloaded.append(descriptor)
@@ -82,6 +126,9 @@ class HistoricalPriceEngine:
     ) -> None:
         # Validation is intentionally separate from selection: no rows are stitched.
         candidates = ["YAHOO_COMPAT", "SIMFIN", "MARKETPARQUET", "STOOQ"]
+        if self.health is not None:
+            candidates = list(self.health.rank(candidates))
+
         other_descriptor = None
         for name in candidates:
             if name == selected_source:
@@ -89,16 +136,45 @@ class HistoricalPriceEngine:
             p = self.providers.get(name)
             if p is None or getattr(p, "configured", True) is False:
                 continue
+            if self.health is not None and not self.health.can_attempt(name):
+                continue
+
+            started = perf_counter()
             try:
                 if not await p.validate_symbol(security):
+                    if self.health is not None:
+                        self.health.record_failure(
+                            name,
+                            latency_ms=(perf_counter() - started) * 1000.0,
+                            message="validation provider rejected symbol",
+                        )
                     continue
                 bars = list(await p.get_history(security, start, end))
                 if not bars:
+                    if self.health is not None:
+                        self.health.record_failure(
+                            name,
+                            latency_ms=(perf_counter() - started) * 1000.0,
+                            message="validation provider returned no bars",
+                        )
                     continue
+                if self.health is not None:
+                    self.health.record_success(
+                        name,
+                        latency_ms=(perf_counter() - started) * 1000.0,
+                    )
                 self.policy.assert_single_source(bars)
                 other_descriptor = self.repository.save_series(bars)
                 break
-            except Exception:
+            except Exception as exc:
+                if self.health is not None:
+                    text = str(exc)
+                    self.health.record_failure(
+                        name,
+                        latency_ms=(perf_counter() - started) * 1000.0,
+                        rate_limited=("429" in text or "rate limit" in text.lower()),
+                        message=text[:500],
+                    )
                 continue
         if other_descriptor is None:
             return
