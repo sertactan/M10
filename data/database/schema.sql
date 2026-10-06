@@ -435,3 +435,63 @@ CREATE INDEX IF NOT EXISTS idx_canonical_model_features_pit
 ON canonical_model_features(security_id,feature_key,feature_as_of,available_at);
 CREATE INDEX IF NOT EXISTS idx_canonical_model_features_source
 ON canonical_model_features(source_phase,source_ref);
+
+
+-- Phase 6: canonical historical backtest labels/evaluation.
+-- Feature/model scoring remains physically/logically separate from future outcome labels.
+CREATE TABLE IF NOT EXISTS forward_outcomes (
+    observation_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    as_of_date_requested TEXT NOT NULL,
+    anchor_session TEXT,
+    anchor_lag_calendar_days INTEGER,
+    entry_adjusted_close REAL,
+    horizon_sessions_available INTEGER NOT NULL,
+    fm252 REAL,
+    max_multiple_observed REAL,
+    outcome_class TEXT,
+    time_to_2x_sessions INTEGER,
+    time_to_3x_sessions INTEGER,
+    time_to_5x_sessions INTEGER,
+    time_to_7x_sessions INTEGER,
+    time_to_10x_sessions INTEGER,
+    outcome_status TEXT NOT NULL,
+    diagnostics_json TEXT NOT NULL DEFAULT '{}',
+    outcome_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forward_outcomes_security_date
+ON forward_outcomes(security_id,as_of_date_requested,outcome_status);
+
+CREATE TABLE IF NOT EXISTS backtest_predictions (
+    observation_id TEXT NOT NULL,
+    model_version TEXT NOT NULL,
+    score REAL,
+    precision_confirmed INTEGER,
+    status TEXT NOT NULL,
+    score_hash TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(observation_id,model_version)
+);
+
+CREATE TABLE IF NOT EXISTS backtest_run_manifest (
+    run_id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    s15_spec_version TEXT NOT NULL,
+    backtest_spec_version TEXT NOT NULL,
+    feature_version TEXT,
+    match_version TEXT,
+    universe_version TEXT,
+    price_data_version TEXT,
+    fundamental_data_version TEXT,
+    winner_count INTEGER,
+    control_count INTEGER,
+    censored_count INTEGER,
+    match_quality_distribution TEXT,
+    date_min TEXT,
+    date_max TEXT,
+    git_commit TEXT,
+    random_seed INTEGER NOT NULL DEFAULT 0,
+    dataset_hash TEXT,
+    status TEXT NOT NULL
+);

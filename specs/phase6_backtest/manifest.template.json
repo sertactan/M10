@@ -1,0 +1,35 @@
+{
+  "bundle_id": "PENDING_AUTHORITATIVE_PHASE6_BUNDLE",
+  "artifacts": [
+    {
+      "name": "Historical Backtest Specification",
+      "path": "REPLACE_WITH_HISTORICAL_BACKTEST_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "Point-in-Time Controls Specification",
+      "path": "REPLACE_WITH_PIT_CONTROLS_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "Corporate Action Adjustment Specification",
+      "path": "REPLACE_WITH_CORPORATE_ACTION_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "Trading Calendar Specification",
+      "path": "REPLACE_WITH_TRADING_CALENDAR_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "Benchmark Specification",
+      "path": "REPLACE_WITH_BENCHMARK_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    {
+      "name": "Golden Backtest Test Cases",
+      "path": "REPLACE_WITH_GOLDEN_BACKTEST_FILENAME",
+      "sha256": "REPLACE_WITH_SHA256"
+    }
+  ]
+}
