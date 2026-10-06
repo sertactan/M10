@@ -201,7 +201,7 @@ Acceptance:
 
 ## Phase 7 — Async Provider Racing
 
-Status: PLANNED
+Status: COMPLETE
 
 Deliverables:
 - Safe parallel probes for eligible fallback/enrichment providers.

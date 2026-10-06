@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -8,6 +9,16 @@ from time import perf_counter
 from core.contracts.entities import Security
 from data.repositories.fundamental_repository import FundamentalRepository
 from data.repositories.provider_health_repository import ProviderHealthRepository
+
+
+@dataclass(frozen=True)
+class _ProviderSyncOutcome:
+    provider: str
+    filings_loaded: int = 0
+    facts_loaded: int = 0
+    estimates_loaded: int = 0
+    kpis_loaded: int = 0
+    error: Exception | None = None
 
 
 @dataclass(frozen=True)
@@ -31,10 +42,18 @@ class FundamentalEngine:
         repository: FundamentalRepository,
         providers: dict[str, object],
         health: ProviderHealthRepository | None = None,
+        provider_concurrency_limits: dict[str, int] | None = None,
+        default_provider_concurrency: int = 2,
     ) -> None:
         self.repository = repository
         self.providers = providers
         self.health = health
+        self.default_provider_concurrency = max(1, int(default_provider_concurrency))
+        self.provider_concurrency_limits = {
+            name.upper(): max(1, int(limit))
+            for name, limit in (provider_concurrency_limits or {}).items()
+        }
+        self._provider_semaphores: dict[str, asyncio.Semaphore] = {}
 
     def _provider_order(self, mode: str) -> tuple[str, ...]:
         selected = self.REGULATORY_PRIORITY if mode == "AUTO" else (mode,)
@@ -46,6 +65,72 @@ class FundamentalEngine:
             return self.health.rank(selected)
         secondary = tuple(name for name in selected if name != "SEC_EDGAR")
         return ("SEC_EDGAR",) + self.health.rank(secondary)
+
+    def _provider_semaphore(self, name: str) -> asyncio.Semaphore:
+        key = name.upper()
+        semaphore = self._provider_semaphores.get(key)
+        if semaphore is None:
+            limit = self.provider_concurrency_limits.get(
+                key, self.default_provider_concurrency
+            )
+            semaphore = asyncio.Semaphore(limit)
+            self._provider_semaphores[key] = semaphore
+        return semaphore
+
+    async def _sync_one_provider(
+        self,
+        name: str,
+        security: Security,
+        *,
+        include_estimates: bool,
+        include_metrics: bool,
+    ) -> _ProviderSyncOutcome:
+        provider = self.providers[name]
+        async with self._provider_semaphore(name):
+            provider_started = perf_counter()
+            try:
+                if not await provider.validate_symbol(security):
+                    raise RuntimeError("symbol validation failed")
+
+                filings = list(await provider.get_filings(security))
+                facts = list(await provider.get_facts(security))
+                filings_loaded = self.repository.save_filings(filings)
+                facts_loaded = self.repository.save_facts(facts)
+
+                estimates_loaded = 0
+                if include_estimates and name == "FINNHUB":
+                    estimates = list(await provider.get_estimates(security))
+                    estimates_loaded = self.repository.save_estimates(estimates)
+
+                kpis_loaded = 0
+                if include_metrics and name in {"FINNHUB", "FMP"}:
+                    metrics = list(await provider.get_company_metrics(security))
+                    kpis_loaded = self.repository.save_guidance_kpis(metrics)
+
+                if self.health is not None:
+                    self.health.record_success(
+                        name,
+                        latency_ms=(perf_counter() - provider_started) * 1000.0,
+                    )
+                return _ProviderSyncOutcome(
+                    provider=name,
+                    filings_loaded=filings_loaded,
+                    facts_loaded=facts_loaded,
+                    estimates_loaded=estimates_loaded,
+                    kpis_loaded=kpis_loaded,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                if self.health is not None:
+                    text = str(exc)
+                    self.health.record_failure(
+                        name,
+                        latency_ms=(perf_counter() - provider_started) * 1000.0,
+                        rate_limited=("429" in text or "rate limit" in text.lower()),
+                        message=text[:500],
+                    )
+                return _ProviderSyncOutcome(provider=name, error=exc)
 
     async def sync_security(
         self,
@@ -74,6 +159,7 @@ class FundamentalEngine:
         errors: list[str] = []
 
         try:
+            eligible: list[str] = []
             for name in selected:
                 provider = self.providers.get(name)
                 if provider is None or getattr(provider, "configured", True) is False:
@@ -81,49 +167,61 @@ class FundamentalEngine:
                 if self.health is not None and not self.health.can_attempt(name):
                     errors.append(f"{name}: circuit open")
                     continue
+                eligible.append(name)
 
-                provider_started = perf_counter()
-                try:
-                    if not await provider.validate_symbol(security):
-                        if self.health is not None:
-                            self.health.record_failure(
-                                name,
-                                latency_ms=(perf_counter() - provider_started) * 1000.0,
-                                message="symbol validation failed",
-                            )
-                        continue
+            def consume(outcome: _ProviderSyncOutcome) -> None:
+                nonlocal filings_loaded, facts_loaded, estimates_loaded, kpis_loaded
+                if outcome.error is not None:
+                    errors.append(f"{outcome.provider}: {outcome.error}")
+                    return
+                filings_loaded += outcome.filings_loaded
+                facts_loaded += outcome.facts_loaded
+                estimates_loaded += outcome.estimates_loaded
+                kpis_loaded += outcome.kpis_loaded
+                used.append(outcome.provider)
 
-                    filings = list(await provider.get_filings(security))
-                    facts = list(await provider.get_facts(security))
-                    filings_loaded += self.repository.save_filings(filings)
-                    facts_loaded += self.repository.save_facts(facts)
+            if mode == "AUTO" and "SEC_EDGAR" in eligible:
+                # SEC is authoritative and completes before enrichment providers
+                # begin. Parallelism is only used among secondary/enrichment
+                # providers, so canonical regulatory precedence cannot change.
+                sec_outcome = await self._sync_one_provider(
+                    "SEC_EDGAR",
+                    security,
+                    include_estimates=include_estimates,
+                    include_metrics=include_metrics,
+                )
+                consume(sec_outcome)
+                eligible = [name for name in eligible if name != "SEC_EDGAR"]
 
-                    if include_estimates and name == "FINNHUB":
-                        estimates = list(await provider.get_estimates(security))
-                        estimates_loaded += self.repository.save_estimates(estimates)
-
-                    if include_metrics and name in {"FINNHUB", "FMP"}:
-                        metrics = list(await provider.get_company_metrics(security))
-                        kpis_loaded += self.repository.save_guidance_kpis(metrics)
-
-                    if self.health is not None:
-                        self.health.record_success(
+            if mode == "AUTO":
+                outcomes = await asyncio.gather(
+                    *(
+                        self._sync_one_provider(
                             name,
-                            latency_ms=(perf_counter() - provider_started) * 1000.0,
+                            security,
+                            include_estimates=include_estimates,
+                            include_metrics=include_metrics,
                         )
-                    used.append(name)
-                except Exception as exc:
-                    text = str(exc)
-                    errors.append(f"{name}: {text}")
-                    if self.health is not None:
-                        self.health.record_failure(
-                            name,
-                            latency_ms=(perf_counter() - provider_started) * 1000.0,
-                            rate_limited=("429" in text or "rate limit" in text.lower()),
-                            message=text[:500],
-                        )
-                    if name == "SEC_EDGAR" and mode == "SEC_EDGAR":
-                        raise
+                        for name in eligible
+                    )
+                )
+                for outcome in outcomes:
+                    consume(outcome)
+            else:
+                for name in eligible:
+                    outcome = await self._sync_one_provider(
+                        name,
+                        security,
+                        include_estimates=include_estimates,
+                        include_metrics=include_metrics,
+                    )
+                    consume(outcome)
+                    if (
+                        name == "SEC_EDGAR"
+                        and mode == "SEC_EDGAR"
+                        and outcome.error is not None
+                    ):
+                        raise outcome.error
 
             validations = self.repository.validate_against_sec(security.security_id)
             status = "SUCCESS" if used else "NO_PROVIDER_DATA"

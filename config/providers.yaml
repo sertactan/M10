@@ -91,3 +91,18 @@ fmp:
   base_url: "https://financialmodelingprep.com/stable"
   api_key_env: "FMP_API_KEY"
   role: "fallback_validation"
+
+async_racing:
+  enabled: true
+  default_provider_concurrency: 2
+  provider_concurrency_limits:
+    SEC_EDGAR: 1
+    MASSIVE: 2
+    STOOQ: 2
+    SIMFIN: 2
+    YAHOO_COMPAT: 2
+    MARKETPARQUET: 4
+    FINNHUB: 2
+    FMP: 2
+  preserve_canonical_priority: true
+  cancel_losers_after_winner: true
