@@ -24,16 +24,8 @@ def test_model_configs_follow_phase_status() -> None:
     v14 = load_yaml(ROOT / "config" / "s153_v14.yaml", ModelConfig)
     assert v12.enabled is True
     assert v12.status == "IMPLEMENTED_PHASE_4_CANONICAL_KERNEL"
-    assert v14.enabled is False
-    with pytest.raises(ModelNotImplemented):
-        S153ModelBase(v14).analyze(
-            ModelInput(
-                security_id="SEC_TEST",
-                ticker="TEST",
-                as_of=datetime(2025, 5, 5, tzinfo=timezone.utc),
-                factors={},
-            )
-        )
+    assert v14.enabled is True
+    assert v14.status == "ACTIVE_RECOVERED_CANONICAL"
 
 
 def test_pit_guard_blocks_future_availability() -> None:
