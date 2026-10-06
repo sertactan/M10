@@ -382,6 +382,35 @@ def ingest_stooq_bulk(root: Path, zip_path: str) -> int:
         app.close()
 
 
+def verify_pilot_historical(root: Path) -> int:
+    from core.historical.pilot_verification import (
+        PilotHistoricalVerifier,
+        load_pilot_observations,
+    )
+
+    app = AppContainer(root)
+    app.initialize()
+    try:
+        observations = load_pilot_observations(root / "data" / "seeds")
+        rows, summary = PilotHistoricalVerifier(app).verify_all(observations)
+        status_counts: dict[str, int] = {}
+        for row in rows:
+            status_counts[row.status] = status_counts.get(row.status, 0) + 1
+        print(json.dumps(
+            {
+                "summary": summary.as_dict(),
+                "status_counts": dict(sorted(status_counts.items())),
+                "strict_pit": True,
+                "proxy_controls_promoted_without_fm252": False,
+            },
+            indent=2,
+            sort_keys=True,
+        ))
+        return 0
+    finally:
+        app.close()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="S15.3 Research Terminal")
     parser.add_argument("--ui", action="store_true", help="Launch the desktop UI")
@@ -413,6 +442,11 @@ def main() -> int:
     parser.add_argument("--ir-ticker", help="Ticker for --ingest-ir-json")
 
     parser.add_argument("--run-v12", metavar="TICKER", help="Run canonical S15.3 V1.2 from PIT canonical model features")
+    parser.add_argument(
+        "--verify-pilot-historical",
+        action="store_true",
+        help="Verify frozen 46 winner / 150 control pilot rows from canonical adjusted BACKTEST paths",
+    )
     parser.add_argument("--model-as-of", help="V1.2 analysis date YYYY-MM-DD")
 
     args = parser.parse_args()
@@ -456,6 +490,8 @@ def main() -> int:
         if not args.model_as_of:
             parser.error("--run-v12 requires --model-as-of YYYY-MM-DD")
         return run_v12(root, args.run_v12, args.model_as_of)
+    if args.verify_pilot_historical:
+        return verify_pilot_historical(root)
 
     from app.ui.launcher import launch_ui
     return launch_ui(root)
