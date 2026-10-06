@@ -10,6 +10,7 @@ from core.contracts.entities import Security
 from core.contracts.enums import Exchange
 from data.providers.sec_edgar_fundamentals import SECEdgarFundamentalsProvider
 from data.providers.sec_edgar_universe import SECEdgarUniverseProvider
+from data.providers.stooq_price import StooqPriceProvider
 from data.providers.yahoo_price import YahooCompatiblePriceProvider
 from data.repositories.fundamental_repository import FundamentalRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
@@ -139,49 +140,71 @@ async def ensure_price_history(
 
     security = _security_from_row(row)
     health = ProviderHealthRepository(app.sqlite)
-    if not health.can_attempt("YAHOO_COMPAT"):
+    start = as_of_date - timedelta(days=lookback_days)
+
+    # Desktop live bootstrap is resilient to a Yahoo 429. Yahoo remains the
+    # preferred adjusted UI source when healthy; Stooq is a real-data fallback
+    # and is stored with its original BOOTSTRAP / RAW_ONLY provenance.
+    providers = (
+        ("YAHOO_COMPAT", YahooCompatiblePriceProvider()),
+        ("STOOQ", StooqPriceProvider()),
+    )
+    errors: list[str] = []
+    bars = None
+    provider_name = None
+
+    for name, provider in providers:
+        if not health.can_attempt(name):
+            errors.append(f"{name}: circuit open")
+            continue
+
+        provider_start = start
+        if incremental:
+            latest = app.sqlite.connection.execute(
+                """
+                SELECT end_date
+                FROM price_series_registry
+                WHERE security_id=? AND source=?
+                ORDER BY end_date DESC
+                LIMIT 1
+                """,
+                (security.security_id, name),
+            ).fetchone()
+            if latest is not None:
+                overlap_start = date.fromisoformat(latest["end_date"]) - timedelta(days=7)
+                provider_start = max(provider_start, overlap_start)
+
+        started = perf_counter()
+        try:
+            candidate_bars = await provider.get_history(
+                security, provider_start, as_of_date
+            )
+            if not candidate_bars:
+                raise RuntimeError(f"No live price history returned for {security.ticker}")
+            health.record_success(
+                name,
+                latency_ms=(perf_counter() - started) * 1000.0,
+            )
+            bars = candidate_bars
+            provider_name = name
+            break
+        except Exception as exc:
+            text = str(exc)
+            health.record_failure(
+                name,
+                latency_ms=(perf_counter() - started) * 1000.0,
+                rate_limited=("429" in text or "rate limit" in text.lower()),
+                message=text[:500],
+            )
+            errors.append(f"{name}: {text}")
+
+    if bars is None or provider_name is None:
         if last_known_good is not None and not force_refresh:
             return 0
         raise RuntimeError(
-            f"YAHOO_COMPAT circuit is open; refresh deferred for {security.ticker}"
+            f"No live price provider available for {security.ticker}: "
+            + "; ".join(errors)
         )
-
-    provider = YahooCompatiblePriceProvider()
-    start = as_of_date - timedelta(days=lookback_days)
-    if incremental:
-        latest = app.sqlite.connection.execute(
-            """
-            SELECT end_date
-            FROM price_series_registry
-            WHERE security_id=? AND source='YAHOO_COMPAT'
-            ORDER BY end_date DESC
-            LIMIT 1
-            """,
-            (security.security_id,),
-        ).fetchone()
-        if latest is not None:
-            overlap_start = date.fromisoformat(latest["end_date"]) - timedelta(days=7)
-            start = max(start, overlap_start)
-    started = perf_counter()
-    try:
-        bars = await provider.get_history(security, start, as_of_date)
-        if not bars:
-            raise RuntimeError(f"No live price history returned for {security.ticker}")
-        health.record_success(
-            "YAHOO_COMPAT",
-            latency_ms=(perf_counter() - started) * 1000.0,
-        )
-    except Exception as exc:
-        text = str(exc)
-        health.record_failure(
-            "YAHOO_COMPAT",
-            latency_ms=(perf_counter() - started) * 1000.0,
-            rate_limited=("429" in text or "rate limit" in text.lower()),
-            message=text[:500],
-        )
-        if last_known_good is not None and not force_refresh:
-            return 0
-        raise
 
     parquet = ParquetPriceStore(
         app.resolve_data_path(app.app_config.database.parquet_root)
@@ -189,21 +212,29 @@ async def ensure_price_history(
     repo = PriceRepository(app.sqlite, parquet)
     descriptor = repo.save_series(bars)
 
-    # Yahoo is intentionally a fallback-quality provider in the canonical
-    # backtest policy. For desktop display we may still select its real,
-    # single-provider adjusted series explicitly; the source remains visible
-    # and is never promoted to authoritative backtest evidence.
+    purpose = (
+        "UI_LIVE_FALLBACK"
+        if provider_name == "YAHOO_COMPAT"
+        else "UI_LIVE_BOOTSTRAP"
+    )
     repo.select_series(
         security_id=security.security_id,
         start=descriptor.start_date,
         end=as_of_date,
         source=descriptor.source,
         source_symbol=descriptor.source_symbol,
-        purpose="UI_LIVE_FALLBACK",
-        reason="real single-provider Yahoo adjusted-price fallback for desktop display",
+        purpose=purpose,
+        reason=(
+            "real single-provider Yahoo adjusted-price fallback for desktop display"
+            if provider_name == "YAHOO_COMPAT"
+            else "real single-provider Stooq raw-price bootstrap after live-provider fallback"
+        ),
     )
 
-    last_bar = max((bar for bar in bars if bar.trade_date <= as_of_date), key=lambda b: b.trade_date)
+    last_bar = max(
+        (bar for bar in bars if bar.trade_date <= as_of_date),
+        key=lambda b: b.trade_date,
+    )
     feature_as_of = datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
     ModelFeatureRepository(app.sqlite).save_feature(
         security_id=security.security_id,
@@ -212,13 +243,16 @@ async def ensure_price_history(
         feature_as_of=feature_as_of,
         available_at=min(last_bar.retrieved_at, feature_as_of),
         source_phase="PHASE2_PRICE",
-        source_ref=f"YAHOO_COMPAT:{security.ticker}:{last_bar.trade_date.isoformat()}",
-        quality_status="FALLBACK_ONLY",
-        computation_version="desktop-live-bootstrap-v1",
-        evidence={"provider": "YAHOO_COMPAT", "trade_date": last_bar.trade_date.isoformat()},
+        source_ref=f"{provider_name}:{last_bar.source_symbol}:{last_bar.trade_date.isoformat()}",
+        quality_status=last_bar.quality_status.value,
+        computation_version="desktop-live-bootstrap-v2",
+        evidence={
+            "provider": provider_name,
+            "trade_date": last_bar.trade_date.isoformat(),
+            "adjustment_status": last_bar.adjustment_status.value,
+        },
     )
     return len(bars)
-
 
 def ensure_price_history_sync(app: AppContainer, row, *, as_of_date: date) -> int:
     return asyncio.run(ensure_price_history(app, row, as_of_date=as_of_date))
