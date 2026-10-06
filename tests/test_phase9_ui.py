@@ -149,7 +149,7 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
             risk=None,
         ),
         v14=ModelView(
-            model_name="S15.3 V1.4",
+            model_name="S15.3 V1.4.1",
             status="PRECISION_CONFIRMED_12M_10X",
             score=84.5,
             route="F10",
@@ -489,13 +489,13 @@ def test_phase9_acceptance_gate_requires_exact_matrix():
     assert len(PHASE9_ACCEPTANCE_ITEMS) == 18
 
     blocked = list(items)
-    index = PHASE9_ACCEPTANCE_ITEMS.index("V1.4 canonical active state")
+    index = PHASE9_ACCEPTANCE_ITEMS.index("V1.4.1 production canonical active state")
     blocked[index] = UIAcceptanceItem(
-        name="V1.4 canonical active state",
+        name="V1.4.1 production canonical active state",
         passed=False,
-        evidence="canonical V1.4 did not render",
+        evidence="production canonical V1.4.1 did not render",
     )
-    with pytest.raises(RuntimeError, match="V1.4 canonical active state"):
+    with pytest.raises(RuntimeError, match="V1.4.1 production canonical active state"):
         require_phase9_complete(blocked)
 
 
