@@ -163,7 +163,7 @@ def _confirmation_magnitude(
     fcvx: float,
     hmg10: float,
     pir: float,
-) -> tuple[float, float, float, float, float, float, float, float]:
+) -> tuple[float, float, float, float, float, float, float, float, float, float]:
     rdf10 = (
         0.35 * float(features["V14_DF_B"])
         + 0.50 * float(features["V14_DF_M"])
