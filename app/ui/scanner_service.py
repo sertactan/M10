@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime, time, timezone
+from dataclasses import replace
+from datetime import date, datetime, time, timedelta, timezone
 import os
 from pathlib import Path
 
 from app.bootstrap import AppContainer
+from app.bulk_data_bootstrap import (
+    ensure_sec_companyfacts_bulk,
+    ensure_stooq_scanner_bulk,
+)
 from app.data_bootstrap import ensure_current_universe_sync
 from app.feature_materializer import CanonicalFeatureMaterializer
 from core.optimization.parallel_scanner import ParallelMarketScanner
@@ -25,6 +30,11 @@ class DesktopScannerService:
     @staticmethod
     def _materialize_cached(app: AppContainer, as_of_date: date) -> int:
         as_of = datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
+        price_cutoff = (
+            as_of_date - timedelta(days=7)
+            if as_of_date == date.today()
+            else as_of_date
+        )
         rows = app.sqlite.connection.execute(
             """
             SELECT DISTINCT s.*
@@ -46,7 +56,7 @@ class DesktopScannerService:
             """,
             (
                 as_of_date.isoformat(),
-                as_of_date.isoformat(),
+                price_cutoff.isoformat(),
                 as_of.isoformat(),
             ),
         ).fetchall()
@@ -90,12 +100,31 @@ class DesktopScannerService:
         app = AppContainer(self.root)
         app.initialize()
         try:
+            notes: list[str] = []
             if as_of_date == date.today():
                 ensure_current_universe_sync(app)
+                try:
+                    sec_count, sec_facts = ensure_sec_companyfacts_bulk(app)
+                    if sec_facts:
+                        notes.append(
+                            f"SEC bulk prepared {sec_count} securities / {sec_facts} facts"
+                        )
+                except Exception as exc:
+                    notes.append(f"SEC bulk unavailable: {exc}")
+                try:
+                    stooq_series, stooq_bars = ensure_stooq_scanner_bulk(app)
+                    if stooq_bars:
+                        notes.append(
+                            f"Stooq scanner cache prepared {stooq_series} series / {stooq_bars} bars"
+                        )
+                except Exception as exc:
+                    notes.append(f"Stooq bulk unavailable: {exc}")
             else:
                 self._ensure_historical_snapshot(app, as_of_date)
 
-            self._materialize_cached(app, as_of_date)
+            materialized = self._materialize_cached(app, as_of_date)
+            if materialized:
+                notes.append(f"canonical features materialized for {materialized} securities")
 
             as_of = datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
             candidates = RepositoryCandidateSource(SecurityRepository(app.sqlite))
@@ -107,7 +136,9 @@ class DesktopScannerService:
                 batch_size=500,
             )
             if as_of_date == date.today():
-                return scanner.scan_current(as_of=as_of)
-            return scanner.scan_historical(as_of=as_of)
+                rows, summary = scanner.scan_current(as_of=as_of)
+            else:
+                rows, summary = scanner.scan_historical(as_of=as_of)
+            return rows, replace(summary, notes=tuple(notes))
         finally:
             app.close()
