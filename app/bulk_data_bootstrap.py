@@ -381,11 +381,17 @@ def ensure_sec_companyfacts_bulk(
         # Some consumer networks receive 403 on the SEC Archives bulk endpoint
         # while data.sec.gov's Company Facts API remains available. Fall back to
         # the per-CIK API with persistent mirror caching and SEC-safe pacing.
-        securities, facts = fill_sec_companyfacts_from_api(
-            app,
-            target_coverage_ratio=minimum_coverage_ratio,
-            max_new_securities=fallback_max_new_securities,
-        )
+        if fallback_max_new_securities is None:
+            securities, facts = fill_sec_companyfacts_from_api(
+                app,
+                target_coverage_ratio=minimum_coverage_ratio,
+            )
+        else:
+            securities, facts = fill_sec_companyfacts_from_api(
+                app,
+                target_coverage_ratio=minimum_coverage_ratio,
+                max_new_securities=fallback_max_new_securities,
+            )
         if securities <= current:
             raise RuntimeError(
                 f"SEC bulk failed ({bulk_exc}); Company Facts API fallback "
