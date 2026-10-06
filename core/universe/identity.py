@@ -13,6 +13,8 @@ MIC_TO_EXCHANGE = {
     "XNAS": Exchange.NASDAQ,
     "XNYS": Exchange.NYSE,
     "XASE": Exchange.AMEX,
+    "OTCM": Exchange.OTC,
+    "BATS": Exchange.CBOE,
 }
 
 SEC_EXCHANGE_TO_EXCHANGE = {
@@ -25,12 +27,16 @@ SEC_EXCHANGE_TO_EXCHANGE = {
     "nyse american": Exchange.AMEX,
     "nyse american llc": Exchange.AMEX,
     "amex": Exchange.AMEX,
+    "otc": Exchange.OTC,
+    "cboe": Exchange.CBOE,
 }
 
 EXCHANGE_TO_MIC = {
     Exchange.NASDAQ: "XNAS",
     Exchange.NYSE: "XNYS",
     Exchange.AMEX: "XASE",
+    Exchange.OTC: "OTCM",
+    Exchange.CBOE: "BATS",
 }
 
 
