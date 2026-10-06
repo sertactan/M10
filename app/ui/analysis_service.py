@@ -63,7 +63,7 @@ class DesktopAnalysisService:
                 status='PRICE NOT AVAILABLE',
             )
 
-        parquet = ParquetPriceStore(self.root / app.app_config.database.parquet_root)
+        parquet = ParquetPriceStore(app.resolve_data_path(app.app_config.database.parquet_root))
         start = date.fromisoformat(selection['start_date'])
         end = min(as_of_date, date.fromisoformat(selection['end_date']))
         frame = parquet.read_bars(
@@ -117,7 +117,7 @@ class DesktopAnalysisService:
         ).fetchone()
         if selection is None:
             return []
-        parquet = ParquetPriceStore(self.root / app.app_config.database.parquet_root)
+        parquet = ParquetPriceStore(app.resolve_data_path(app.app_config.database.parquet_root))
         start = date.fromisoformat(selection['start_date'])
         end = min(as_of_date, date.fromisoformat(selection['end_date']))
         frame = parquet.read_bars(
