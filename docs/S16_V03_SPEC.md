@@ -1,3 +1,5 @@
+> **Superseded for production:** V0.3 remains frozen only for historical A/B comparison. The canonical production formula is `docs/S16_V1_CANONICAL_SPEC.md` / `S16V1Model`.
+
 # S16 — Explosive 1-Week 10X Discovery
 
 Status: V0.2 baseline implemented; V0.3 false-positive-resistant challenger implemented.

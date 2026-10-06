@@ -18,6 +18,9 @@ class S16BenchmarkRow:
     hit_3x_close: bool
     hit_5x_close: bool
     hit_10x_close: bool
+    v1_armed: float = 0.0
+    v1_ignition: float = 0.0
+    v1_explosive: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -56,7 +59,11 @@ def evaluate_threshold(
     threshold: float,
 ) -> S16BinaryMetrics:
     items = list(rows)
-    valid_scores = {"v02_armed", "v02_ignition", "v03_armed", "v03_ignition"}
+    valid_scores = {
+        "v02_armed", "v02_ignition",
+        "v03_armed", "v03_ignition",
+        "v1_armed", "v1_ignition", "v1_explosive",
+    }
     valid_labels = {
         "hit_3x_high", "hit_5x_high", "hit_10x_high",
         "hit_3x_close", "hit_5x_close", "hit_10x_close",
@@ -120,7 +127,11 @@ def benchmark_grid(
     thresholds: Iterable[float] = (50, 55, 60, 65, 70, 75, 80, 85, 90),
 ) -> list[S16BinaryMetrics]:
     items = list(rows)
-    scores = ("v02_armed", "v02_ignition", "v03_armed", "v03_ignition")
+    scores = (
+        "v02_armed", "v02_ignition",
+        "v03_armed", "v03_ignition",
+        "v1_armed", "v1_ignition", "v1_explosive",
+    )
     labels = (
         "hit_3x_high", "hit_5x_high", "hit_10x_high",
         "hit_3x_close", "hit_5x_close", "hit_10x_close",

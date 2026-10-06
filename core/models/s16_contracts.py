@@ -19,6 +19,7 @@ class S16Input:
     route: str | None = None
 
     # FUEL / structural capacity
+    market_cap_scarcity: float = 0.0
     float_scarcity: float = 0.0
     short_pressure: float = 0.0
     float_turnover: float = 0.0
@@ -62,5 +63,6 @@ class S16Result:
     convergence_bonus: float
     status: str
     route: str | None = None
+    explosive_score: float | None = None
     components: Mapping[str, float] = field(default_factory=dict)
     flags: Mapping[str, bool] = field(default_factory=dict)

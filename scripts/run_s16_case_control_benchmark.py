@@ -35,6 +35,9 @@ def _read(path: Path) -> list[S16BenchmarkRow]:
                 v02_ignition=float(raw["v02_ignition"]),
                 v03_armed=float(raw["v03_armed"]),
                 v03_ignition=float(raw["v03_ignition"]),
+                v1_armed=float(raw.get("v1_armed") or 0.0),
+                v1_ignition=float(raw.get("v1_ignition") or 0.0),
+                v1_explosive=float(raw.get("v1_explosive") or 0.0),
                 **{key: _bool(raw[key]) for key in BOOL_FIELDS},
             ))
     return out

@@ -5,11 +5,12 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from core.historical.s16_controls import S16MatchSnapshot, build_matched_controls
-from core.models.s16 import S16V02Model, S16V03Model
+from core.models.s16 import S16V02Model, S16V03Model, S16V1Model
 from core.models.s16_contracts import S16Input
 
 
 def _input(name: str, **kw) -> S16Input:
+    kw.setdefault("market_cap_scarcity", 70.0)
     return S16Input(
         security_id=name,
         ticker=name[:4].upper(),
@@ -91,3 +92,67 @@ def test_seed_catalog_has_31_positives_and_manifest_has_1550_slots() -> None:
     assert len(positives) == 31
     assert len(manifest) == 1550
     assert all(row["status"] == "PENDING_PIT_MATCH" for row in manifest)
+
+
+def test_v1_canonical_rejects_hard_negative_ignition_noise() -> None:
+    results = [S16V1Model().analyze(x) for x in HARD_NEGATIVES]
+    non_ipo = [x for x, src in zip(results, HARD_NEGATIVES) if src.route != "IPO"]
+    assert sum(x.ignition_score >= 80 for x in results) == 0
+    assert sum((x.explosive_score or 0.0) >= 75 for x in non_ipo) == 0
+    assert all(x.flags["CANONICAL_V1"] for x in results)
+
+
+def test_v1_canonical_scores_true_explosive_archetypes_high() -> None:
+    archetypes = [
+        _input(
+            "bio-catalyst-positive",
+            market_cap_scarcity=90, float_scarcity=90, short_pressure=55,
+            float_turnover=85, liquidity_elasticity=80, ownership_lock=75,
+            catalyst=95, volume_ignition=95, momentum_acceleration=90,
+            social_velocity=65, news_velocity=90, regime_sympathy=70,
+            attention=75, compression=65, catalyst_proximity=90,
+            theme=75, anomaly=90, dilution_risk=.10, extension_risk=.20,
+            data_risk=.05, liquidity_risk=.15, manipulation_risk=.05,
+        ),
+        _input(
+            "squeeze-positive",
+            market_cap_scarcity=90, float_scarcity=95, short_pressure=95,
+            float_turnover=95, liquidity_elasticity=90, ownership_lock=85,
+            catalyst=65, volume_ignition=95, momentum_acceleration=95,
+            social_velocity=95, news_velocity=75, regime_sympathy=80,
+            attention=95, compression=70, catalyst_proximity=65,
+            theme=80, anomaly=95, dilution_risk=.10, extension_risk=.25,
+            data_risk=.05, liquidity_risk=.10, manipulation_risk=.05,
+        ),
+        _input(
+            "treasury-positive",
+            market_cap_scarcity=90, float_scarcity=85, short_pressure=45,
+            float_turnover=90, liquidity_elasticity=85, ownership_lock=70,
+            catalyst=95, volume_ignition=90, momentum_acceleration=85,
+            social_velocity=85, news_velocity=90, regime_sympathy=90,
+            attention=90, compression=60, catalyst_proximity=95,
+            theme=95, anomaly=90, dilution_risk=.20, extension_risk=.15,
+            data_risk=.05, liquidity_risk=.15, manipulation_risk=.05,
+        ),
+    ]
+    results = [S16V1Model().analyze(x) for x in archetypes]
+    assert all(x.flags["IGNITION_GATE"] for x in results)
+    assert all(x.armed_score >= 80 for x in results)
+    assert all(x.ignition_score >= 85 for x in results)
+    assert all((x.explosive_score or 0.0) >= 85 for x in results)
+
+
+def test_v1_market_cap_scarcity_matters_independently_of_float() -> None:
+    common = dict(
+        float_scarcity=90, short_pressure=70, float_turnover=75,
+        liquidity_elasticity=75, ownership_lock=70, catalyst=70,
+        volume_ignition=75, momentum_acceleration=70, social_velocity=70,
+        news_velocity=65, regime_sympathy=65, attention=70, compression=65,
+        catalyst_proximity=70, theme=65, anomaly=75, dilution_risk=.10,
+        extension_risk=.10, data_risk=.05, liquidity_risk=.10,
+        manipulation_risk=.05,
+    )
+    micro = S16V1Model().analyze(_input("micro", market_cap_scarcity=95, **common))
+    large = S16V1Model().analyze(_input("large", market_cap_scarcity=10, **common))
+    assert micro.fuel_score > large.fuel_score
+    assert (micro.explosive_score or 0.0) > (large.explosive_score or 0.0)
