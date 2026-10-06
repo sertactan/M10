@@ -187,7 +187,7 @@ Acceptance:
 
 ## Phase 6 — SEC Local Mirror + Incremental Update
 
-Status: PLANNED
+Status: IN PROGRESS
 
 Deliverables:
 - Local cache for SEC ticker universe and selected SEC JSON/XBRL payloads.
