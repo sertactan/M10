@@ -12,7 +12,7 @@ class ComparePage(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         self.table = QTableWidget(len(self.METRICS), 3)
-        self.table.setHorizontalHeaderLabels(["Metric", "V1.2", "V1.4"])
+        self.table.setHorizontalHeaderLabels(["Metric", "V1.2", "V1.4.1"])
         layout.addWidget(self.table)
 
         self.consensus = QLabel("MODEL CONSENSUS: —")
