@@ -86,6 +86,11 @@ def _raw_from_price_frame(
         momentum20=momentum20,
         supply_kind=row.get("supply_kind") or "UNKNOWN_SUPPLY",
         source_quality=row.get("source_quality") or "PIT_PROXY",
+        market_cap=(
+            float(row["market_cap"])
+            if row.get("market_cap") not in (None, "")
+            else None
+        ),
     )
 
 
