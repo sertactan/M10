@@ -11,6 +11,8 @@ class Exchange(StrEnum):
     NASDAQ = "NASDAQ"
     NYSE = "NYSE"
     AMEX = "AMEX"
+    OTC = "OTC"
+    CBOE = "CBOE"
 
 
 class DataState(StrEnum):

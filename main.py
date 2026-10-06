@@ -18,6 +18,7 @@ from core.prices.engine import HistoricalPriceEngine
 from core.runtime.readiness import check_release_readiness
 from core.universe.service import USUniverseService
 from data.providers.company_ir import CompanyInvestorRelationsProvider
+from data.providers.adanos_global_reference import AdanosGlobalReferenceProvider
 from data.providers.finnhub_fundamentals import FinnhubFundamentalsProvider
 from data.providers.finnhub_universe import FinnhubUniverseProvider
 from data.providers.fmp_fundamentals import FMPFundamentalsProvider
@@ -31,6 +32,7 @@ from data.providers.simfin_price import SimFinPriceProvider
 from data.providers.stooq_price import StooqPriceProvider
 from data.providers.yahoo_price import YahooCompatiblePriceProvider
 from data.repositories.fundamental_repository import FundamentalRepository
+from data.repositories.global_security_repository import GlobalSecurityRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
 from data.repositories.model_run_repository import ModelRunRepository
 from data.repositories.price_repository import PriceRepository
@@ -107,6 +109,50 @@ async def sync_universe(root: Path, as_of: date, include_delisted: bool, ticker_
         print(f"FINNHUB VALIDATED: {result.finnhub_validated}")
         print(f"SNAPSHOT COUNT: {result.snapshot_count}")
         print(f"TICKER EVENTS: {result.ticker_events_loaded}")
+        return 0
+    finally:
+        app.close()
+
+
+async def sync_global_reference(root: Path, market: str | None = None) -> int:
+    app = AppContainer(root)
+    app.initialize()
+    try:
+        health = ProviderHealthRepository(app.sqlite)
+        provider_name = "ADANOS_REFERENCE"
+        if not health.can_attempt(provider_name):
+            raise RuntimeError("ADANOS_REFERENCE circuit is open")
+
+        provider = AdanosGlobalReferenceProvider()
+        started = __import__("time").perf_counter()
+        try:
+            records = await provider.list_reference_securities()
+            if market:
+                wanted = market.strip().upper()
+                records = [row for row in records if row.market.upper() == wanted]
+            count = GlobalSecurityRepository(app.sqlite).bulk_upsert_reference(records)
+            health.record_success(
+                provider_name,
+                latency_ms=(__import__("time").perf_counter() - started) * 1000.0,
+            )
+        except Exception as exc:
+            text = str(exc)
+            health.record_failure(
+                provider_name,
+                latency_ms=(__import__("time").perf_counter() - started) * 1000.0,
+                rate_limited=("429" in text or "rate limit" in text.lower()),
+                message=text[:500],
+            )
+            raise
+
+        counts = GlobalSecurityRepository(app.sqlite).count_by_market()
+        print(f"GLOBAL REFERENCE LOADED: {count}")
+        if market:
+            print(f"MARKET: {market.upper()} · ROWS: {counts.get(market.upper(), 0)}")
+        else:
+            top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:15]
+            print("TOP MARKETS: " + ", ".join(f"{key}={value}" for key, value in top))
+        print("SCOPE: REFERENCE_ONLY (not authoritative model evidence)")
         return 0
     finally:
         app.close()
@@ -306,6 +352,8 @@ def main() -> int:
     parser.add_argument("--as-of", help="Universe PIT date YYYY-MM-DD; default=today")
     parser.add_argument("--no-delisted", action="store_true", help="Skip current delisted archive sync")
     parser.add_argument("--ticker-events", type=int, default=0, help="Fetch ticker-change events for first N securities")
+    parser.add_argument("--sync-global-reference", action="store_true", help="Sync broad global ticker reference database")
+    parser.add_argument("--global-market", help="Optional country/market code filter, e.g. US/JP/TR/HK")
 
     parser.add_argument("--sync-price", metavar="TICKER", help="Sync one ticker's historical daily prices")
     parser.add_argument("--price-start", help="Price start YYYY-MM-DD")
@@ -334,6 +382,8 @@ def main() -> int:
     if args.sync_universe:
         as_of = date.fromisoformat(args.as_of) if args.as_of else date.today()
         return asyncio.run(sync_universe(root, as_of, not args.no_delisted, args.ticker_events))
+    if args.sync_global_reference:
+        return asyncio.run(sync_global_reference(root, args.global_market))
     if args.sync_price:
         if not args.price_start or not args.price_end:
             parser.error("--sync-price requires --price-start and --price-end")

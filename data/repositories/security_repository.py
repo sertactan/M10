@@ -237,6 +237,18 @@ class SecurityRepository:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def current_us_all_listings(self) -> list[dict]:
+        rows = self.store.connection.execute(
+            """
+            SELECT * FROM security_master
+            WHERE active=1
+              AND market='US'
+              AND exchange IN ('NASDAQ','NYSE','AMEX','OTC','CBOE')
+            ORDER BY exchange,ticker
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def lookup_security_id(self, *, ticker: str, exchange: str | None = None) -> str | None:
         if exchange:
             row = self.store.connection.execute(

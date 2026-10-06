@@ -16,6 +16,7 @@ on:
       - "pyproject.toml"
       - "packaging/windows/**"
       - "tests/**"
+      - "scripts/**"
       - "PHASE12_STATUS.md"
       - ".github/workflows/windows-build.yml"
 
@@ -39,6 +40,18 @@ jobs:
           python -m pip install "pyinstaller>=6.11"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Build bundled SEC universe seed
+        shell: pwsh
+        run: |
+          python scripts/build_sec_seed.py
+          if (!(Test-Path "data/seeds/sec_us_current.csv")) {
+            throw "Bundled SEC seed was not produced"
+          }
+          $rows = (Get-Content "data/seeds/sec_us_current.csv").Count - 1
+          if ($rows -lt 1000) {
+            throw "Bundled SEC seed is unexpectedly small: $rows"
+          }
+
       - name: Build Windows application
         shell: pwsh
         run: |
@@ -53,6 +66,14 @@ jobs:
           $schema = "dist\S153ResearchTerminal\_internal\data\database\schema.sql"
           if (!(Test-Path $schema)) {
             throw "Packaged SQLite schema is missing: $schema"
+          }
+
+      - name: Verify packaged SEC universe seed
+        shell: pwsh
+        run: |
+          $seed = "dist\S153ResearchTerminal\_internal\data\seeds\sec_us_current.csv"
+          if (!(Test-Path $seed)) {
+            throw "Packaged SEC universe seed is missing: $seed"
           }
 
       - name: Smoke test executable from clean working directory

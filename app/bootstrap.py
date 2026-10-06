@@ -6,6 +6,7 @@ from core.config.env import load_local_env
 from core.config.loader import load_yaml
 from core.config.models import ApplicationConfig, ModelConfig
 from data.database.sqlite_store import SQLiteStore
+from data.seeds.loader import bootstrap_bundled_us_seed
 from core.runtime.paths import writable_runtime_root
 
 
@@ -25,6 +26,7 @@ class AppContainer:
         if not self.app_config.strict_pit:
             raise RuntimeError("Production bootstrap requires strict_pit=true")
         self.sqlite.initialize()
+        bootstrap_bundled_us_seed(self.sqlite)
 
     def resolve_data_path(self, configured_path: str) -> Path:
         return self.runtime_root / configured_path

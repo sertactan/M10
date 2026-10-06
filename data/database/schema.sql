@@ -25,12 +25,24 @@ CREATE TABLE IF NOT EXISTS security_master (
     locale TEXT,
     composite_figi TEXT,
     share_class_figi TEXT,
+    listing_key TEXT,
+    country TEXT,
+    country_code TEXT,
+    isin TEXT,
+    asset_type TEXT,
+    aliases TEXT,
+    source_scope TEXT NOT NULL DEFAULT 'CANONICAL',
+    redistribution_status TEXT,
     source_priority INTEGER NOT NULL DEFAULT 99,
     first_seen TEXT,
     last_seen TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_security_ticker ON security_master(ticker);
 CREATE INDEX IF NOT EXISTS idx_security_exchange ON security_master(exchange);
+CREATE INDEX IF NOT EXISTS idx_security_market ON security_master(market);
+CREATE INDEX IF NOT EXISTS idx_security_country_code ON security_master(country_code);
+CREATE INDEX IF NOT EXISTS idx_security_isin ON security_master(isin);
+CREATE INDEX IF NOT EXISTS idx_security_listing_key ON security_master(listing_key);
 
 CREATE TABLE IF NOT EXISTS ticker_aliases (
     alias TEXT NOT NULL,
