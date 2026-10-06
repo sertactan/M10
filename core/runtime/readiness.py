@@ -23,6 +23,8 @@ def check_release_readiness(root: Path) -> ReleaseReadiness:
 
     if not (root / "specs" / "s153_v14" / "manifest.json").exists():
         blockers.append("PHASE5_V14_CANONICAL_BUNDLE_MISSING")
+    if not (root / "specs" / "s153_v141" / "canonical_completion_specification.md").exists():
+        blockers.append("V141_CANONICAL_COMPLETION_SPEC_MISSING")
 
     required_modules = {
         "PHASE6_BACKTEST_ENGINE_MISSING": "core.backtest.engine",
@@ -39,6 +41,10 @@ def check_release_readiness(root: Path) -> ReleaseReadiness:
     v14_config = load_yaml(root / "config" / "s153_v14.yaml", ModelConfig)
     if not v14_config.enabled:
         blockers.append("PHASE5_V14_MODEL_DISABLED")
+
+    v141_config = load_yaml(root / "config" / "s153_v141.yaml", ModelConfig)
+    if not v141_config.enabled:
+        blockers.append("V141_PRODUCTION_MODEL_DISABLED")
 
     app_config = load_yaml(root / "config" / "app.yaml", ApplicationConfig)
     if not app_config.strict_pit:
