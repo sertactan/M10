@@ -302,30 +302,31 @@ jobs:
             dist_installer/S153ResearchTerminal-Setup.exe
             dist_installer/SHA256.txt
 
-      - name: Publish GitHub Release v1.0.2
+      - name: Publish GitHub Release v1.0.3
         if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $repo = "${{ github.repository }}"
-          $tag = "v1.0.2"
+          $tag = "v1.0.3"
           $setup = "dist_installer/S153ResearchTerminal-Setup.exe"
           $sha = "dist_installer/SHA256.txt"
-          $title = "S15.3 Research Terminal v1.0.2"
+          $title = "S15.3 Research Terminal v1.0.3"
           $notes = @"
-          S15.3 Research Terminal v1.0.2.
+          S15.3 Research Terminal v1.0.3.
 
           Includes:
           - Windows Setup installer
           - SHA256 checksum
+          - on-demand single-ticker historical FM252/backtest from adjusted canonical price cache
+          - progressive bounded SEC fallback for faster first-run scanner response
+          - actionable scanner ordering (final scores first, then partial DNA60)
+          - expanded deterministic canonical factors D05/D06/D38
+          - partial DNA60/S15.2 display when final canonical gates remain incomplete
+          - explicit missing-gate diagnostics
           - SEC bulk 403 fallback to paced data.sec.gov Company Facts API
           - direct Stooq static US bulk ZIP fallback
-          - canonical feature materialization bridge
-          - scanner partial DNA60 / missing-gate diagnostics
-          - historical PIT auto-sync when MASSIVE_API_KEY is configured
-          - scanner SQLite thread fix
-          - Yahoo query2/query1 fallback hardening
           - Windows clean-install, recovery, migration and installer smoke tests
           "@
 
