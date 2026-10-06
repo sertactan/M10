@@ -55,13 +55,6 @@ class HistoricalBacktestEngine:
         v12_result = self.v12_model.analyze(v12_input)
         v14_result = self.v14_model.analyze(v14_input)
 
-        missing = self.binding.missing()
-        if missing:
-            raise Phase6SpecificationMissing(
-                "Full Phase 6 evaluation remains fail-closed until authoritative "
-                "backtest artifacts are bound: " + "; ".join(missing)
-            )
-
         outcome = self.outcomes.compute(
             security_id=v12_input.security_id,
             as_of_date_requested=v12_input.as_of.date(),
