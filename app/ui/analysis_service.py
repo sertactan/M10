@@ -10,7 +10,9 @@ from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeade
 from core.features.s153_v12_input_loader import S153V12InputLoader
 from core.features.s153_v14_input_loader import S153V14InputLoader
 from core.models.s153_v12 import S153V12Model
-from core.models.s153_v14 import S153V14Model, V14CanonicalSpecificationMissing
+from core.models.s153_v14 import S153V14Model
+from core.forecast.calibration import ForecastCalibrationUnavailable
+from core.forecast.empirical_provider import MarketPrevalenceEmpiricalCalibrationProvider
 from data.repositories.forecast_run_repository import ForecastReproducibilityError, ForecastRunRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
 from data.storage.parquet_price_store import ParquetPriceStore
@@ -243,29 +245,54 @@ class DesktopAnalysisService:
                 risk=None,
             )
 
-            v14_components: dict[str, object] = {}
-            try:
-                v14_input = S153V14InputLoader(features).load(
-                    security_id=row['security_id'],
-                    ticker=row['ticker'],
-                    as_of=as_of,
-                )
-                v14_result = S153V14Model().analyze(v14_input)
-                v14_view = ModelView(
-                    model_name='S15.3 V1.4',
-                    status=v14_result.status,
-                    score=v14_result.score,
-                    route=v14_result.primary_route,
-                    destination=v14_result.primary_magnitude,
-                    confidence=v14_result.confidence,
-                    risk=None,
-                )
-                v14_components = dict(v14_result.components)
-            except V14CanonicalSpecificationMissing:
-                v14_view = ModelView(
-                    model_name='S15.3 V1.4',
-                    status='BLOCKED_CANONICAL_SPEC',
-                )
+            v14_input = S153V14InputLoader(features).load(
+                security_id=row['security_id'],
+                ticker=row['ticker'],
+                as_of=as_of,
+            )
+            v14_result = S153V14Model().analyze(v14_input)
+            v14_view = ModelView(
+                model_name='S15.3 V1.4',
+                status=v14_result.status,
+                score=v14_result.score,
+                route=v14_result.primary_route,
+                destination=v14_result.primary_magnitude,
+                confidence=v14_result.confidence,
+                risk=None,
+            )
+            v14_components: dict[str, object] = dict(v14_result.components)
+
+            if (
+                forecast.status == 'NOT AVAILABLE'
+                and as_of_date == date.today()
+                and v14_result.score is not None
+            ):
+                try:
+                    calibrated = MarketPrevalenceEmpiricalCalibrationProvider(
+                        app.sqlite
+                    ).calibrate(
+                        v12=v12_result,
+                        v14=v14_result,
+                        as_of=as_of,
+                        horizon_months=12,
+                    )
+                    forecast = ForecastView(
+                        status='EMPIRICAL FORECAST',
+                        bull_return_pct=calibrated.bull_return_pct,
+                        base_return_pct=calibrated.base_return_pct,
+                        bear_return_pct=calibrated.bear_return_pct,
+                        probability_positive_return_pct=calibrated.probability_positive_return_pct,
+                        probability_2x_plus_pct=calibrated.probability_2x_plus_pct,
+                        probability_5x_plus_pct=calibrated.probability_5x_plus_pct,
+                        probability_10x_plus_pct=calibrated.probability_10x_plus_pct,
+                        confidence_pct=calibrated.confidence_pct,
+                        risk=calibrated.risk,
+                        calibration_id=calibrated.calibration_id,
+                    )
+                except ForecastCalibrationUnavailable as exc:
+                    forecast = ForecastView(
+                        status=f'CALIBRATION NOT AVAILABLE — {exc}'
+                    )
 
             return DesktopAnalysisView(
                 ticker=row['ticker'],
