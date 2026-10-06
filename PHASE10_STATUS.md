@@ -2,7 +2,7 @@
 
 ## Status
 
-**STARTED on a dependent branch.**
+**COMPLETE on the dependent branch; acceptance tests pass.**
 
 Scope from the master prompt:
 
