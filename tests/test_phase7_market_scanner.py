@@ -18,7 +18,6 @@ from data.database.sqlite_store import SQLiteStore
 from data.repositories.model_feature_repository import ModelFeatureRepository
 from data.repositories.security_repository import SecurityRepository
 from core.scanner.production import CanonicalDualModelScorer, RepositoryCandidateSource
-from core.models.s153_v14 import V14CanonicalSpecificationMissing
 
 
 AS_OF = datetime(2025, 3, 1, 21, 0, tzinfo=timezone.utc)
@@ -278,13 +277,17 @@ def test_phase7_pit_filtering_excludes_future_feature_versions(tmp_path: Path):
         store.close()
 
 
-def test_production_scanner_does_not_fake_v14_scoring(tmp_path: Path):
+def test_production_scanner_uses_canonical_v14_without_faking_missing_inputs(tmp_path: Path):
     store = SQLiteStore(tmp_path / "production-gate.sqlite")
     store.initialize()
     try:
         scorer = CanonicalDualModelScorer(ModelFeatureRepository(store))
-        with pytest.raises(V14CanonicalSpecificationMissing):
-            scorer.score(candidate(1, "NASDAQ"), AS_OF)
+        v12, v14 = scorer.score(candidate(1, "NASDAQ"), AS_OF)
+        assert v12.score is None
+        assert v14.score is None
+        assert v14.status == "INCONCLUSIVE_V1_4_INPUTS"
+        assert v14.large_winner_probability is None
+        assert v14.risk_adjusted_conviction is None
     finally:
         store.close()
 
@@ -302,7 +305,7 @@ def test_phase7_acceptance_contract_requires_exact_15_items():
     blocked[idx] = AcceptanceItem(
         name="V1.4 scoring",
         passed=False,
-        evidence="Phase 5 canonical V1.4 specification is not yet bound",
+        evidence="deliberate negative acceptance fixture",
     )
     with pytest.raises(RuntimeError, match="V1.4 scoring"):
         require_all_pass(blocked)
