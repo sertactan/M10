@@ -214,7 +214,7 @@ Acceptance:
 
 ## Phase 8 — Observability + Data Health UI
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Deliverables:
 - Provider health dashboard.
