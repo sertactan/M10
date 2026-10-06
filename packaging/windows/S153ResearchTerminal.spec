@@ -19,6 +19,14 @@ a = Analysis(
             os.path.join(project_root, "data", "seeds", "sec_us_current.csv"),
             os.path.join("data", "seeds"),
         ),
+        (
+            os.path.join(project_root, "data", "seeds", "jp_tr_hk_current.csv"),
+            os.path.join("data", "seeds"),
+        ),
+        (
+            os.path.join(project_root, "THIRD_PARTY_DATA_LICENSES.md"),
+            ".",
+        ),
     ],
     hiddenimports=[
         "PySide6.QtCharts",
