@@ -58,7 +58,10 @@ async def ensure_current_universe(app: AppContainer, *, force_refresh: bool = Fa
             return len(existing)
         raise RuntimeError("SEC_EDGAR circuit is open; background universe refresh deferred")
 
-    provider = SECEdgarUniverseProvider(user_agent=_sec_user_agent())
+    provider = SECEdgarUniverseProvider(
+        user_agent=_sec_user_agent(),
+        mirror_root=app.resolve_data_path("sec_mirror"),
+    )
     started = perf_counter()
     try:
         records = await provider.list_current_us_securities()
@@ -250,7 +253,10 @@ async def ensure_sec_fundamentals(
             raise RuntimeError("SEC_EDGAR circuit is open; fundamentals refresh deferred")
         return 0
 
-    provider = SECEdgarFundamentalsProvider(user_agent=_sec_user_agent())
+    provider = SECEdgarFundamentalsProvider(
+        user_agent=_sec_user_agent(),
+        mirror_root=app.resolve_data_path("sec_mirror"),
+    )
     repo = FundamentalRepository(app.sqlite)
     started = perf_counter()
     try:
