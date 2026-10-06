@@ -100,16 +100,24 @@ class MarketScannerDialog(QDialog):
             int(summary.v14_scored),
             sum(1 for row in self.rows if row.v14_score is not None),
         )
+        notes = tuple(getattr(summary, 'notes', ()) or ())
+        note_text = ' · '.join(notes[-2:])
         if v12_scored == 0 and v14_scored == 0:
-            self.status.setText(
-                f'{summary.total} rows · scored 0 · canonical feature cache is empty'
-            )
+            base = f'{summary.total} rows · final scored 0'
+            if note_text:
+                base += f' · {note_text}'
+            else:
+                base += ' · canonical feature cache is empty'
+            self.status.setText(base)
         else:
-            self.status.setText(
+            base = (
                 f'{summary.total} rows · V1.2 scored {v12_scored} · '
                 f'V1.4 scored {v14_scored} · NASDAQ {summary.nasdaq} · '
                 f'NYSE {summary.nyse} · AMEX {summary.amex}'
             )
+            if note_text:
+                base += f' · {note_text}'
+            self.status.setText(base)
         self.progress.hide()
         self.run_button.setEnabled(True)
         self.exchange.setEnabled(True)
