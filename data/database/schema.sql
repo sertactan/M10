@@ -600,3 +600,25 @@ CREATE TABLE IF NOT EXISTS provider_health_events (
 );
 CREATE INDEX IF NOT EXISTS idx_provider_health_events_provider
 ON provider_health_events(provider,event_id);
+
+
+-- Data Fabric V2 Phase 3: persistent background sync queue.
+CREATE TABLE IF NOT EXISTS background_sync_tasks (
+    task_id TEXT PRIMARY KEY,
+    task_type TEXT NOT NULL,
+    dedupe_key TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    priority INTEGER NOT NULL DEFAULT 100,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    run_after TEXT NOT NULL,
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    started_at TEXT,
+    completed_at TEXT,
+    UNIQUE(task_type,dedupe_key)
+);
+CREATE INDEX IF NOT EXISTS idx_background_sync_ready
+ON background_sync_tasks(status,run_after,priority,created_at);

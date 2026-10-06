@@ -46,24 +46,24 @@ def _security_from_row(row) -> Security:
     )
 
 
-async def ensure_current_universe(app: AppContainer) -> int:
+async def ensure_current_universe(app: AppContainer, *, force_refresh: bool = False) -> int:
     repo = SecurityRepository(app.sqlite)
     existing = repo.current_us_common_stocks()
-    if len(existing) >= 1000:
+    if len(existing) >= 1000 and not force_refresh:
         return len(existing)
 
     health = ProviderHealthRepository(app.sqlite)
     if not health.can_attempt("SEC_EDGAR"):
-        if existing:
+        if existing and not force_refresh:
             return len(existing)
-        raise RuntimeError("SEC_EDGAR circuit is open and no cached universe is available")
+        raise RuntimeError("SEC_EDGAR circuit is open; background universe refresh deferred")
 
     provider = SECEdgarUniverseProvider(user_agent=_sec_user_agent())
     started = perf_counter()
     try:
         records = await provider.list_current_us_securities()
         if not records:
-            if existing:
+            if existing and not force_refresh:
                 return len(existing)
             raise RuntimeError("SEC EDGAR returned an empty US universe")
         health.record_success(
@@ -78,7 +78,7 @@ async def ensure_current_universe(app: AppContainer) -> int:
             rate_limited=("429" in text or "rate limit" in text.lower()),
             message=text[:500],
         )
-        if existing:
+        if existing and not force_refresh:
             return len(existing)
         raise
 
@@ -96,6 +96,8 @@ async def ensure_price_history(
     *,
     as_of_date: date,
     lookback_days: int = 1095,
+    force_refresh: bool = False,
+    incremental: bool = False,
 ) -> int:
     existing = app.sqlite.connection.execute(
         """
@@ -112,7 +114,7 @@ async def ensure_price_history(
             as_of_date.isoformat(),
         ),
     ).fetchone()
-    if existing is not None:
+    if existing is not None and not force_refresh:
         return 0
 
     last_known_good = app.sqlite.connection.execute(
@@ -135,14 +137,28 @@ async def ensure_price_history(
     security = _security_from_row(row)
     health = ProviderHealthRepository(app.sqlite)
     if not health.can_attempt("YAHOO_COMPAT"):
-        if last_known_good is not None:
+        if last_known_good is not None and not force_refresh:
             return 0
         raise RuntimeError(
-            f"YAHOO_COMPAT circuit is open and no cached price history exists for {security.ticker}"
+            f"YAHOO_COMPAT circuit is open; refresh deferred for {security.ticker}"
         )
 
     provider = YahooCompatiblePriceProvider()
     start = as_of_date - timedelta(days=lookback_days)
+    if incremental:
+        latest = app.sqlite.connection.execute(
+            """
+            SELECT end_date
+            FROM price_series_registry
+            WHERE security_id=? AND source='YAHOO_COMPAT'
+            ORDER BY end_date DESC
+            LIMIT 1
+            """,
+            (security.security_id,),
+        ).fetchone()
+        if latest is not None:
+            overlap_start = date.fromisoformat(latest["end_date"]) - timedelta(days=7)
+            start = max(start, overlap_start)
     started = perf_counter()
     try:
         bars = await provider.get_history(security, start, as_of_date)
@@ -160,7 +176,7 @@ async def ensure_price_history(
             rate_limited=("429" in text or "rate limit" in text.lower()),
             message=text[:500],
         )
-        if last_known_good is not None:
+        if last_known_good is not None and not force_refresh:
             return 0
         raise
 
@@ -176,7 +192,7 @@ async def ensure_price_history(
     # and is never promoted to authoritative backtest evidence.
     repo.select_series(
         security_id=security.security_id,
-        start=start,
+        start=descriptor.start_date,
         end=as_of_date,
         source=descriptor.source,
         source_symbol=descriptor.source_symbol,
@@ -210,6 +226,7 @@ async def ensure_sec_fundamentals(
     row,
     *,
     as_of_date: date,
+    force_refresh: bool = False,
 ) -> int:
     security = _security_from_row(row)
     if not security.cik:
@@ -224,11 +241,13 @@ async def ensure_sec_fundamentals(
         """,
         (security.security_id, cutoff.isoformat()),
     ).fetchone()
-    if existing is not None and int(existing["n"]) > 0:
+    if existing is not None and int(existing["n"]) > 0 and not force_refresh:
         return int(existing["n"])
 
     health = ProviderHealthRepository(app.sqlite)
     if not health.can_attempt("SEC_EDGAR"):
+        if force_refresh:
+            raise RuntimeError("SEC_EDGAR circuit is open; fundamentals refresh deferred")
         return 0
 
     provider = SECEdgarFundamentalsProvider(user_agent=_sec_user_agent())
