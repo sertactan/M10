@@ -138,13 +138,13 @@ def test_event_anchor_resolves_strict_prior_close_10x() -> None:
 def test_event_anchor_marks_intraday_only_separately() -> None:
     start = date(2023, 11, 1)
     bars = [
-        _bar(start, 10.0),
-        _bar(start + timedelta(days=1), 10.0, high=11.0, low=10.0),
-        _bar(start + timedelta(days=2), 10.0, high=100.0, low=5.0),
-        _bar(start + timedelta(days=3), 9.0),
-        _bar(start + timedelta(days=4), 8.0),
-        _bar(start + timedelta(days=5), 7.0),
-        _bar(start + timedelta(days=6), 6.0),
+        _bar(start, 20.0),
+        _bar(start + timedelta(days=1), 20.0, high=22.0, low=20.0),
+        _bar(start + timedelta(days=2), 20.0, high=100.0, low=5.0),
+        _bar(start + timedelta(days=3), 18.0),
+        _bar(start + timedelta(days=4), 17.0),
+        _bar(start + timedelta(days=5), 16.0),
+        _bar(start + timedelta(days=6), 15.0),
     ]
     result = resolve_event_anchor(
         ticker="TEST",
@@ -154,6 +154,7 @@ def test_event_anchor_marks_intraday_only_separately() -> None:
     )
     assert result.resolution == "INTRADAY_ONLY_NOT_STRICT_5D_PRIOR_CLOSE"
     assert result.strict_5d_10x_from_prior_close is False
+    assert result.observed_multiple == pytest.approx(20.0)
 
 
 def test_s16_feature_coverage_is_fail_closed() -> None:
