@@ -38,10 +38,16 @@ def _cagr(current: float | None, prior: float | None, years: int) -> float | Non
     return (float(current) / float(prior)) ** (1.0 / years) - 1.0
 
 
-def _annual_series(facts: list[dict], metric: str) -> list[dict]:
+def _metric_series(
+    facts: list[dict],
+    metric: str,
+    *,
+    period_kinds: set[str] | None = None,
+) -> list[dict]:
     rows = [
         row for row in facts
-        if row["metric_name"] == metric and row["period_kind"] == "ANNUAL"
+        if row["metric_name"] == metric
+        and (period_kinds is None or row["period_kind"] in period_kinds)
     ]
     dedup: dict[str, dict] = {}
     for row in rows:
@@ -50,6 +56,10 @@ def _annual_series(facts: list[dict], metric: str) -> list[dict]:
         if current is None or row["available_at"] > current["available_at"]:
             dedup[key] = row
     return sorted(dedup.values(), key=lambda row: row["period_end"])
+
+
+def _annual_series(facts: list[dict], metric: str) -> list[dict]:
+    return _metric_series(facts, metric, period_kinds={"ANNUAL"})
 
 
 def _annual_fcf(facts: list[dict]) -> list[tuple[str, float, str]]:
@@ -184,7 +194,7 @@ class CanonicalFeatureMaterializer:
         op = _annual_series(facts, "OPERATING_INCOME")
         gp = _annual_series(facts, "GROSS_PROFIT")
         ni = _annual_series(facts, "NET_INCOME")
-        shares = _annual_series(facts, "SHARES_OUTSTANDING")
+        shares = _metric_series(facts, "SHARES_OUTSTANDING")
         eps = _annual_series(facts, "DILUTED_EPS")
         fcf = _annual_fcf(facts)
 
