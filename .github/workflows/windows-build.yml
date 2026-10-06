@@ -165,14 +165,86 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dbDir | Out-Null
           $db = Join-Path $dbDir "operational.db"
 
-          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.executescript(\"CREATE TABLE security_master (security_id TEXT PRIMARY KEY,ticker TEXT NOT NULL,name TEXT NOT NULL,exchange TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,sector TEXT,industry TEXT,ipo_date TEXT,delisted_date TEXT,active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE TABLE ticker_aliases (alias TEXT NOT NULL,security_id TEXT NOT NULL,valid_from TEXT NOT NULL DEFAULT '',valid_to TEXT,PRIMARY KEY(alias,security_id,valid_from)); INSERT INTO security_master (security_id,ticker,name,exchange,market,active,created_at,updated_at) VALUES ('LEGACY-1','OLD','Legacy Corp','NASDAQ','US',1,'2025-01-01T00:00:00+00:00','2025-01-01T00:00:00+00:00');\"); c.commit(); c.close()" $db
+          $createLegacy = @'
+          import sqlite3
+          import sys
+
+          db = sys.argv[1]
+          conn = sqlite3.connect(db)
+          conn.executescript("""
+          CREATE TABLE security_master (
+              security_id TEXT PRIMARY KEY,
+              ticker TEXT NOT NULL,
+              name TEXT NOT NULL,
+              exchange TEXT NOT NULL,
+              market TEXT NOT NULL DEFAULT 'US',
+              cik TEXT,
+              sector TEXT,
+              industry TEXT,
+              ipo_date TEXT,
+              delisted_date TEXT,
+              active INTEGER NOT NULL DEFAULT 1,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+          );
+          CREATE TABLE ticker_aliases (
+              alias TEXT NOT NULL,
+              security_id TEXT NOT NULL,
+              valid_from TEXT NOT NULL DEFAULT '',
+              valid_to TEXT,
+              PRIMARY KEY(alias, security_id, valid_from)
+          );
+          INSERT INTO security_master (
+              security_id,ticker,name,exchange,market,active,created_at,updated_at
+          ) VALUES (
+              'LEGACY-1','OLD','Legacy Corp','NASDAQ','US',1,
+              '2025-01-01T00:00:00+00:00','2025-01-01T00:00:00+00:00'
+          );
+          """)
+          conn.commit()
+          conn.close()
+          '@
+          $createLegacy | python - $db
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           $env:S153_RUNTIME_ROOT = $runtime
           & $exe --doctor
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); cols={r[1] for r in c.execute('pragma table_info(security_master)')}; aliases={r[1] for r in c.execute('pragma table_info(ticker_aliases)')}; legacy=c.execute(\"select ticker from security_master where security_id='LEGACY-1'\").fetchone(); n=c.execute(\"select count(*) from security_master where market='US'\").fetchone()[0]; c.close(); print('Upgraded US rows=',n); assert {'country_code','listing_key','source_scope','source_priority','first_seen','last_seen'}<=cols; assert {'source','event_type','availability_date','ingested_at'}<=aliases; assert legacy and legacy[0]=='OLD'; assert n>=1000" $db
+          $verifyUpgrade = @'
+          import sqlite3
+          import sys
+
+          conn = sqlite3.connect(sys.argv[1])
+          cols = {row[1] for row in conn.execute("pragma table_info(security_master)")}
+          aliases = {row[1] for row in conn.execute("pragma table_info(ticker_aliases)")}
+          legacy = conn.execute(
+              "select ticker from security_master where security_id='LEGACY-1'"
+          ).fetchone()
+          us_rows = conn.execute(
+              "select count(*) from security_master where market='US'"
+          ).fetchone()[0]
+          conn.close()
+
+          print("Upgraded US rows=", us_rows)
+          assert {
+              "country_code",
+              "listing_key",
+              "source_scope",
+              "source_priority",
+              "first_seen",
+              "last_seen",
+          } <= cols
+          assert {
+              "source",
+              "event_type",
+              "availability_date",
+              "ingested_at",
+          } <= aliases
+          assert legacy and legacy[0] == "OLD"
+          assert us_rows >= 1000
+          '@
+          $verifyUpgrade | python - $db
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install Inno Setup
