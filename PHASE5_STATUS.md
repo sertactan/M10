@@ -2,7 +2,7 @@
 
 ## Status
 
-**STARTED — canonical architecture added; scoring remains fail-closed pending the authoritative V1.4 specification set.**
+**RECOVERED CANONICAL V1.4 IMPLEMENTED — Golden tests and SHA-256 bundle bound.**
 
 Phase 5 does not introduce a new market-data or fundamental-data provider. It consumes the
 same normalized, Point-in-Time canonical feature layer built by Phases 1-3 and used by Phase 4.
@@ -78,3 +78,21 @@ The repository now has a deterministic ingestion path for the missing authoritat
 - only then enable V1.4.
 
 Missing, duplicate, tampered, path-escaping, empty or placeholder bundles are rejected.
+
+
+## Recovered canonical activation
+
+The latest exact prior V1.3/V1.4 work was recovered and explicitly adopted for this project:
+
+- V1.3 Confidence-Weighted Robust Destination
+- M10_D / M10_C / DMG
+- CB / DP
+- V1.4 final score
+- SPIN / CYCLE / ASSET destination gates
+- EA10 / ProgressGate / EAB / ESP
+- Precision / Strong Watch / Early Asymmetric gates
+
+The five canonical artifacts are now pinned in `specs/s153_v14/manifest.json`.
+
+Probability percentages remain empirical Phase 8 calibration outputs; UI examples are not hard-coded.
+Risk-adjusted conviction has no recovered deterministic formula and is therefore not fabricated.
