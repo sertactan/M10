@@ -58,3 +58,4 @@ class ScanSummary:
     delisted: int
     v12_scored: int = 0
     v14_scored: int = 0
+    notes: tuple[str, ...] = ()

@@ -19,6 +19,7 @@ from core.fundamentals.models import (
 )
 from data.cache.sec_json_mirror import SecJsonMirror
 from data.providers.http_json import JsonHttpClient
+from data.providers.sec_access import resolve_sec_user_agent
 from data.providers.price_utils import sha256_payload
 
 
@@ -80,20 +81,16 @@ class SECEdgarFundamentalsProvider:
     ) -> None:
         self.data_base_url = data_base_url.rstrip("/")
         self.archive_base_url = archive_base_url.rstrip("/")
-        self.user_agent = user_agent or os.getenv("SEC_USER_AGENT")
+        self.user_agent = resolve_sec_user_agent(user_agent)
         self.http = JsonHttpClient(timeout_seconds, max_retries)
         self.mirror = SecJsonMirror(mirror_root) if mirror_root is not None else None
         self._filing_cache: dict[str, list[FilingRecord]] = {}
 
     @property
     def configured(self) -> bool:
-        return bool(self.user_agent)
+        return True
 
     def _headers(self) -> dict[str, str]:
-        if not self.user_agent:
-            raise RuntimeError(
-                "SEC_USER_AGENT is required, e.g. 'Your Name your-email@example.com'"
-            )
         return {
             "User-Agent": self.user_agent,
             "Accept-Encoding": "gzip, deflate",

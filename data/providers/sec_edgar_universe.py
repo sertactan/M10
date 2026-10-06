@@ -9,6 +9,7 @@ from core.universe.identity import EXCHANGE_TO_MIC, exchange_from_sec_name, norm
 from core.universe.models import UniverseRecord
 from data.cache.sec_json_mirror import SecJsonMirror
 from data.providers.http_json import JsonHttpClient
+from data.providers.sec_access import resolve_sec_user_agent
 
 
 class SECEdgarUniverseProvider:
@@ -24,16 +25,11 @@ class SECEdgarUniverseProvider:
         mirror_root: str | Path | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
-        self.user_agent = user_agent or os.getenv("SEC_USER_AGENT")
+        self.user_agent = resolve_sec_user_agent(user_agent)
         self.http = JsonHttpClient(timeout_seconds, max_retries)
         self.mirror = SecJsonMirror(mirror_root) if mirror_root is not None else None
 
     def _headers(self) -> dict[str, str]:
-        if not self.user_agent:
-            raise RuntimeError(
-                "SEC_USER_AGENT is required for automated SEC access, e.g. "
-                "'Your Name your-email@example.com'"
-            )
         return {
             "User-Agent": self.user_agent,
             "Accept-Encoding": "gzip, deflate",

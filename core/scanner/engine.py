@@ -104,6 +104,8 @@ class MarketScanner:
                         metadata={
                             "v12_confidence": getattr(v12, "confidence", None),
                             "v14_confidence": getattr(v14, "confidence", None),
+                            "dna60": getattr(v12, "components", {}).get("DNA60"),
+                            "v12_missing": tuple(getattr(v12, "missing_requirements", ()) or ()),
                         },
                     )
                 )

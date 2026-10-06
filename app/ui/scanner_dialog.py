@@ -36,7 +36,7 @@ class ScannerTask(QRunnable):
 
 
 class MarketScannerDialog(QDialog):
-    COLUMNS = ('Ticker','Exchange','V1.2','V1.4','V1.2 Route','V1.4 Route','Delisted')
+    COLUMNS = ('Ticker','Exchange','DNA60','V1.2','V1.4','V1.2 Route','V1.4 Route','Missing','Delisted')
 
     def __init__(self, *, scanner_service_factory: Callable[[], object], as_of_date: date, parent=None) -> None:
         super().__init__(parent)
@@ -100,16 +100,24 @@ class MarketScannerDialog(QDialog):
             int(summary.v14_scored),
             sum(1 for row in self.rows if row.v14_score is not None),
         )
+        notes = tuple(getattr(summary, 'notes', ()) or ())
+        note_text = ' · '.join(notes[-2:])
         if v12_scored == 0 and v14_scored == 0:
-            self.status.setText(
-                f'{summary.total} rows · scored 0 · canonical feature cache is empty'
-            )
+            base = f'{summary.total} rows · final scored 0'
+            if note_text:
+                base += f' · {note_text}'
+            else:
+                base += ' · canonical feature cache is empty'
+            self.status.setText(base)
         else:
-            self.status.setText(
+            base = (
                 f'{summary.total} rows · V1.2 scored {v12_scored} · '
                 f'V1.4 scored {v14_scored} · NASDAQ {summary.nasdaq} · '
                 f'NYSE {summary.nyse} · AMEX {summary.amex}'
             )
+            if note_text:
+                base += f' · {note_text}'
+            self.status.setText(base)
         self.progress.hide()
         self.run_button.setEnabled(True)
         self.exchange.setEnabled(True)
@@ -134,11 +142,17 @@ class MarketScannerDialog(QDialog):
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(rows))
         for index, row in enumerate(rows):
+            dna60 = row.metadata.get('dna60')
+            missing = row.metadata.get('v12_missing') or ()
             values = (
-                row.ticker, row.exchange,
+                row.ticker,
+                row.exchange,
+                '—' if dna60 is None else f'{float(dna60):.1f}',
                 '—' if row.v12_score is None else f'{row.v12_score:.1f}',
                 '—' if row.v14_score is None else f'{row.v14_score:.1f}',
-                row.v12_route or '—', row.v14_route or '—',
+                row.v12_route or '—',
+                row.v14_route or '—',
+                ', '.join(str(item) for item in missing) if missing else '—',
                 'YES' if row.delisted else 'NO',
             )
             for column, value in enumerate(values):
