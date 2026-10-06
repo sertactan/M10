@@ -277,7 +277,7 @@ def test_phase7_pit_filtering_excludes_future_feature_versions(tmp_path: Path):
         store.close()
 
 
-def test_production_scanner_uses_canonical_v14_without_faking_missing_inputs(tmp_path: Path):
+def test_production_scanner_uses_canonical_v141_without_faking_missing_inputs(tmp_path: Path):
     store = SQLiteStore(tmp_path / "production-gate.sqlite")
     store.initialize()
     try:
@@ -285,7 +285,7 @@ def test_production_scanner_uses_canonical_v14_without_faking_missing_inputs(tmp
         v12, v14 = scorer.score(candidate(1, "NASDAQ"), AS_OF)
         assert v12.score is None
         assert v14.score is None
-        assert v14.status == "INCONCLUSIVE_V1_4_INPUTS"
+        assert v14.status == "INCONCLUSIVE_V1_4_1_INPUTS"
         assert v14.large_winner_probability is None
         assert v14.risk_adjusted_conviction is None
     finally:
