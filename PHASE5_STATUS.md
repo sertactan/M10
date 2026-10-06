@@ -1,0 +1,98 @@
+# Phase 5 — S15.3 V1.4 Dual-Magnitude Architecture
+
+## Status
+
+**RECOVERED CANONICAL V1.4 IMPLEMENTED — Golden tests and SHA-256 bundle bound.**
+
+Phase 5 does not introduce a new market-data or fundamental-data provider. It consumes the
+same normalized, Point-in-Time canonical feature layer built by Phases 1-3 and used by Phase 4.
+
+The original project/master prompt is pinned in `docs/MASTER_PROMPT_REFERENCE.md` by filename,
+size and SHA-256 so future phases have a durable reference instead of relying on chat history.
+
+## Added
+
+- separate `S153V14Model` class
+- separate V1.4 input/result contracts
+- V1.4 PIT input loader backed only by `ModelFeatureRepository`
+- `V14SpecificationBinding` manifest
+- cryptographic canonical spec-bundle loader (`manifest.json` + SHA-256 validation)
+- dedicated authoritative drop location: `specs/s153_v14/`
+- immutable lists of required canonical sources and forbidden invented model elements
+- result fields reserved for:
+  - route-specific destination
+  - dual magnitude
+  - asymmetric-candidate diagnostics
+  - acceleration
+  - large-winner probability
+  - risk-adjusted conviction
+  - confidence
+  - probability buckets
+- hard fail-closed canonical-spec binding gate
+- regression tests proving that plausible-looking feature names cannot activate invented V1.4 logic
+
+## Authoritative sources still required
+
+The engine will remain disabled until all of the following are available as explicit canonical
+artifacts:
+
+1. S15.3 V1.4 Canonical Specification
+2. V1.4 Factor / DNA Definitions
+3. V1.4 Router and Gate Specification
+4. Dual-Magnitude / Destination Specification
+5. Golden Test Cases
+
+The currently available project material describes V1.4 architecture and UI examples, but does
+not provide a complete authoritative set of V1.4 formulas, factor weights, thresholds, route
+gates, probability mappings, destination rules, magnitude buckets, confidence rules, and
+missing-data treatment.
+
+## No-invention rule
+
+Until those artifacts are bound, Phase 5 must not invent or modify:
+
+- formulas
+- factor weights
+- thresholds
+- routes
+- gates
+- penalties
+- probability mappings
+- destination rules
+- magnitude buckets
+- confidence rules
+- missing-data treatment
+
+The correct runtime behavior is therefore to fail closed instead of returning a fabricated
+score, probability, route, or destination.
+
+## Next binding operation
+
+The repository now has a deterministic ingestion path for the missing authoritative package:
+
+- place exactly five canonical artifacts under `specs/s153_v14/`;
+- create `manifest.json` from `manifest.template.json`;
+- pin each artifact by SHA-256;
+- run the integrity gate;
+- encode the exact executable formulas and Golden expected outputs from the verified files;
+- only then enable V1.4.
+
+Missing, duplicate, tampered, path-escaping, empty or placeholder bundles are rejected.
+
+
+## Recovered canonical activation
+
+The latest exact prior V1.3/V1.4 work was recovered and explicitly adopted for this project:
+
+- V1.3 Confidence-Weighted Robust Destination
+- M10_D / M10_C / DMG
+- CB / DP
+- V1.4 final score
+- SPIN / CYCLE / ASSET destination gates
+- EA10 / ProgressGate / EAB / ESP
+- Precision / Strong Watch / Early Asymmetric gates
+
+The five canonical artifacts are now pinned in `specs/s153_v14/manifest.json`.
+
+Probability percentages remain empirical Phase 8 calibration outputs; UI examples are not hard-coded.
+Risk-adjusted conviction has no recovered deterministic formula and is therefore not fabricated.

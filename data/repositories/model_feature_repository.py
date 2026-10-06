@@ -26,7 +26,7 @@ def _iso(dt: datetime) -> str:
 class ModelFeatureRepository:
     """PIT model-feature materialization. This is not a data provider.
 
-    Rows must trace to Phase 1–3 canonical storage, historical-control datasets,
+    Rows must trace to Phase 1-3 canonical storage, historical-control datasets,
     or deterministic derivations from those rows.
     """
 
@@ -49,7 +49,7 @@ class ModelFeatureRepository:
     ) -> str:
         if source_phase not in ALLOWED_SOURCE_PHASES:
             raise ValueError(
-                f"Phase 4 forbids non-canonical source phase: {source_phase}"
+                f"Canonical model layer forbids non-canonical source phase: {source_phase}"
             )
         if available_at > feature_as_of:
             # A feature snapshot cannot claim knowledge before its latest input existed.

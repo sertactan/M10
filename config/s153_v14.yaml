@@ -1,7 +1,7 @@
 model_id: "S15.3_V1.4"
 display_name: "S15.3 V1.4 Dual-Magnitude Architecture"
-enabled: false
-canonical_formula_version: "PENDING_PHASE_5_CANONICAL_BINDING"
-status: "NOT_IMPLEMENTED_PHASE_5"
+enabled: true
+canonical_formula_version: "S15.3_V1.4_RECOVERED_2026-10-05"
+status: "ACTIVE_RECOVERED_CANONICAL"
 weights: {}
 thresholds: {}
