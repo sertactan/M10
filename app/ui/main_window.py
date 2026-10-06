@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from app.ui.analysis_worker import AnalysisTask
 from app.ui.compare_page import ComparePage
 from app.ui.context_panels import AnalysisContextPanel, StockHeaderPanel
+from app.ui.data_health_dialog import DataHealthDialog
 from app.ui.model_page import ModelPage
 from app.ui.scanner_dialog import MarketScannerDialog
 from app.ui.view_models import ComparisonView
@@ -35,11 +36,13 @@ class ResearchTerminalWindow(QMainWindow):
         *,
         analysis_service_factory: Callable[[], object] | None = None,
         scanner_service_factory: Callable[[], object] | None = None,
+        data_health_service_factory: Callable[[], object] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.analysis_service_factory = analysis_service_factory
         self.scanner_service_factory = scanner_service_factory
+        self.data_health_service_factory = data_health_service_factory
         self.thread_pool = QThreadPool.globalInstance()
         self.setWindowTitle("S15.3 Research Terminal")
         self.resize(1440, 900)
@@ -109,6 +112,10 @@ class ResearchTerminalWindow(QMainWindow):
         self.horizon.addItem("12 Months", 12)
         layout.addWidget(self.horizon)
 
+        self.data_health_button = QPushButton("DATA HEALTH")
+        self.data_health_button.clicked.connect(self._open_data_health)
+        layout.addWidget(self.data_health_button)
+
         self.scanner_button = QPushButton("MARKET SCANNER")
         self.scanner_button.clicked.connect(self._open_scanner)
         layout.addWidget(self.scanner_button)
@@ -117,6 +124,18 @@ class ResearchTerminalWindow(QMainWindow):
         self.run_button.clicked.connect(self._run_analysis)
         layout.addWidget(self.run_button)
         return frame
+
+    def _open_data_health(self) -> None:
+        if self.data_health_service_factory is None:
+            self.status.setText("Data health backend is not connected")
+            return
+        dialog = DataHealthDialog(
+            service_factory=self.data_health_service_factory,
+            parent=self,
+        )
+        dialog.setModal(False)
+        dialog.show()
+        self._data_health_dialog = dialog
 
     def _open_scanner(self) -> None:
         if self.scanner_service_factory is None:
