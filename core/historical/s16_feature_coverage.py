@@ -8,6 +8,7 @@ from core.models.s16_contracts import S16Input
 
 
 S16_REQUIRED_FEATURES = (
+    "market_cap_scarcity",
     "float_scarcity",
     "short_pressure",
     "float_turnover",
