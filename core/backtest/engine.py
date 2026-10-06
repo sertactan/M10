@@ -8,7 +8,7 @@ from core.backtest.outcomes import CanonicalForwardOutcomeEngine
 from core.backtest.spec_manifest import Phase6SpecificationBinding
 from core.models.s153_v12 import S153V12Model
 from core.models.s153_v12_contracts import S153V12Input
-from core.models.s153_v14 import S153V14Model
+from core.models.s153_v141 import S153V141Model
 from core.models.s153_v14_contracts import S153V14Input
 from core.prices.models import SourcePriceBar
 
@@ -28,11 +28,11 @@ class HistoricalBacktestEngine:
         self,
         *,
         v12_model: S153V12Model | None = None,
-        v14_model: S153V14Model | None = None,
+        v14_model: S153V141Model | None = None,
         binding: Phase6SpecificationBinding | None = None,
     ) -> None:
         self.v12_model = v12_model or S153V12Model()
-        self.v14_model = v14_model or S153V14Model()
+        self.v14_model = v14_model or S153V141Model()
         self.binding = binding or Phase6SpecificationBinding()
         self.outcomes = CanonicalForwardOutcomeEngine()
 
@@ -46,9 +46,9 @@ class HistoricalBacktestEngine:
         terminal_value_unknown: bool = False,
     ) -> HistoricalBacktestResult:
         if v12_input.security_id != v14_input.security_id:
-            raise ValueError("V1.2 and V1.4 inputs must reference the same security_id")
+            raise ValueError("V1.2 and V1.4.1 inputs must reference the same security_id")
         if v12_input.as_of != v14_input.as_of:
-            raise ValueError("V1.2 and V1.4 inputs must use the same PIT as_of timestamp")
+            raise ValueError("V1.2 and V1.4.1 inputs must use the same PIT as_of timestamp")
 
         # Critical physical/logical firewall: score first. Future labels are not
         # computed or joined until both model engines have completed.
