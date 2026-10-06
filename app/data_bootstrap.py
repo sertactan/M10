@@ -156,6 +156,8 @@ async def ensure_price_history(
     for name, provider in providers:
         if not health.can_attempt(name):
             errors.append(f"{name}: circuit open")
+            if name == "YAHOO_COMPAT" and last_known_good is not None and not force_refresh:
+                return 0
             continue
 
         provider_start = start
@@ -197,6 +199,8 @@ async def ensure_price_history(
                 message=text[:500],
             )
             errors.append(f"{name}: {text}")
+            if name == "YAHOO_COMPAT" and last_known_good is not None and not force_refresh:
+                return 0
 
     if bars is None or provider_name is None:
         if last_known_good is not None and not force_refresh:
