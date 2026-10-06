@@ -2,7 +2,7 @@
 
 ## Status
 
-**STARTED on a dependent branch.**
+**COMPLETE — canonical V1.2/V1.4 desktop UI and acceptance matrix implemented.**
 
 Dependency chain:
 
@@ -37,7 +37,7 @@ Phase 9 must not manufacture model output to make the interface look complete.
 - non-blocking QRunnable/QThreadPool analysis worker
 - fresh database connection per analysis worker
 - real canonical V1.2 input/model binding
-- V1.4 fail-closed UI state when the canonical Phase 5 specification is unavailable
+- canonical V1.4 execution with dual-magnitude components surfaced in the metric table
 - no synthetic consensus/winner/conviction
 - canonical Stock Header bound to `canonical_price_selection` + Parquet
 - real day-over-day change from the last two canonical adjusted-close bars
@@ -49,7 +49,7 @@ Phase 9 must not manufacture model output to make the interface look complete.
 - separate Market Scanner dialog bound to the Phase 7 scanner engine
 - scanner runs off the UI thread
 - sortable scanner result table, exchange filter and CSV export action
-- production scanner remains fail-closed while V1.4 is blocked
+- production scanner uses canonical V1.2/V1.4 scoring
 - indeterminate loading indicators for analysis and scanner jobs
 - controls disabled during background work and restored on success/error
 - Enter-to-run ticker workflow
@@ -61,12 +61,8 @@ Phase 9 must not manufacture model output to make the interface look complete.
 Initial UI values are neutral placeholders such as `—` and `NOT LOADED`.
 The UI does not ship random/demo stock scores as production results.
 
-## Remaining Phase 9 work
-
-- V1.4 dual-magnitude detail surface once V1.4 is executable
-
 
 ## Final UI acceptance gate
 
 The exact Phase 9 UI acceptance matrix is encoded in `app/ui/acceptance.py`.
-CI success plus this matrix is required for closure. V1.4 remains fail-closed until its canonical Phase 5 dependency is executable.
+CI success plus this matrix is required for closure. Canonical V1.4 is executable; M10_D, M10_C, DMG and EA10 diagnostics are exposed through the model component surface.
