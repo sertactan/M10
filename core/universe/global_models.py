@@ -14,6 +14,15 @@ class GlobalReferenceListing:
     country_code: str | None
     isin: str | None
     aliases: str | None
+    currency: str | None = None
+    mic: str | None = None
+    sector: str | None = None
+    industry_group: str | None = None
+    industry: str | None = None
+    figi: str | None = None
+    composite_figi: str | None = None
+    shareclass_figi: str | None = None
+    active: bool = True
     source: str = "ADANOS_REFERENCE"
     source_scope: str = "REFERENCE_ONLY"
     redistribution_status: str = "LOCAL_REFERENCE_ONLY"
