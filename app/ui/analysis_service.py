@@ -17,7 +17,7 @@ from core.backtest.outcomes import CanonicalForwardOutcomeEngine
 from core.features.s153_v12_input_loader import S153V12InputLoader
 from core.features.s153_v14_input_loader import S153V14InputLoader
 from core.models.s153_v12 import S153V12Model
-from core.models.s153_v14 import S153V14Model
+from core.models.s153_v141 import S153V141Model
 from core.forecast.calibration import ForecastCalibrationUnavailable
 from core.forecast.empirical_provider import MarketPrevalenceEmpiricalCalibrationProvider
 from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
@@ -413,9 +413,9 @@ class DesktopAnalysisService:
                 ticker=row['ticker'],
                 as_of=as_of,
             )
-            v14_result = S153V14Model().analyze(v14_input)
+            v14_result = S153V141Model().analyze(v14_input)
             v14_view = ModelView(
-                model_name='S15.3 V1.4',
+                model_name='S15.3 V1.4.1',
                 status=v14_result.status,
                 score=v14_result.score,
                 route=v14_result.primary_route,
@@ -432,7 +432,8 @@ class DesktopAnalysisService:
             ):
                 try:
                     calibrated = MarketPrevalenceEmpiricalCalibrationProvider(
-                        app.sqlite
+                        app.sqlite,
+                        model_version='S15.3_V1.4.1',
                     ).calibrate(
                         v12=v12_result,
                         v14=v14_result,

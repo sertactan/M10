@@ -185,7 +185,7 @@ def test_phase6_binding_lists_all_authoritative_sources_when_unbound() -> None:
     assert len(binding.missing()) == 6
 
 
-def test_full_backtest_runs_with_canonical_v14_and_no_future_outcome_leakage() -> None:
+def test_full_backtest_runs_with_production_v141_and_no_future_outcome_leakage() -> None:
     as_of = datetime(2025, 1, 1, tzinfo=timezone.utc)
     v12 = S153V12Input(
         security_id="SEC_TEST",
@@ -208,7 +208,7 @@ def test_full_backtest_runs_with_canonical_v14_and_no_future_outcome_leakage() -
         v14_input=v14,
         bars=_series([20.0] * 252),
     )
-    assert result.v14.status == "INCONCLUSIVE_V1_4_INPUTS"
+    assert result.v14.status == "INCONCLUSIVE_V1_4_1_INPUTS"
     assert result.outcome.outcome_status == "READY"
     assert result.outcome.fm252 == pytest.approx(2.0)
 

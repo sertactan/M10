@@ -59,10 +59,10 @@ class ResearchTerminalWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.v12_page = ModelPage("S15.3 V1.2")
-        self.v14_page = ModelPage("S15.3 V1.4")
+        self.v14_page = ModelPage("S15.3 V1.4.1")
         self.compare_page = ComparePage()
         self.tabs.addTab(self.v12_page, "V1.2")
-        self.tabs.addTab(self.v14_page, "V1.4")
+        self.tabs.addTab(self.v14_page, "V1.4.1")
         self.tabs.addTab(self.compare_page, "COMPARE")
         root.addWidget(self.tabs, 1)
 

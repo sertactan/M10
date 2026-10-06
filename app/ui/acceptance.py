@@ -7,7 +7,7 @@ PHASE9_ACCEPTANCE_ITEMS = (
     "Desktop shell",
     "Global header",
     "V1.2 tab",
-    "V1.4 tab",
+    "V1.4.1 tab",
     "Compare tab",
     "Canonical stock header",
     "Phase 6 backtest card",
@@ -21,7 +21,7 @@ PHASE9_ACCEPTANCE_ITEMS = (
     "Loading/progress/error states",
     "Responsive minimum layout",
     "No mock production results",
-    "V1.4 canonical active state",
+    "V1.4.1 production canonical active state",
 )
 
 

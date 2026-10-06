@@ -40,7 +40,7 @@ class ScannerTask(QRunnable):
 
 
 class MarketScannerDialog(QDialog):
-    COLUMNS = ('Ticker','Exchange','DNA60','V1.2','V1.4','V1.2 Route','V1.4 Route','Missing','Delisted')
+    COLUMNS = ('Ticker','Exchange','DNA60','V1.2','V1.4.1','V1.2 Route','V1.4.1 Route','Missing','Delisted')
 
     def __init__(self, *, scanner_service_factory: Callable[[], object], as_of_date: date, parent=None) -> None:
         super().__init__(parent)

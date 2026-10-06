@@ -15,6 +15,7 @@ on:
       - "data/**"
       - "config/**"
       - "specs/s153_v14/**"
+      - "specs/s153_v141/**"
       - "main.py"
       - "pyproject.toml"
       - "packaging/windows/**"
@@ -78,6 +79,14 @@ jobs:
           pyinstaller --noconfirm --clean packaging/windows/S153ResearchTerminal.spec
           if (!(Test-Path "dist/S153ResearchTerminal/S153ResearchTerminal.exe")) {
             throw "PyInstaller executable was not produced"
+          }
+
+      - name: Verify packaged V1.4.1 canonical completion spec
+        shell: pwsh
+        run: |
+          $spec = "dist\S153ResearchTerminal\_internal\specs\s153_v141\canonical_completion_specification.md"
+          if (!(Test-Path $spec)) {
+            throw "Packaged V1.4.1 canonical completion spec is missing: $spec"
           }
 
       - name: Verify packaged schema

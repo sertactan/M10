@@ -178,7 +178,7 @@ class DesktopScannerService:
 
             # Put actionable rows first. Final canonical scores remain preferred;
             # partial DNA60 is only a discovery ordering aid and is never exposed
-            # as a substituted V1.2/V1.4 final score.
+            # as a substituted V1.2/V1.4.1 final score.
             rows = sorted(
                 rows,
                 key=lambda row: (
