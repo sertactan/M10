@@ -261,3 +261,73 @@ def import_stooq_bulk_for_scanner(app: AppContainer, zip_path: str | Path) -> tu
         bars_count += len(group)
 
     return series_count, bars_count
+
+
+def ensure_stooq_scanner_bulk(
+    app: AppContainer,
+    *,
+    minimum_coverage_ratio: float = 0.70,
+    freshness_days: int = 10,
+) -> tuple[int, int]:
+    universe = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM security_master
+        WHERE market='US' AND exchange IN ('NASDAQ','NYSE','AMEX') AND active=1
+        """
+    ).fetchone()
+    total = int(universe["n"] or 0)
+    if total <= 0:
+        return 0, 0
+
+    cutoff = (date.today() - __import__("datetime").timedelta(days=freshness_days)).isoformat()
+    covered = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(DISTINCT p.security_id) AS n
+        FROM price_series_registry p
+        JOIN security_master s ON s.security_id=p.security_id
+        WHERE p.source='STOOQ'
+          AND p.end_date>=?
+          AND s.market='US'
+          AND s.exchange IN ('NASDAQ','NYSE','AMEX')
+          AND s.active=1
+        """,
+        (cutoff,),
+    ).fetchone()
+    current = int(covered["n"] or 0)
+    if current / total >= minimum_coverage_ratio:
+        return current, 0
+
+    bulk_dir = app.resolve_data_path("bulk/stooq")
+    zip_path = bulk_dir / "us_daily.zip"
+    marker = bulk_dir / "us-daily-import.json"
+
+    if marker.exists() and zip_path.exists():
+        try:
+            payload = json.loads(marker.read_text(encoding="utf-8"))
+            imported_at = datetime.fromisoformat(str(payload["imported_at"]))
+            if (
+                (datetime.now(timezone.utc) - imported_at).days < freshness_days
+                and int(payload.get("series", 0)) / total >= minimum_coverage_ratio
+            ):
+                return int(payload.get("series", 0)), 0
+        except Exception:
+            pass
+
+    download_stooq_us_daily_ascii(zip_path)
+    series, bars = import_stooq_bulk_for_scanner(app, zip_path)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(
+        json.dumps(
+            {
+                "imported_at": datetime.now(timezone.utc).isoformat(),
+                "series": series,
+                "bars": bars,
+                "source": STOOQ_BULK_PAGE,
+                "scope": "SCANNER_BOOTSTRAP_RAW_ONLY",
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return series, bars
