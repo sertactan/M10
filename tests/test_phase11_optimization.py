@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from threading import Lock
+from threading import Lock, get_ident
 
 from core.optimization.acceptance import (
     PHASE11_ACCEPTANCE_ITEMS,
@@ -87,6 +87,44 @@ def test_parallel_scanner_preserves_deterministic_order_and_closes_workers():
     assert summary.total == 30
     assert progress[-1].completed == 30
     assert 1 <= closed["count"] <= 4
+
+
+def test_parallel_scanner_closes_worker_on_owning_thread():
+    rows = [
+        ScanCandidate(
+            security_id=f"SEC_{i}",
+            ticker=f"T{i}",
+            exchange="NASDAQ",
+        )
+        for i in range(8)
+    ]
+    lifecycle = []
+    lifecycle_lock = Lock()
+
+    class ThreadBoundScorer(WorkerScorer):
+        def __init__(self):
+            super().__init__({"count": 0, "lock": Lock()})
+            self.owner = get_ident()
+            with lifecycle_lock:
+                lifecycle.append(("open", self.owner))
+
+        def close(self):
+            closed_on = get_ident()
+            with lifecycle_lock:
+                lifecycle.append(("close", self.owner, closed_on))
+            assert closed_on == self.owner
+
+    scanner = ParallelMarketScanner(
+        Candidates(rows),
+        scorer_factory=ThreadBoundScorer,
+        workers=3,
+        batch_size=4,
+    )
+    result, _summary = scanner.scan_current(as_of=AS_OF)
+    assert len(result) == len(rows)
+    closes = [item for item in lifecycle if item[0] == "close"]
+    assert closes
+    assert all(owner == closed_on for _, owner, closed_on in closes)
 
 
 def test_parallel_scanner_rejects_invalid_worker_count():
