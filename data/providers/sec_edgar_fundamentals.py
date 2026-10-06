@@ -23,7 +23,7 @@ from data.providers.sec_access import resolve_sec_user_agent
 from data.providers.price_utils import sha256_payload
 
 
-SUPPORTED_FORMS = {
+FACT_FORMS = {
     "10-K", "10-K/A",
     "10-Q", "10-Q/A",
     "8-K", "8-K/A",
@@ -31,6 +31,19 @@ SUPPORTED_FORMS = {
     "40-F", "40-F/A",
     "6-K", "6-K/A",
 }
+
+# Filing-history coverage is intentionally broader than XBRL-fact coverage.
+# S16 needs financing / offering forms for PIT dilution-risk evidence, but those
+# forms must never be treated as canonical financial-statement facts.
+S16_EVENT_FORMS = {
+    "S-1", "S-1/A", "S-3", "S-3/A",
+    "F-1", "F-1/A", "F-3", "F-3/A",
+    "424B2", "424B3", "424B4", "424B5",
+    "EFFECT", "RW",
+    "DEF 14A", "PRE 14A",
+}
+
+SUPPORTED_FORMS = FACT_FORMS | S16_EVENT_FORMS
 
 
 def _utc_now() -> datetime:
@@ -262,7 +275,7 @@ class SECEdgarFundamentalsProvider:
                 for unit, items in units.items():
                     for item in items or []:
                         form = str(item.get("form") or "").strip()
-                        if form not in SUPPORTED_FORMS:
+                        if form not in FACT_FORMS:
                             continue
                         end = _parse_date(item.get("end"))
                         if end is None:

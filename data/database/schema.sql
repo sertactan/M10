@@ -622,3 +622,60 @@ CREATE TABLE IF NOT EXISTS background_sync_tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_background_sync_ready
 ON background_sync_tasks(status,run_after,priority,created_at);
+
+
+-- S16 Phase 3: point-in-time historical evidence archives.
+CREATE TABLE IF NOT EXISTS s16_short_interest_source (
+    record_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    settlement_date TEXT NOT NULL,
+    short_interest REAL NOT NULL,
+    avg_daily_volume REAL,
+    float_shares REAL,
+    days_to_cover REAL,
+    available_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_ref TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    raw_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_s16_short_interest_pit
+ON s16_short_interest_source(security_id,available_at,settlement_date,source);
+
+CREATE TABLE IF NOT EXISTS s16_attention_source (
+    record_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    available_at TEXT NOT NULL,
+    mentions REAL NOT NULL,
+    unique_authors REAL,
+    sentiment REAL,
+    source TEXT NOT NULL,
+    source_ref TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    raw_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_s16_attention_pit
+ON s16_attention_source(security_id,channel,observed_at,available_at,source);
+
+CREATE TABLE IF NOT EXISTS s16_feature_evidence_source (
+    record_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    feature_key TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    available_at TEXT NOT NULL,
+    value REAL NOT NULL,
+    source TEXT NOT NULL,
+    source_ref TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    raw_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_s16_feature_evidence_pit
+ON s16_feature_evidence_source(security_id,feature_key,observed_at,available_at,source);

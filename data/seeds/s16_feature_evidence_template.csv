@@ -1,0 +1,8 @@
+ticker,feature_key,observed_at,available_at,value,source,source_ref,quality_status
+TEST,catalyst,2024-01-15T12:00:00+00:00,2024-01-15T12:00:00+00:00,85,EXAMPLE,archive://catalyst/TEST/1,EXAMPLE_ONLY
+TEST,catalyst_proximity,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,70,EXAMPLE,archive://calendar/TEST/1,EXAMPLE_ONLY
+TEST,theme,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,60,EXAMPLE,archive://theme/TEST/1,EXAMPLE_ONLY
+TEST,regime_sympathy,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,65,EXAMPLE,archive://regime/TEST/1,EXAMPLE_ONLY
+TEST,ownership_lock,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,75,EXAMPLE,archive://ownership/TEST/1,EXAMPLE_ONLY
+TEST,dilution_risk,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,0.2,EXAMPLE,archive://dilution/TEST/1,EXAMPLE_ONLY
+TEST,manipulation_risk,2024-01-15T00:00:00+00:00,2024-01-15T00:00:00+00:00,0.1,EXAMPLE,archive://risk/TEST/1,EXAMPLE_ONLY
