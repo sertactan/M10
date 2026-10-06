@@ -152,7 +152,7 @@ def _route_confidence(features: Mapping[str, float | None]) -> float:
     )
 
 
-def _confirmation_magnitude(
+def confirmation_magnitude(
     *,
     features: Mapping[str, float | None],
     base_df10: float,
@@ -262,6 +262,22 @@ def _ea10(
     return ea, cgc, progress_gate, eab, esp, label
 
 
+def dual_magnitude_core(
+    *,
+    v12_score: float,
+    m10_d: float,
+    m10_c: float,
+) -> tuple[float, float, float, float]:
+    dmg = float(m10_d) - float(m10_c)
+    cb = (
+        min(3.0, 0.30 * (float(m10_c) - 65.0))
+        if float(m10_c) >= 65.0 and dmg <= 10.0
+        else 0.0
+    )
+    dp = min(4.0, 0.20 * max(0.0, dmg - 10.0))
+    return dmg, cb, dp, clip(float(v12_score) + cb - dp)
+
+
 def calculate_recovered_v14(
     *,
     features: Mapping[str, float | None],
@@ -281,7 +297,7 @@ def calculate_recovered_v14(
     if missing:
         raise ValueError("Missing recovered V1.3 inputs: " + ", ".join(missing))
 
-    rdf10, rc, alpha, df10_c, du, dup, abp, rdp, raw, m10_c = _confirmation_magnitude(
+    rdf10, rc, alpha, df10_c, du, dup, abp, rdp, raw, m10_c = confirmation_magnitude(
         features=features,
         base_df10=base_df10,
         mch10=mch10,
@@ -292,10 +308,11 @@ def calculate_recovered_v14(
         hmg10=hmg10,
         pir=pir,
     )
-    dmg = m10_d - m10_c
-    cb = min(3.0, 0.30 * (m10_c - 65.0)) if m10_c >= 65 and dmg <= 10 else 0.0
-    dp = min(4.0, 0.20 * max(0.0, dmg - 10.0))
-    base_v14 = clip(v12_score + cb - dp)
+    dmg, cb, dp, base_v14 = dual_magnitude_core(
+        v12_score=v12_score,
+        m10_d=m10_d,
+        m10_c=m10_c,
+    )
 
     early = v12_score >= 65 and (m10_c < 65 or dmg > 10)
     ea_route: str | None = None
