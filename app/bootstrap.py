@@ -17,7 +17,7 @@ class AppContainer:
         load_local_env(root / ".env")
         self.app_config = load_yaml(root / "config" / "app.yaml", ApplicationConfig)
         self.v12_config = load_yaml(root / "config" / "s153_v12.yaml", ModelConfig)
-        self.v14_config = load_yaml(root / "config" / "s153_v14.yaml", ModelConfig)
+        self.v14_config = load_yaml(root / "config" / "s153_v14.yaml", ModelConfig)\n        self.v141_config = load_yaml(root / "config" / "s153_v141.yaml", ModelConfig)
         self.runtime_root = writable_runtime_root(root)
         self.sqlite = SQLiteStore(self.runtime_root / self.app_config.database.sqlite_path)
         self.bootstrap_counts: dict[str, int] = {}
