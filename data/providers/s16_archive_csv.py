@@ -13,6 +13,7 @@ from core.historical.s16_evidence import (
 
 
 DIRECT_FEATURE_KEYS = {
+    # Canonical direct V1 inputs.
     "ownership_lock",
     "catalyst",
     "regime_sympathy",
@@ -20,6 +21,21 @@ DIRECT_FEATURE_KEYS = {
     "theme",
     "dilution_risk",
     "manipulation_risk",
+
+    # Short-pressure sublegs (0..100).
+    "borrow_pressure",
+    "ftd_pressure",
+
+    # Optional premarket subleg (0..100).
+    "premarket_turnover",
+
+    # Catalyst sublegs (0..100).
+    "catalyst_materiality",
+    "catalyst_surprise",
+    "catalyst_credibility",
+    "catalyst_market_cap_impact",
+    "catalyst_novelty",
+    "catalyst_immediacy",
 }
 
 
