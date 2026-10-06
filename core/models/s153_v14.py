@@ -3,43 +3,49 @@ from __future__ import annotations
 from core.models.s153_v12 import S153V12Model
 from core.models.s153_v12_contracts import S153V12Input
 from core.models.s153_v14_contracts import S153V14Input, S153V14Result
-from core.models.s153_v14_recovered import (
-    RECOVERED_FORMULA_VERSION,
-    calculate_recovered_v14,
-    missing_v13_features,
+from core.scoring.math import clip
+from core.scoring.s153_v14_dual import (
+    assumption_burden,
+    confirmation_bonus,
+    confirmation_gap_closure,
+    destination_route_acceleration,
+    destination_uncertainty,
+    disagreement_penalty,
+    early_asymmetric_score,
+    early_boost,
+    early_stall_penalty,
+    m10_confirmation,
+    progress_gate,
+    robust_destination,
+    route_blend_alpha,
+    route_confidence,
+    route_disagreement,
 )
-from core.models.s153_v14_spec_manifest import V14SpecificationBinding
 
 
 class V14CanonicalSpecificationMissing(RuntimeError):
-    """Retained for compatibility with older callers of the fail-closed scaffold."""
+    """Retained for compatibility with callers that import the old Phase-5 gate."""
 
 
 class S153V14Model:
     model_id = "S15.3_V1.4"
-    canonical_formula_version = RECOVERED_FORMULA_VERSION
+    canonical_formula_version = "S153_V1.4_DUAL_MAGNITUDE_2026-10-05"
 
-    def __init__(self, binding: V14SpecificationBinding | None = None) -> None:
-        # Binding is retained as reproducibility metadata. The recovered formulas
-        # are now embedded and locked by repository Golden tests.
-        self.binding = binding or V14SpecificationBinding()
-        self.v12_model = S153V12Model()
+    def __init__(self, binding=None, *, v12_model: S153V12Model | None = None) -> None:
+        # The recovered/approved V1.4 math is now executable in code.
+        # binding is accepted only for backwards compatibility with the former gate.
+        self.binding = binding
+        self.v12_model = v12_model or S153V12Model()
 
     @staticmethod
     def _v12_input(data: S153V14Input) -> S153V12Input:
-        # V14-only raw/scenario inputs are not passed to the V1.2 validator.
-        v12_features = {
-            key: value
-            for key, value in data.features.items()
-            if not key.startswith("V14_")
-        }
         return S153V12Input(
             security_id=data.security_id,
             ticker=data.ticker,
             as_of=data.as_of,
             discovery_factors=data.discovery_factors,
             control_factors=data.control_factors,
-            features=v12_features,
+            features=data.features,
             current_price=data.current_price,
             current_market_cap=data.current_market_cap,
         )
@@ -49,111 +55,161 @@ class S153V14Model:
             raise ValueError("as_of must be timezone-aware")
 
         v12 = self.v12_model.analyze(self._v12_input(data))
-        required_components = (
-            "S15.3",
-            "M10",
-            "DF10",
-            "MCH10",
-            "ETRQ",
-            "RER",
-            "CMAG",
-            "FCVX",
-            "HMG10",
-            "PIR",
-            "T10",
+        f = dict(data.features)
+        f["MI"] = v12.components.get("MI")
+
+        m10_d = v12.components.get("M10")
+        t10 = v12.components.get("T10")
+        base_df10 = v12.components.get("DF10")
+        rc = route_confidence(f)
+        alpha = route_blend_alpha(rc)
+
+        rdf10, df10_c = robust_destination(
+            base_df10=base_df10,
+            df_bear=f.get("V14_DF_BEAR"),
+            df_base=f.get("V14_DF_BASE"),
+            df_bull=f.get("V14_DF_BULL"),
+            alpha=alpha,
         )
-        missing = [
-            name
-            for name in required_components
-            if v12.components.get(name) is None
-        ]
-        missing.extend(missing_v13_features(data.features))
-        if missing:
-            return S153V14Result(
-                security_id=data.security_id,
-                ticker=data.ticker,
-                as_of=data.as_of,
-                score=None,
-                status="INCONCLUSIVE_V1_4_INPUTS",
-                primary_route=v12.primary_route,
-                secondary_route=v12.secondary_route,
-                confidence=v12.confidence,
-                components={
-                    **v12.components,
-                    "M10_D": v12.components.get("M10"),
-                },
-                flags={"PRECISION_CONFIRMED": False},
-                missing_requirements=tuple(dict.fromkeys(missing)),
-            )
+        du, dup = destination_uncertainty(
+            mc_bear=f.get("V14_MC_BEAR"),
+            mc_base=f.get("V14_MC_BASE"),
+            mc_bull=f.get("V14_MC_BULL"),
+            explicit_du=f.get("V14_DU"),
+        )
+        ab, abp = assumption_burden(f)
+        route_gap, rdp = route_disagreement(f)
 
-        try:
-            recovered = calculate_recovered_v14(
-                features=data.features,
-                v12_score=float(v12.score),
-                m10_d=float(v12.components["M10"]),
-                base_df10=float(v12.components["DF10"]),
-                mch10=float(v12.components["MCH10"]),
-                etrq=float(v12.components["ETRQ"]),
-                rer=float(v12.components["RER"]),
-                cmag=float(v12.components["CMAG"]),
-                fcvx=float(v12.components["FCVX"]),
-                hmg10=float(v12.components["HMG10"]),
-                pir=float(v12.components["PIR"]),
-                mi=(
-                    float(v12.components["MI"])
-                    if v12.components.get("MI") is not None
-                    else None
-                ),
-            )
-        except ValueError as exc:
-            return S153V14Result(
-                security_id=data.security_id,
-                ticker=data.ticker,
-                as_of=data.as_of,
-                score=None,
-                status="INCONCLUSIVE_V1_4_INPUTS",
-                primary_route=v12.primary_route,
-                secondary_route=v12.secondary_route,
-                confidence=v12.confidence,
-                components={
-                    **v12.components,
-                    "M10_D": v12.components.get("M10"),
-                },
-                flags={"PRECISION_CONFIRMED": False},
-                missing_requirements=(str(exc),),
-            )
+        m10_c_raw, m10_c, m10_c_legs = m10_confirmation(
+            df10_v13=df10_c,
+            mch10=v12.components.get("MCH10"),
+            etrq=v12.components.get("ETRQ"),
+            rer=v12.components.get("RER"),
+            cmag=v12.components.get("CMAG"),
+            fcvx=v12.components.get("FCVX"),
+            hmg10=v12.components.get("HMG10"),
+            pir=v12.components.get("PIR"),
+            dup=dup,
+            abp=abp,
+            rdp=rdp,
+        )
 
-        t10 = float(v12.components["T10"])
-        xr = v12.components.get("XR")
-        hmg10 = v12.components.get("HMG10")
-        confidence = v12.confidence
+        missing: list[str] = []
+        if v12.score is None:
+            missing.append("S15.3_V1.2")
+        if m10_d is None:
+            missing.append("M10_D")
+        if rc is None:
+            missing.append("V1.3_RC")
+        if df10_c is None:
+            missing.append("V1.3_DF10")
+        if dup is None:
+            missing.append("V1.3_DUP")
+        if abp is None:
+            missing.append("V1.3_ABP")
+        if rdp is None:
+            missing.append("V1.3_RDP")
+        if m10_c is None or m10_c_legs < 5:
+            missing.append("M10_C>=5/7")
+        if t10 is None:
+            missing.append("T10")
+
+        dmg = (
+            float(m10_d) - float(m10_c)
+            if m10_d is not None and m10_c is not None
+            else None
+        )
+        cb = confirmation_bonus(m10_c, dmg)
+        dp = disagreement_penalty(dmg)
+
+        core_v14 = None
+        if not missing and cb is not None and dp is not None:
+            core_v14 = clip(float(v12.score) + float(cb) - float(dp))
+
+        early_active = bool(
+            v12.score is not None
+            and v12.score >= 65.0
+            and m10_d is not None
+            and m10_d >= 65.0
+            and m10_c is not None
+            and (m10_c < 70.0 or (dmg is not None and dmg > 10.0))
+        )
+
+        cgc = None
+        dra = None
+        ea10 = None
+        ea_route = None
+        ea_parts: dict[str, float | None] = {
+            "CA10": None,
+            "AA10": None,
+            "SPIN_ACCEL": None,
+        }
+        progress_pass = False
+        progress_count = 0
+        eab = 0.0
+        esp = 0.0
+
+        if early_active and core_v14 is not None:
+            cgc = confirmation_gap_closure(
+                dmg_now=dmg,
+                dmg_3m_ago=f.get("V14_DMG_3M_AGO"),
+                explicit_cgc=f.get("V14_CGC"),
+            )
+            dra = destination_route_acceleration(f)
+            ea10, ea_route, ea_parts = early_asymmetric_score(
+                f,
+                dra=dra,
+                cgc=cgc,
+            )
+            progress_pass, progress_count = progress_gate(f, dra=dra, cgc=cgc)
+            if ea10 is None:
+                missing.append("EA10")
+            else:
+                eab = float(early_boost(ea10, progress_pass) or 0.0)
+                esp = float(early_stall_penalty(ea10) or 0.0)
+
+        final_score = None
+        if core_v14 is not None and not (early_active and ea10 is None):
+            final_score = clip(core_v14 + eab - esp)
+            # Latest recovered EA rule: confirmation below 70 cannot enter 80+.
+            if m10_c is not None and m10_c < 70.0:
+                final_score = min(final_score, 79.0)
 
         precision = bool(
-            not recovered.early_asymmetric
-            and recovered.final_v14_score >= 80
-            and recovered.m10_d >= 70
-            and recovered.m10_c >= 70
-            and t10 >= 70
-            and recovered.df10_confirmation >= 60
-            and xr is not None and float(xr) >= 99
-            and hmg10 is not None
-            and v12.route_gate
-            and confidence is not None and confidence >= 70
+            final_score is not None
+            and final_score >= 80.0
+            and m10_d is not None and m10_d >= 70.0
+            and m10_c is not None and m10_c >= 70.0
+            and t10 is not None and t10 >= 70.0
+            and base_df10 is not None and base_df10 >= 60.0
+            and v12.components.get("XR") is not None
+            and v12.components["XR"] >= 99.0
+            and v12.components.get("HMG10") is not None
+            and bool(v12.route_gate)
+            and v12.confidence is not None
+            and v12.confidence >= 70.0
         )
         strong = bool(
-            not recovered.early_asymmetric
-            and recovered.final_v14_score >= 75
-            and recovered.m10_d >= 65
-            and recovered.m10_c >= 65
-            and t10 >= 65
+            final_score is not None
+            and final_score >= 75.0
+            and m10_d is not None and m10_d >= 65.0
+            and m10_c is not None and m10_c >= 65.0
+            and t10 is not None and t10 >= 65.0
+            and bool(v12.route_gate)
         )
-        discovery = recovered.final_v14_score >= 65
+        discovery = bool(final_score is not None and final_score >= 65.0)
 
-        if precision:
+        if missing:
+            status = "INCONCLUSIVE"
+        elif precision:
             status = "PRECISION_CONFIRMED_12M_10X"
-        elif recovered.early_asymmetric:
-            status = recovered.ea_label or "EARLY_ASYMMETRIC"
-        elif recovered.final_v14_score >= 80:
+        elif early_active and ea10 is not None and ea10 >= 75.0 and progress_pass:
+            status = "EARLY_ACCELERATING_10X"
+        elif early_active and ea10 is not None and ea10 >= 60.0:
+            status = "EARLY_ASYMMETRIC_WATCH"
+        elif early_active:
+            status = "EARLY_STALLED"
+        elif final_score is not None and final_score >= 80.0:
             status = "HIGH_SCORE_NOT_CONFIRMED"
         elif strong:
             status = "STRONG_10X_WATCH"
@@ -162,51 +218,59 @@ class S153V14Model:
         else:
             status = "NO_CANONICAL_GATE_STATUS"
 
-        components = {
-            **v12.components,
-            "M10_D": recovered.m10_d,
-            "M10_C": recovered.m10_c,
-            "M10_C_RAW": recovered.m10_c_raw,
-            "DMG": recovered.dmg,
-            "RDF10": recovered.rdf10,
-            "ROUTE_CONFIDENCE_V13": recovered.route_confidence,
-            "ALPHA_V13": recovered.alpha,
-            "DF10_C": recovered.df10_confirmation,
-            "DU": recovered.du,
-            "DUP": recovered.dup,
-            "ABP": recovered.abp,
-            "RDP": recovered.rdp,
-            "CB": recovered.cb,
-            "DP": recovered.dp,
-            "S15.3_V1.4_BASE": recovered.base_v14_score,
-            "EA10": recovered.ea10,
-            "CGC": recovered.cgc,
-            "EAB": recovered.eab,
-            "ESP": recovered.esp,
-            "S15.3_V1.4": recovered.final_v14_score,
-        }
+        components = dict(v12.components)
+        components.update({
+            "S15.3_V1.2": v12.score,
+            "M10_D": m10_d,
+            "RC": rc,
+            "ALPHA": alpha,
+            "RDF10": rdf10,
+            "DF10_C": df10_c,
+            "DU": du,
+            "DUP": dup,
+            "AB": ab,
+            "ABP": abp,
+            "ROUTE_GAP": route_gap,
+            "RDP": rdp,
+            "M10_C_RAW": m10_c_raw,
+            "M10_C": m10_c,
+            "DMG": dmg,
+            "CB": cb,
+            "DP": dp,
+            "S15.3_V1.4_CORE": core_v14,
+            "CGC": cgc,
+            "DRA": dra,
+            "EA10": ea10,
+            "EAB": eab,
+            "ESP": esp,
+            "S15.3_V1.4": final_score,
+            **ea_parts,
+        })
         flags = {
-            **v12.flags,
-            "EARLY_ASYMMETRIC": recovered.early_asymmetric,
-            "EA_PROGRESS_GATE": bool(recovered.progress_gate),
             "PRECISION_CONFIRMED": precision,
             "STRONG_WATCH": strong,
             "DISCOVERY": discovery,
+            "EARLY_ASYMMETRIC": early_active,
+            "PROGRESS_GATE": progress_pass,
+            "M10_CONFIRMATION_GE_70": bool(m10_c is not None and m10_c >= 70.0),
         }
+
         return S153V14Result(
             security_id=data.security_id,
             ticker=data.ticker,
             as_of=data.as_of,
-            score=recovered.final_v14_score,
+            score=final_score,
             status=status,
             primary_route=v12.primary_route,
             secondary_route=v12.secondary_route,
-            acceleration_score=recovered.ea10,
+            primary_magnitude=None,
+            extreme_magnitude=None,
+            acceleration_score=ea10,
             large_winner_probability=None,
             risk_adjusted_conviction=None,
-            confidence=confidence,
+            confidence=v12.confidence,
             probability_buckets={},
             components=components,
             flags=flags,
-            missing_requirements=(),
+            missing_requirements=tuple(dict.fromkeys(missing)),
         )
