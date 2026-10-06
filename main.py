@@ -291,6 +291,7 @@ def ingest_stooq_bulk(root: Path, zip_path: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="S15.3 Research Terminal")
+    parser.add_argument("--ui", action="store_true", help="Launch the desktop UI")
     parser.add_argument("--doctor", action="store_true", help="Validate architecture")
 
     parser.add_argument("--sync-universe", action="store_true", help="Sync US universe")
@@ -317,6 +318,9 @@ def main() -> int:
     args = parser.parse_args()
     root = Path(__file__).resolve().parent
 
+    if args.ui:
+        from app.ui.launcher import launch_ui
+        return launch_ui(root)
     if args.doctor:
         return doctor(root)
     if args.sync_universe:
@@ -349,8 +353,8 @@ def main() -> int:
             parser.error("--run-v12 requires --model-as-of YYYY-MM-DD")
         return run_v12(root, args.run_v12, args.model_as_of)
 
-    print("UI NOT IMPLEMENTED — Phase 9")
-    return 0
+    from app.ui.launcher import launch_ui
+    return launch_ui(root)
 
 
 if __name__ == "__main__":
