@@ -47,11 +47,28 @@ jobs:
             throw "PyInstaller executable was not produced"
           }
 
-      - name: Smoke test executable
+      - name: Verify packaged schema
         shell: pwsh
         run: |
-          & "dist\S153ResearchTerminal\S153ResearchTerminal.exe" --doctor
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $schema = "dist\S153ResearchTerminal\_internal\data\database\schema.sql"
+          if (!(Test-Path $schema)) {
+            throw "Packaged SQLite schema is missing: $schema"
+          }
+
+      - name: Smoke test executable from clean working directory
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist\S153ResearchTerminal\S153ResearchTerminal.exe").Path
+          $smoke = Join-Path $env:RUNNER_TEMP "s153-smoke"
+          New-Item -ItemType Directory -Force -Path $smoke | Out-Null
+          Push-Location $smoke
+          try {
+            & $exe --doctor
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            Pop-Location
+          }
 
       - name: Install Inno Setup
         shell: pwsh
