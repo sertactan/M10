@@ -495,3 +495,64 @@ CREATE TABLE IF NOT EXISTS backtest_run_manifest (
     dataset_hash TEXT,
     status TEXT NOT NULL
 );
+
+
+-- Phase 8: validated forecast calibration profiles.
+-- Probability calibration is allowed only from unbiased market-prevalence /
+-- walk-forward backtest evidence. This table stores validated upstream outputs;
+-- it does not define or fit a probability formula.
+CREATE TABLE IF NOT EXISTS forecast_calibration_profiles (
+    calibration_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES backtest_run_manifest(run_id),
+    model_version TEXT NOT NULL,
+    horizon_months INTEGER NOT NULL,
+    dataset_kind TEXT NOT NULL,
+    calibration_method TEXT NOT NULL,
+    calibration_cutoff TEXT NOT NULL,
+    sample_size INTEGER NOT NULL,
+    bull_return_pct REAL NOT NULL,
+    base_return_pct REAL NOT NULL,
+    bear_return_pct REAL NOT NULL,
+    probability_positive_return_pct REAL NOT NULL,
+    probability_2x_plus_pct REAL NOT NULL,
+    probability_5x_plus_pct REAL NOT NULL,
+    probability_10x_plus_pct REAL NOT NULL,
+    confidence_pct REAL NOT NULL,
+    risk TEXT NOT NULL,
+    evidence_json TEXT NOT NULL DEFAULT '{}',
+    evidence_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forecast_calibration_lookup
+ON forecast_calibration_profiles(
+    model_version,horizon_months,dataset_kind,calibration_cutoff,status
+);
+
+-- Phase 8: reproducible forward forecast run records.
+CREATE TABLE IF NOT EXISTS forecast_runs (
+    analysis_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    analysis_date TEXT NOT NULL,
+    horizon_months INTEGER NOT NULL,
+    v12_model_version TEXT NOT NULL,
+    v14_model_version TEXT NOT NULL,
+    v12_score REAL,
+    v14_score REAL,
+    v12_route TEXT,
+    v14_route TEXT,
+    v12_destination TEXT,
+    v14_destination TEXT,
+    calibration_id TEXT NOT NULL REFERENCES forecast_calibration_profiles(calibration_id),
+    calibration_cutoff TEXT NOT NULL,
+    calibration_sample_size INTEGER NOT NULL,
+    calibration_evidence_hash TEXT NOT NULL,
+    data_snapshot_hash TEXT NOT NULL,
+    model_config_hash TEXT NOT NULL,
+    forecast_payload_json TEXT NOT NULL,
+    forecast_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forecast_runs_security_date
+ON forecast_runs(security_id,analysis_date);
