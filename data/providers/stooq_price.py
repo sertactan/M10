@@ -99,19 +99,81 @@ class StooqPriceProvider:
         security_lookup,
         retrieved_at: datetime | None = None,
     ):
-        """Yield provider-isolated series one group at a time to limit memory use."""
+        """Yield provider-isolated series without loading the full archive into RAM."""
         now = retrieved_at or utc_now()
         with zipfile.ZipFile(zip_path) as zf:
             for member in zf.namelist():
                 if member.endswith("/") or not member.lower().endswith((".txt", ".csv")):
                     continue
-                text = zf.read(member).decode("utf-8", errors="replace")
-                rows = self._parse_bulk_text(text, member, security_lookup, now)
-                groups: dict[tuple[str, str], list[SourcePriceBar]] = {}
-                for bar in rows:
-                    groups.setdefault((bar.security_id, bar.source_symbol), []).append(bar)
-                for group in groups.values():
-                    yield group
+                with zf.open(member) as raw:
+                    text = io.TextIOWrapper(raw, encoding="utf-8", errors="replace", newline="")
+                    reader = csv.DictReader(text)
+                    fields = {str(name or "").upper() for name in (reader.fieldnames or [])}
+                    if "<TICKER>" in fields or "<DATE>" in fields:
+                        current_key: tuple[str, str] | None = None
+                        group: list[SourcePriceBar] = []
+                        for row in reader:
+                            symbol = str(row.get("<TICKER>") or "").strip().lower()
+                            if not symbol or not row.get("<DATE>") or not row.get("<CLOSE>"):
+                                continue
+                            ticker = symbol.split(".")[0].upper().replace("_", "-")
+                            security_id = security_lookup(ticker)
+                            if not security_id:
+                                continue
+                            key = (security_id, symbol)
+                            if current_key is not None and key != current_key and group:
+                                yield group
+                                group = []
+                            current_key = key
+                            close = float(row["<CLOSE>"])
+                            group.append(SourcePriceBar(
+                                security_id=security_id,
+                                source="STOOQ",
+                                source_symbol=symbol,
+                                trade_date=parse_date(row["<DATE>"]),
+                                open=float(row["<OPEN>"]),
+                                high=float(row["<HIGH>"]),
+                                low=float(row["<LOW>"]),
+                                raw_close=close,
+                                adjusted_close=close,
+                                volume=float(row.get("<VOL>") or 0),
+                                retrieved_at=now,
+                                quality_status=PriceQualityStatus.BOOTSTRAP,
+                                adjustment_status=AdjustmentStatus.RAW_ONLY,
+                                raw_payload_hash=sha256_payload(row),
+                            ))
+                        if group:
+                            yield group
+                        continue
+
+                    filename_symbol = Path(member).stem.lower()
+                    ticker = filename_symbol.split(".")[0].upper().replace("_", "-")
+                    security_id = security_lookup(ticker)
+                    if not security_id:
+                        continue
+                    group: list[SourcePriceBar] = []
+                    for row in reader:
+                        if not row.get("Date") or not row.get("Close"):
+                            continue
+                        close = float(row["Close"])
+                        group.append(SourcePriceBar(
+                            security_id=security_id,
+                            source="STOOQ",
+                            source_symbol=filename_symbol,
+                            trade_date=parse_date(row["Date"]),
+                            open=float(row["Open"]),
+                            high=float(row["High"]),
+                            low=float(row["Low"]),
+                            raw_close=close,
+                            adjusted_close=close,
+                            volume=float(row.get("Volume") or 0),
+                            retrieved_at=now,
+                            quality_status=PriceQualityStatus.BOOTSTRAP,
+                            adjustment_status=AdjustmentStatus.RAW_ONLY,
+                            raw_payload_hash=sha256_payload(row),
+                        ))
+                    if group:
+                        yield group
 
     @staticmethod
     def _parse_bulk_text(text: str, member: str, security_lookup, retrieved_at: datetime) -> list[SourcePriceBar]:
