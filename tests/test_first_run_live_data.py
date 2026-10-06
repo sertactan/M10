@@ -137,3 +137,101 @@ async def test_price_bootstrap_persists_real_series_and_ui_selection(tmp_path, m
         assert feature["value"] == pytest.approx(10.5)
     finally:
         app.close()
+
+
+@pytest.mark.asyncio
+async def test_price_bootstrap_falls_back_to_stooq_after_yahoo_429(tmp_path, monkeypatch):
+    root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("S153_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    app = AppContainer(root)
+    app.initialize()
+    try:
+        now = datetime(2026, 10, 6, 1, 0, tzinfo=timezone.utc)
+        repo = SecurityRepository(app.sqlite)
+        repo.bulk_upsert(
+            [
+                UniverseRecord(
+                    ticker="TEST",
+                    name="Test Inc.",
+                    exchange=Exchange.NASDAQ,
+                    exchange_mic="XNAS",
+                    active=True,
+                    provider="SEC_EDGAR",
+                    availability_date=now,
+                    security_type="CS",
+                    cik="0000000001",
+                    currency="USD",
+                    locale="us",
+                )
+            ],
+            snapshot_date=date(2026, 10, 6),
+        )
+        row = app.sqlite.connection.execute(
+            "SELECT * FROM security_master WHERE ticker='TEST'"
+        ).fetchone()
+
+        async def yahoo_429(self, security, start, end):
+            raise RuntimeError("HTTP 429 Too Many Requests")
+
+        async def stooq_history(self, security, start, end):
+            return [
+                SourcePriceBar(
+                    security_id=security.security_id,
+                    source="STOOQ",
+                    source_symbol="test.us",
+                    trade_date=date(2026, 10, 5),
+                    open=20.0,
+                    high=21.0,
+                    low=19.0,
+                    raw_close=20.5,
+                    adjusted_close=20.5,
+                    volume=2000.0,
+                    retrieved_at=now,
+                    quality_status=PriceQualityStatus.BOOTSTRAP,
+                    adjustment_status=AdjustmentStatus.RAW_ONLY,
+                )
+            ]
+
+        monkeypatch.setattr(
+            data_bootstrap.YahooCompatiblePriceProvider,
+            "get_history",
+            yahoo_429,
+        )
+        monkeypatch.setattr(
+            data_bootstrap.StooqPriceProvider,
+            "get_history",
+            stooq_history,
+        )
+
+        count = await data_bootstrap.ensure_price_history(
+            app,
+            row,
+            as_of_date=date(2026, 10, 6),
+        )
+        assert count == 1
+
+        selection = app.sqlite.connection.execute(
+            """
+            SELECT * FROM canonical_price_selection
+            WHERE security_id=? AND purpose='UI_LIVE_BOOTSTRAP'
+            ORDER BY selected_at DESC
+            LIMIT 1
+            """,
+            (row["security_id"],),
+        ).fetchone()
+        assert selection is not None
+        assert selection["source"] == "STOOQ"
+
+        yahoo_event = app.sqlite.connection.execute(
+            """
+            SELECT * FROM provider_health_events
+            WHERE provider='YAHOO_COMPAT'
+            ORDER BY event_id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        assert yahoo_event is not None
+        assert yahoo_event["success"] == 0
+        assert yahoo_event["rate_limited"] == 1
+    finally:
+        app.close()

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from threading import Lock, local
+from math import ceil
 from typing import Protocol
 
 from core.scanner.contracts import ScanCandidate, ScanMode, ScanProgress, ScanRow, ScanSummary
@@ -86,21 +86,11 @@ class ParallelMarketScanner:
         if invalid:
             raise ValueError(f"US scanner received unsupported exchanges: {invalid}")
 
-        thread_state = local()
-        workers: list[ClosableSecurityScorer] = []
-        workers_lock = Lock()
-
-        def scorer_for_thread() -> ClosableSecurityScorer:
-            scorer = getattr(thread_state, "scorer", None)
-            if scorer is None:
-                scorer = self.scorer_factory()
-                thread_state.scorer = scorer
-                with workers_lock:
-                    workers.append(scorer)
-            return scorer
-
-        def score_candidate(candidate: ScanCandidate) -> ScanRow:
-            v12, v14 = scorer_for_thread().score(candidate, as_of)
+        def score_candidate(
+            scorer: ClosableSecurityScorer,
+            candidate: ScanCandidate,
+        ) -> ScanRow:
+            v12, v14 = scorer.score(candidate, as_of)
             return ScanRow(
                 security_id=candidate.security_id,
                 ticker=candidate.ticker,
@@ -122,10 +112,32 @@ class ParallelMarketScanner:
                 },
             )
 
+        if not candidates:
+            return [], self._summary([], mode=mode, as_of=as_of)
+
+        # Each worker owns one scorer/database context for its entire chunk.
+        # The scorer is also closed inside that same worker thread. This keeps
+        # SQLite's default check_same_thread safety intact and prevents the
+        # desktop scanner from closing worker-owned connections on the parent
+        # QRunnable thread.
+        worker_count = min(self.workers, len(candidates))
+        chunk_size = ceil(len(candidates) / worker_count)
+        chunks = [
+            candidates[start:start + chunk_size]
+            for start in range(0, len(candidates), chunk_size)
+        ]
+
+        def score_chunk(chunk: list[ScanCandidate]) -> list[ScanRow]:
+            scorer = self.scorer_factory()
+            try:
+                return [score_candidate(scorer, candidate) for candidate in chunk]
+            finally:
+                scorer.close()
+
         rows: list[ScanRow] = []
-        try:
-            with ThreadPoolExecutor(max_workers=self.workers) as executor:
-                for row in executor.map(score_candidate, candidates):
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            for chunk_rows in executor.map(score_chunk, chunks):
+                for row in chunk_rows:
                     rows.append(row)
                     if on_progress is not None:
                         on_progress(
@@ -135,9 +147,6 @@ class ParallelMarketScanner:
                                 last_ticker=row.ticker,
                             )
                         )
-        finally:
-            for scorer in workers:
-                scorer.close()
 
         return rows, self._summary(rows, mode=mode, as_of=as_of)
 
