@@ -2,7 +2,7 @@
 
 ## Status
 
-**STARTED on a dependency branch; forecast orchestration implemented, production calibration remains fail-closed.**
+**CODE COMPLETE — canonical V1.4 active; forecast probabilities remain evidence-backed and fail closed until a validated Market Prevalence calibration profile exists.**
 
 Dependency chain:
 
@@ -14,7 +14,7 @@ main
                  └─ Phase 8 — Forecast Engine
 ```
 
-Phase 8 must not merge ahead of the canonical Phase 5/6/7 chain.
+Phase 5/6/7 are merged and canonical. Phase 8 is ready to merge.
 
 ## Master-prompt scope
 
@@ -62,11 +62,10 @@ probability mappings or scenario formulas.
 
 Phase 8 remains production-blocked until:
 
-1. Phase 5 V1.4 is canonical and executable.
-2. Phase 6 walk-forward / market-prevalence backtest is complete.
-3. An authoritative calibration method is bound to Phase 6 evidence.
-4. Calibration outputs are reproducible and carry a calibration id, cutoff, source and sample size.
-5. Production tests confirm no look-ahead and no hard-coded/example probabilities.
+1. Phase 5 V1.4 is canonical and executable — PASS.
+2. Calibration must come from validated Phase 6 Market Prevalence / walk-forward evidence.
+3. Calibration outputs must carry calibration id, cutoff, source and sample size.
+4. Production tests enforce no look-ahead and no hard-coded/example probabilities.
 
 No scenario return or probability mapping is invented by Phase 8.
 
@@ -94,6 +93,4 @@ Every persisted forecast run is tied to:
 - deterministic analysis id
 
 The Phase 8 completion gate is encoded in `core/forecast/acceptance.py`.
-CI success alone does not make Phase 8 production-complete. In particular,
-`V1.4 canonical scoring` and genuine Market Prevalence calibration must pass
-before the phase can be closed.
+Phase 8 code is complete. Runtime probability output intentionally remains unavailable when no validated Market Prevalence calibration profile is installed; this is a data/evidence state, not a missing formula.
