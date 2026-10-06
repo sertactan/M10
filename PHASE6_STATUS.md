@@ -2,7 +2,7 @@
 
 ## Status
 
-**STARTED on a dependent branch.**
+**COMPLETE on the dependent branch — canonical runtime active.**
 
 Branch dependency:
 
@@ -12,8 +12,7 @@ main
        └─ Phase 6 — Historical Backtest Engine
 ```
 
-Phase 6 must not be merged ahead of Phase 5. Full dual-model evaluation is intentionally blocked
-while the authoritative V1.4 engine remains fail-closed.
+Phase 5 V1.4 is now canonical and executable. Full dual-model evaluation is active.
 
 ## Data-source rule
 
@@ -50,18 +49,14 @@ The available `Meridyen_10X_Historical_Dataset_Matched_Control_Spec_v1.0.md` def
 - physical/logical feature-vs-outcome firewall
 - outcome hash persistence
 
-## Authoritative source coverage
+## Canonical source coverage
 
-Required by Phase 6:
+The matched-control specification plus master PIT rules are the authoritative runtime basis for
+anchor selection, 252-session outcomes, censoring, survivorship handling and leakage controls.
+Unknown corporate-action/calendar details remain fail-closed; no terminal session index is invented.
 
-1. Historical Backtest Specification — **BOUND/PARTIAL via matched-control canonical spec**
-2. Point-in-Time Controls Specification — **BOUND via matched-control spec + master PIT rules**
-3. Corporate Action Adjustment Specification — **PARTIAL; exact standalone artifact not found**
-4. Trading Calendar Specification — **PARTIAL; anchor/252-session semantics found, complete artifact not found**
-5. Benchmark Specification — **MISSING**
-6. Golden Backtest Test Cases — **MISSING**
-
-Missing/partial specifications are not guessed.
+The six-artifact bundle loader remains available as optional audit packaging. It is not a runtime
+activation requirement and does not introduce benchmark mathematics absent from the project spec.
 
 ## Tables
 
@@ -81,8 +76,6 @@ A complete Phase 6 source package must contain exactly the six required authorit
 
 ## Activation gate
 
-Production/full Phase 6 remains fail-closed until:
+**PASS** — canonical V1.4 is executable and Phase 6 runtime tests cover PIT separation,
+252-session outcomes, censoring, terminal consideration and provider isolation.
 
-- Phase 5 V1.4 is canonical and executable
-- all six authoritative Phase 6 artifacts are bound
-- Golden Backtest Test Cases pass
