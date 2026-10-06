@@ -6,7 +6,7 @@ from typing import Protocol
 from core.features.s153_v12_input_loader import S153V12InputLoader
 from core.features.s153_v14_input_loader import S153V14InputLoader
 from core.models.s153_v12 import S153V12Model
-from core.models.s153_v14 import S153V14Model
+from core.models.s153_v141 import S153V141Model
 from core.scanner.contracts import ScanCandidate
 from data.repositories.model_feature_repository import ModelFeatureRepository
 from data.repositories.security_repository import SecurityRepository
@@ -55,19 +55,19 @@ class RepositoryCandidateSource:
 
 
 class CanonicalDualModelScorer:
-    """Production scoring adapter. No fallback or synthetic model output is allowed."""
+    """Production scoring adapter. V1.2 + production V1.4.1; no fallback or synthetic model output is allowed."""
 
     def __init__(
         self,
         feature_repository: ModelFeatureRepository,
         *,
         v12_model: S153V12Model | None = None,
-        v14_model: S153V14Model | None = None,
+        v14_model: S153V141Model | None = None,
     ) -> None:
         self.v12_loader = S153V12InputLoader(feature_repository)
         self.v14_loader = S153V14InputLoader(feature_repository)
         self.v12_model = v12_model or S153V12Model()
-        self.v14_model = v14_model or S153V14Model()
+        self.v14_model = v14_model or S153V141Model()
 
     def score(self, candidate: ScanCandidate, as_of: datetime):
         if as_of.tzinfo is None:
