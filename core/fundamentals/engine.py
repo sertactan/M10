@@ -3,9 +3,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from time import perf_counter
 
 from core.contracts.entities import Security
 from data.repositories.fundamental_repository import FundamentalRepository
+from data.repositories.provider_health_repository import ProviderHealthRepository
 
 
 @dataclass(frozen=True)
@@ -24,9 +26,26 @@ class FundamentalSyncResult:
 class FundamentalEngine:
     REGULATORY_PRIORITY = ("SEC_EDGAR", "FINNHUB", "SIMFIN", "FMP")
 
-    def __init__(self, repository: FundamentalRepository, providers: dict[str, object]) -> None:
+    def __init__(
+        self,
+        repository: FundamentalRepository,
+        providers: dict[str, object],
+        health: ProviderHealthRepository | None = None,
+    ) -> None:
         self.repository = repository
         self.providers = providers
+        self.health = health
+
+    def _provider_order(self, mode: str) -> tuple[str, ...]:
+        selected = self.REGULATORY_PRIORITY if mode == "AUTO" else (mode,)
+        if self.health is None or mode != "AUTO":
+            return selected
+        # SEC remains authoritative for canonical regulatory facts. Dynamic
+        # health ranking only reorders the enrichment/fallback providers.
+        if "SEC_EDGAR" not in selected:
+            return self.health.rank(selected)
+        secondary = tuple(name for name in selected if name != "SEC_EDGAR")
+        return ("SEC_EDGAR",) + self.health.rank(secondary)
 
     async def sync_security(
         self,
@@ -37,7 +56,7 @@ class FundamentalEngine:
         include_metrics: bool = True,
     ) -> FundamentalSyncResult:
         mode = provider_mode.upper()
-        selected = self.REGULATORY_PRIORITY if mode == "AUTO" else (mode,)
+        selected = self._provider_order(mode)
         started = datetime.now(timezone.utc)
         sync_id = str(uuid.uuid4())
         self.repository.store.connection.execute(
@@ -59,9 +78,21 @@ class FundamentalEngine:
                 provider = self.providers.get(name)
                 if provider is None or getattr(provider, "configured", True) is False:
                     continue
+                if self.health is not None and not self.health.can_attempt(name):
+                    errors.append(f"{name}: circuit open")
+                    continue
+
+                provider_started = perf_counter()
                 try:
                     if not await provider.validate_symbol(security):
+                        if self.health is not None:
+                            self.health.record_failure(
+                                name,
+                                latency_ms=(perf_counter() - provider_started) * 1000.0,
+                                message="symbol validation failed",
+                            )
                         continue
+
                     filings = list(await provider.get_filings(security))
                     facts = list(await provider.get_facts(security))
                     filings_loaded += self.repository.save_filings(filings)
@@ -75,9 +106,22 @@ class FundamentalEngine:
                         metrics = list(await provider.get_company_metrics(security))
                         kpis_loaded += self.repository.save_guidance_kpis(metrics)
 
+                    if self.health is not None:
+                        self.health.record_success(
+                            name,
+                            latency_ms=(perf_counter() - provider_started) * 1000.0,
+                        )
                     used.append(name)
                 except Exception as exc:
-                    errors.append(f"{name}: {exc}")
+                    text = str(exc)
+                    errors.append(f"{name}: {text}")
+                    if self.health is not None:
+                        self.health.record_failure(
+                            name,
+                            latency_ms=(perf_counter() - provider_started) * 1000.0,
+                            rate_limited=("429" in text or "rate limit" in text.lower()),
+                            message=text[:500],
+                        )
                     if name == "SEC_EDGAR" and mode == "SEC_EDGAR":
                         raise
 

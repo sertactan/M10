@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import date, datetime, time, timedelta, timezone
+from time import perf_counter
 
 from app.bootstrap import AppContainer
 from core.contracts.entities import Security
@@ -13,6 +14,7 @@ from data.providers.yahoo_price import YahooCompatiblePriceProvider
 from data.repositories.fundamental_repository import FundamentalRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
 from data.repositories.price_repository import PriceRepository
+from data.repositories.provider_health_repository import ProviderHealthRepository
 from data.repositories.security_repository import SecurityRepository
 from data.storage.parquet_price_store import ParquetPriceStore
 
@@ -50,8 +52,36 @@ async def ensure_current_universe(app: AppContainer) -> int:
     if len(existing) >= 1000:
         return len(existing)
 
+    health = ProviderHealthRepository(app.sqlite)
+    if not health.can_attempt("SEC_EDGAR"):
+        if existing:
+            return len(existing)
+        raise RuntimeError("SEC_EDGAR circuit is open and no cached universe is available")
+
     provider = SECEdgarUniverseProvider(user_agent=_sec_user_agent())
-    records = await provider.list_current_us_securities()
+    started = perf_counter()
+    try:
+        records = await provider.list_current_us_securities()
+        if not records:
+            if existing:
+                return len(existing)
+            raise RuntimeError("SEC EDGAR returned an empty US universe")
+        health.record_success(
+            "SEC_EDGAR",
+            latency_ms=(perf_counter() - started) * 1000.0,
+        )
+    except Exception as exc:
+        text = str(exc)
+        health.record_failure(
+            "SEC_EDGAR",
+            latency_ms=(perf_counter() - started) * 1000.0,
+            rate_limited=("429" in text or "rate limit" in text.lower()),
+            message=text[:500],
+        )
+        if existing:
+            return len(existing)
+        raise
+
     repo.bulk_upsert(records, snapshot_date=date.today())
     return len(repo.current_us_common_stocks())
 
@@ -86,11 +116,32 @@ async def ensure_price_history(
         return 0
 
     security = _security_from_row(row)
+    health = ProviderHealthRepository(app.sqlite)
+    if not health.can_attempt("YAHOO_COMPAT"):
+        raise RuntimeError(
+            f"YAHOO_COMPAT circuit is open and no cached price history exists for {security.ticker}"
+        )
+
     provider = YahooCompatiblePriceProvider()
     start = as_of_date - timedelta(days=lookback_days)
-    bars = await provider.get_history(security, start, as_of_date)
-    if not bars:
-        raise RuntimeError(f"No live price history returned for {security.ticker}")
+    started = perf_counter()
+    try:
+        bars = await provider.get_history(security, start, as_of_date)
+        if not bars:
+            raise RuntimeError(f"No live price history returned for {security.ticker}")
+        health.record_success(
+            "YAHOO_COMPAT",
+            latency_ms=(perf_counter() - started) * 1000.0,
+        )
+    except Exception as exc:
+        text = str(exc)
+        health.record_failure(
+            "YAHOO_COMPAT",
+            latency_ms=(perf_counter() - started) * 1000.0,
+            rate_limited=("429" in text or "rate limit" in text.lower()),
+            message=text[:500],
+        )
+        raise
 
     parquet = ParquetPriceStore(
         app.resolve_data_path(app.app_config.database.parquet_root)
@@ -155,13 +206,32 @@ async def ensure_sec_fundamentals(
     if existing is not None and int(existing["n"]) > 0:
         return int(existing["n"])
 
+    health = ProviderHealthRepository(app.sqlite)
+    if not health.can_attempt("SEC_EDGAR"):
+        return 0
+
     provider = SECEdgarFundamentalsProvider(user_agent=_sec_user_agent())
     repo = FundamentalRepository(app.sqlite)
-    filings = await provider.get_filings(security)
-    facts = await provider.get_facts(security)
-    repo.save_filings(filings)
-    repo.save_facts(facts)
-    return len(facts)
+    started = perf_counter()
+    try:
+        filings = await provider.get_filings(security)
+        facts = await provider.get_facts(security)
+        repo.save_filings(filings)
+        repo.save_facts(facts)
+        health.record_success(
+            "SEC_EDGAR",
+            latency_ms=(perf_counter() - started) * 1000.0,
+        )
+        return len(facts)
+    except Exception as exc:
+        text = str(exc)
+        health.record_failure(
+            "SEC_EDGAR",
+            latency_ms=(perf_counter() - started) * 1000.0,
+            rate_limited=("429" in text or "rate limit" in text.lower()),
+            message=text[:500],
+        )
+        raise
 
 
 def ensure_sec_fundamentals_sync(app: AppContainer, row, *, as_of_date: date) -> int:
