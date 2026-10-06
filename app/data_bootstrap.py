@@ -115,9 +115,28 @@ async def ensure_price_history(
     if existing is not None:
         return 0
 
+    last_known_good = app.sqlite.connection.execute(
+        """
+        SELECT 1
+        FROM canonical_price_selection
+        WHERE security_id=?
+          AND start_date<=?
+          AND end_date<?
+        ORDER BY end_date DESC, selected_at DESC
+        LIMIT 1
+        """,
+        (
+            row["security_id"],
+            as_of_date.isoformat(),
+            as_of_date.isoformat(),
+        ),
+    ).fetchone()
+
     security = _security_from_row(row)
     health = ProviderHealthRepository(app.sqlite)
     if not health.can_attempt("YAHOO_COMPAT"):
+        if last_known_good is not None:
+            return 0
         raise RuntimeError(
             f"YAHOO_COMPAT circuit is open and no cached price history exists for {security.ticker}"
         )
@@ -141,6 +160,8 @@ async def ensure_price_history(
             rate_limited=("429" in text or "rate limit" in text.lower()),
             message=text[:500],
         )
+        if last_known_good is not None:
+            return 0
         raise
 
     parquet = ParquetPriceStore(
