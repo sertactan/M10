@@ -15,6 +15,7 @@ from core.fundamentals.snapshot import FundamentalSnapshotService
 from core.features.s153_v12_input_loader import S153V12InputLoader
 from core.models.s153_v12 import S153V12Model
 from core.prices.engine import HistoricalPriceEngine
+from core.runtime.readiness import check_release_readiness
 from core.universe.service import USUniverseService
 from data.providers.company_ir import CompanyInvestorRelationsProvider
 from data.providers.finnhub_fundamentals import FinnhubFundamentalsProvider
@@ -40,15 +41,21 @@ from data.storage.parquet_price_store import ParquetPriceStore
 def doctor(root: Path) -> int:
     app = AppContainer(root)
     app.initialize()
-    print(f"APP: {app.app_config.app_name}")
-    print(f"MARKET: {app.app_config.market}")
-    print(f"PIT: {'STRICT' if app.app_config.strict_pit else 'OFF'}")
-    print(f"MOCK DATA: {'FORBIDDEN' if not app.app_config.allow_mock_data else 'ENABLED'}")
-    print(f"V1.2: {app.v12_config.status}")
-    print(f"V1.4: {app.v14_config.status}")
-    print(f"SQLite: {app.sqlite.db_path}")
-    app.close()
-    return 0
+    try:
+        readiness = check_release_readiness(root)
+        print(f"APP: {app.app_config.app_name}")
+        print(f"MARKET: {app.app_config.market}")
+        print(f"PIT: {'STRICT' if app.app_config.strict_pit else 'OFF'}")
+        print(f"MOCK DATA: {'FORBIDDEN' if not app.app_config.allow_mock_data else 'ENABLED'}")
+        print(f"V1.2: {app.v12_config.status}")
+        print(f"V1.4: {app.v14_config.status}")
+        print(f"SQLite: {app.sqlite.db_path}")
+        print(f"RELEASE READY: {'YES' if readiness.ready else 'NO'}")
+        if readiness.blockers:
+            print("BLOCKERS: " + ", ".join(readiness.blockers))
+        return 0 if readiness.ready else 1
+    finally:
+        app.close()
 
 
 def _security_from_row(row) -> Security:
@@ -109,7 +116,7 @@ async def sync_price(root: Path, ticker: str, start: date, end: date, provider: 
     app.initialize()
     try:
         security = _load_security(app, ticker)
-        parquet = ParquetPriceStore(root / app.app_config.database.parquet_root)
+        parquet = ParquetPriceStore(app.resolve_data_path(app.app_config.database.parquet_root))
         repo = PriceRepository(app.sqlite, parquet)
         providers = {
             "MASSIVE": MassivePriceProvider(),
@@ -270,7 +277,7 @@ def ingest_stooq_bulk(root: Path, zip_path: str) -> int:
     try:
         security_repo = SecurityRepository(app.sqlite)
         price_repo = PriceRepository(
-            app.sqlite, ParquetPriceStore(root / app.app_config.database.parquet_root)
+            app.sqlite, ParquetPriceStore(app.resolve_data_path(app.app_config.database.parquet_root))
         )
         provider = StooqPriceProvider()
         count = 0

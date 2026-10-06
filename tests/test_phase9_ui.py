@@ -221,6 +221,7 @@ def test_phase9_canonical_price_and_backtest_connections(tmp_path):
             app_config=SimpleNamespace(
                 database=SimpleNamespace(parquet_root="parquet")
             ),
+            resolve_data_path=lambda configured: tmp_path / configured,
         )
         row = store.connection.execute(
             "SELECT security_id,ticker,name,exchange FROM security_master WHERE security_id='SEC_TEST'"
