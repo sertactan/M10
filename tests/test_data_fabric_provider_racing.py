@@ -4,7 +4,10 @@ import asyncio
 
 import pytest
 
+from core.contracts.entities import Security
+from core.contracts.enums import Exchange
 from core.data_sync.racing import race_in_canonical_order
+from core.prices.engine import HistoricalPriceEngine
 
 
 @pytest.mark.asyncio
@@ -74,3 +77,40 @@ async def test_race_cancels_losing_requests_after_valid_winner():
     assert result is not None
     assert result.provider == "PRIMARY"
     assert cancelled.is_set()
+
+
+@pytest.mark.asyncio
+async def test_price_provider_concurrency_limit_is_enforced():
+    active = {"now": 0, "max": 0}
+
+    class Provider:
+        configured = True
+
+        async def validate_symbol(self, security):
+            return True
+
+        async def get_history(self, security, start, end):
+            active["now"] += 1
+            active["max"] = max(active["max"], active["now"])
+            await asyncio.sleep(0.02)
+            active["now"] -= 1
+            return ["bar"]
+
+    security = Security(
+        security_id="SEC_TEST",
+        ticker="TEST",
+        name="Test Corp",
+        exchange=Exchange.NASDAQ,
+    )
+    engine = HistoricalPriceEngine(
+        None,
+        {"SIMFIN": Provider()},
+        provider_concurrency_limits={"SIMFIN": 1},
+    )
+
+    await asyncio.gather(
+        engine._probe_history_provider("SIMFIN", security, None, None),
+        engine._probe_history_provider("SIMFIN", security, None, None),
+    )
+
+    assert active["max"] == 1
