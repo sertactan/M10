@@ -20,6 +20,10 @@ from app.ui.parallel_scoring import WorkerLocalCanonicalScorer
 from data.providers.finnhub_universe import FinnhubUniverseProvider
 from data.providers.massive_universe import MassiveUniverseProvider
 from data.providers.sec_edgar_universe import SECEdgarUniverseProvider
+from data.providers.stock_data_pit_universe import (
+    StockDataPitUnavailable,
+    StockDataPitUniverseProvider,
+)
 from data.repositories.security_repository import SecurityRepository
 
 
@@ -72,28 +76,57 @@ class DesktopScannerService:
         repository = SecurityRepository(app.sqlite)
         if repository.universe_as_of(as_of_date):
             return
+
+        public_error: str | None = None
+        try:
+            public_records = asyncio.run(
+                StockDataPitUniverseProvider().list_historical_us_securities(
+                    as_of_date
+                )
+            )
+            if public_records:
+                repository.bulk_upsert_historical_snapshot(
+                    public_records,
+                    snapshot_date=as_of_date,
+                )
+                if repository.universe_as_of(as_of_date):
+                    return
+        except StockDataPitUnavailable as exc:
+            public_error = str(exc)
+        except Exception as exc:
+            public_error = f"public PIT archive unavailable: {exc}"
+
         massive = MassiveUniverseProvider()
-        if not massive.configured:
-            raise RuntimeError(
-                "Historical PIT universe is not installed for this date. "
-                "Set MASSIVE_API_KEY (the app will sync it automatically) "
-                "or import a PIT-capable historical universe dataset. "
-                "Current-universe substitution is forbidden."
+        if massive.configured:
+            service = USUniverseService(
+                repository,
+                sec=SECEdgarUniverseProvider(
+                    mirror_root=app.resolve_data_path("sec_mirror")
+                ),
+                massive=massive,
+                finnhub=FinnhubUniverseProvider(),
             )
-        service = USUniverseService(
-            repository,
-            sec=SECEdgarUniverseProvider(
-                mirror_root=app.resolve_data_path("sec_mirror")
-            ),
-            massive=massive,
-            finnhub=FinnhubUniverseProvider(),
+            asyncio.run(
+                service.sync(
+                    as_of=as_of_date,
+                    include_delisted=True,
+                    ticker_event_limit=0,
+                )
+            )
+            if repository.universe_as_of(as_of_date):
+                return
+
+        detail = (
+            f" Public fallback: {public_error}."
+            if public_error
+            else ""
         )
-        asyncio.run(
-            service.sync(
-                as_of=as_of_date,
-                include_delisted=True,
-                ticker_event_limit=0,
-            )
+        raise RuntimeError(
+            "Historical PIT universe is not available for this date."
+            + detail
+            + " For older dates configure MASSIVE_API_KEY or import a "
+              "PIT-capable historical universe. Current-universe substitution "
+              "is forbidden."
         )
 
     def scan(self, *, as_of_date: date, on_progress=None):
