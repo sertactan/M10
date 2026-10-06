@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from typing import Iterable
 
@@ -146,6 +147,128 @@ class SecurityRepository:
             (record.ticker, record.exchange.value),
         ).fetchone()
         return row["security_id"] if row else None
+
+    def upsert_historical_snapshot_record(
+        self,
+        record: UniverseRecord,
+        *,
+        snapshot_date: date,
+    ) -> str:
+        """Persist PIT membership without rewriting today's active state.
+
+        Historical membership proves that a listing existed on snapshot_date;
+        it does not prove that it remains active now.
+        """
+        row = self.store.connection.execute(
+            """
+            SELECT security_id
+            FROM security_master
+            WHERE ticker=? AND exchange=?
+            ORDER BY active DESC, updated_at DESC
+            LIMIT 1
+            """,
+            (record.ticker, record.exchange.value),
+        ).fetchone()
+        now = datetime.now(timezone.utc).isoformat()
+        if row is not None:
+            security_id = str(row["security_id"])
+            self.store.connection.execute(
+                """
+                UPDATE security_master
+                SET name=CASE WHEN name='' AND ?<>'' THEN ? ELSE name END,
+                    cik=COALESCE(cik,?),
+                    primary_exchange_mic=COALESCE(primary_exchange_mic,?),
+                    updated_at=?
+                WHERE security_id=?
+                """,
+                (
+                    record.name,
+                    record.name,
+                    record.cik,
+                    record.exchange_mic,
+                    now,
+                    security_id,
+                ),
+            )
+        else:
+            # Force listing identity for a historical-only ticker. Using a bare
+            # CIK identity could collapse multiple share classes under one issuer.
+            identity_record = replace(record, cik=None, active=False)
+            security_id = stable_security_id(identity_record)
+            self.store.connection.execute(
+                """
+                INSERT INTO security_master (
+                    security_id,ticker,name,exchange,market,cik,active,created_at,updated_at,
+                    primary_exchange_mic,security_type,currency,locale,source_priority,
+                    first_seen,last_seen
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(security_id) DO UPDATE SET
+                    name=CASE WHEN excluded.name<>'' THEN excluded.name ELSE security_master.name END,
+                    cik=COALESCE(excluded.cik,security_master.cik),
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    security_id,
+                    record.ticker,
+                    record.name,
+                    record.exchange.value,
+                    "US",
+                    record.cik,
+                    0,
+                    now,
+                    now,
+                    record.exchange_mic,
+                    record.security_type,
+                    record.currency,
+                    record.locale,
+                    self._source_priority(record.provider),
+                    snapshot_date.isoformat(),
+                    snapshot_date.isoformat(),
+                ),
+            )
+
+        self.store.connection.execute(
+            """
+            INSERT INTO universe_snapshot_membership (
+                snapshot_date,security_id,ticker,exchange,exchange_mic,security_type,
+                source,availability_date,ingested_at
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(snapshot_date,security_id,ticker,source) DO UPDATE SET
+                exchange=excluded.exchange,
+                exchange_mic=excluded.exchange_mic,
+                security_type=COALESCE(excluded.security_type,universe_snapshot_membership.security_type),
+                availability_date=excluded.availability_date,
+                ingested_at=excluded.ingested_at
+            """,
+            (
+                snapshot_date.isoformat(),
+                security_id,
+                record.ticker,
+                record.exchange.value,
+                record.exchange_mic,
+                record.security_type,
+                record.provider,
+                _iso(record.availability_date),
+                now,
+            ),
+        )
+        return security_id
+
+    def bulk_upsert_historical_snapshot(
+        self,
+        records: Iterable[UniverseRecord],
+        *,
+        snapshot_date: date,
+    ) -> int:
+        count = 0
+        for record in records:
+            self.upsert_historical_snapshot_record(
+                record,
+                snapshot_date=snapshot_date,
+            )
+            count += 1
+        self.store.connection.commit()
+        return count
 
     def bulk_upsert(self, records: Iterable[UniverseRecord], *, snapshot_date: date | None = None) -> int:
         count = 0
@@ -299,4 +422,10 @@ class SecurityRepository:
 
     @staticmethod
     def _source_priority(provider: str) -> int:
-        return {"SEC_EDGAR": 1, "MASSIVE": 2, "FINNHUB": 3, "FMP": 4}.get(provider, 99)
+        return {
+            "SEC_EDGAR": 1,
+            "STOCK_DATA_PIT": 2,
+            "MASSIVE": 3,
+            "FINNHUB": 4,
+            "FMP": 5,
+        }.get(provider, 99)
