@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from datetime import date, datetime, timezone
@@ -122,7 +123,7 @@ class StockDataPitUniverseProvider:
             follow_redirects=True,
             headers=headers,
         ) as client:
-            manifest_response, data_response = await __import__("asyncio").gather(
+            manifest_response, data_response = await asyncio.gather(
                 client.get(self.manifest_url),
                 client.get(self.data_url),
             )
