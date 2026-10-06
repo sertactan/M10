@@ -1,0 +1,6 @@
+model_id: "S15.3_V1.4.1"
+display_name: "S15.3 V1.4.1 Canonical Completion"
+enabled: true
+canonical_formula_version: "S15.3_V1.4.1_CANONICAL_COMPLETION_2026-10-07"
+status: "ACTIVE_CANONICAL_COMPLETION"
+inherits_core: "S15.3_V1.4_RECOVERED_2026-10-05"
