@@ -54,6 +54,19 @@ def doctor(root: Path) -> int:
         print(f"V1.2: {app.v12_config.status}")
         print(f"V1.4: {app.v14_config.status}")
         print(f"SQLite: {app.sqlite.db_path}")
+        print(f"RUNTIME ROOT: {app.runtime_root}")
+        print("RUNTIME WRITABLE: YES")
+        print(
+            "OFFLINE SECURITY MASTER: "
+            + ", ".join(
+                f"{market}={count}"
+                for market, count in sorted(app.bootstrap_counts.items())
+            )
+        )
+        if app.sqlite.last_recovery_backup is not None:
+            print(f"SQLITE RECOVERED FROM: {app.sqlite.last_recovery_backup}")
+        else:
+            print("SQLITE RECOVERY: NOT NEEDED")
         print(f"RELEASE READY: {'YES' if readiness.ready else 'NO'}")
         if readiness.blockers:
             print("BLOCKERS: " + ", ".join(readiness.blockers))

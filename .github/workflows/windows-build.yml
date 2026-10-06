@@ -108,12 +108,15 @@ jobs:
             throw "Packaged JP/TR/HK seed failed row-count validation"
           }
 
-      - name: Smoke test executable from clean working directory
+      - name: Clean-install offline first-run smoke test
         shell: pwsh
         run: |
           $exe = (Resolve-Path "dist\S153ResearchTerminal\S153ResearchTerminal.exe").Path
-          $smoke = Join-Path $env:RUNNER_TEMP "s153-smoke"
+          $smoke = Join-Path $env:RUNNER_TEMP "s153-clean-install"
+          $runtime = Join-Path $smoke "runtime"
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $smoke
           New-Item -ItemType Directory -Force -Path $smoke | Out-Null
+          $env:S153_RUNTIME_ROOT = $runtime
           Push-Location $smoke
           try {
             & $exe --doctor
@@ -122,6 +125,55 @@ jobs:
           finally {
             Pop-Location
           }
+
+          $db = Join-Path $runtime "data\runtime\operational.db"
+          if (!(Test-Path $db)) {
+            throw "Fresh install did not create operational.db"
+          }
+          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute(\"select count(*) from security_master where market='US'\").fetchone()[0]; c.close(); print('Fresh US rows=',n); assert n>=1000" $db
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Corrupt database recovery smoke test
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist\S153ResearchTerminal\S153ResearchTerminal.exe").Path
+          $runtime = Join-Path $env:RUNNER_TEMP "s153-clean-install\runtime"
+          $env:S153_RUNTIME_ROOT = $runtime
+          $db = Join-Path $runtime "data\runtime\operational.db"
+          [System.IO.File]::WriteAllBytes(
+            $db,
+            [System.Text.Encoding]::UTF8.GetBytes("not a sqlite database")
+          )
+
+          & $exe --doctor
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $backups = @(Get-ChildItem -Path (Split-Path $db) -Filter "operational.db.corrupt-*.bak")
+          if ($backups.Count -lt 1) {
+            throw "Corrupt SQLite database was not preserved as a backup"
+          }
+          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute(\"select count(*) from security_master where market='US'\").fetchone()[0]; q=c.execute('pragma quick_check').fetchone()[0]; c.close(); print('Recovered US rows=',n,'quick_check=',q); assert n>=1000 and q=='ok'" $db
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upgrade migration smoke test
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist\S153ResearchTerminal\S153ResearchTerminal.exe").Path
+          $runtime = Join-Path $env:RUNNER_TEMP "s153-upgrade-runtime"
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $runtime
+          $dbDir = Join-Path $runtime "data\runtime"
+          New-Item -ItemType Directory -Force -Path $dbDir | Out-Null
+          $db = Join-Path $dbDir "operational.db"
+
+          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.executescript(\"CREATE TABLE security_master (security_id TEXT PRIMARY KEY,ticker TEXT NOT NULL,name TEXT NOT NULL,exchange TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,sector TEXT,industry TEXT,ipo_date TEXT,delisted_date TEXT,active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE TABLE ticker_aliases (alias TEXT NOT NULL,security_id TEXT NOT NULL,valid_from TEXT NOT NULL DEFAULT '',valid_to TEXT,PRIMARY KEY(alias,security_id,valid_from)); INSERT INTO security_master (security_id,ticker,name,exchange,market,active,created_at,updated_at) VALUES ('LEGACY-1','OLD','Legacy Corp','NASDAQ','US',1,'2025-01-01T00:00:00+00:00','2025-01-01T00:00:00+00:00');\"); c.commit(); c.close()" $db
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $env:S153_RUNTIME_ROOT = $runtime
+          & $exe --doctor
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); cols={r[1] for r in c.execute('pragma table_info(security_master)')}; aliases={r[1] for r in c.execute('pragma table_info(ticker_aliases)')}; legacy=c.execute(\"select ticker from security_master where security_id='LEGACY-1'\").fetchone(); n=c.execute(\"select count(*) from security_master where market='US'\").fetchone()[0]; c.close(); print('Upgraded US rows=',n); assert {'country_code','listing_key','source_scope','source_priority','first_seen','last_seen'}<=cols; assert {'source','event_type','availability_date','ingested_at'}<=aliases; assert legacy and legacy[0]=='OLD'; assert n>=1000" $db
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install Inno Setup
         shell: pwsh
