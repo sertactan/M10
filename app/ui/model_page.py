@@ -68,7 +68,19 @@ class ModelPage(QWidget):
 
     def set_model(self, view: ModelView, components: dict[str, object] | None = None) -> None:
         self.status.setText(view.status)
-        self.score.setText("—" if view.score is None else f"{view.score:.1f} / 100")
+        if view.score is not None:
+            self.score.setText(f"{view.score:.1f} / 100")
+        else:
+            partial = None
+            for key in ("S15.2", "DNA60", "CORE48"):
+                value = (components or {}).get(key)
+                if isinstance(value, (int, float)):
+                    partial = (key, float(value))
+                    break
+            if partial is None:
+                self.score.setText("—")
+            else:
+                self.score.setText(f"{partial[0]} {partial[1]:.1f} · PARTIAL")
         self.route.setText(_fmt(view.route))
         self.destination.setText(_fmt(view.destination))
         self.confidence.setText(

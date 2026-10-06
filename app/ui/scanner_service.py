@@ -104,7 +104,10 @@ class DesktopScannerService:
             if as_of_date == date.today():
                 ensure_current_universe_sync(app)
                 try:
-                    sec_count, sec_facts = ensure_sec_companyfacts_bulk(app)
+                    sec_count, sec_facts = ensure_sec_companyfacts_bulk(
+                        app,
+                        fallback_max_new_securities=150,
+                    )
                     if sec_facts:
                         notes.append(
                             f"SEC bulk prepared {sec_count} securities / {sec_facts} facts"
@@ -139,6 +142,23 @@ class DesktopScannerService:
                 rows, summary = scanner.scan_current(as_of=as_of)
             else:
                 rows, summary = scanner.scan_historical(as_of=as_of)
+
+            # Put actionable rows first. Final canonical scores remain preferred;
+            # partial DNA60 is only a discovery ordering aid and is never exposed
+            # as a substituted V1.2/V1.4 final score.
+            rows = sorted(
+                rows,
+                key=lambda row: (
+                    row.v14_score is not None,
+                    float(row.v14_score or -1.0),
+                    row.v12_score is not None,
+                    float(row.v12_score or -1.0),
+                    row.metadata.get("dna60") is not None,
+                    float(row.metadata.get("dna60") or -1.0),
+                    row.ticker,
+                ),
+                reverse=True,
+            )
             return rows, replace(summary, notes=tuple(notes))
         finally:
             app.close()
