@@ -9,7 +9,7 @@ from core.historical.s16_feature_coverage import (
     S16_REQUIRED_FEATURES,
     build_complete_s16_input,
 )
-from core.models.s16 import S16V02Model, S16V03Model
+from core.models.s16 import S16V02Model, S16V03Model, S16V1Model
 
 
 def main() -> int:
@@ -49,6 +49,7 @@ def main() -> int:
 
         v02 = S16V02Model().analyze(model_input)
         v03 = S16V03Model().analyze(model_input)
+        v1 = S16V1Model().analyze(model_input)
         output.append({
             "observation_id": row["observation_id"],
             "cohort": row.get("cohort") or "",
@@ -61,6 +62,10 @@ def main() -> int:
             "v03_armed": f"{v03.armed_score:.10f}",
             "v03_ignition": f"{v03.ignition_score:.10f}",
             "v03_status": v03.status,
+            "v1_armed": f"{v1.armed_score:.10f}",
+            "v1_ignition": f"{v1.ignition_score:.10f}",
+            "v1_explosive": f"{float(v1.explosive_score):.10f}",
+            "v1_status": v1.status,
         })
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
