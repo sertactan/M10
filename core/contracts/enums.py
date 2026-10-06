@@ -33,4 +33,5 @@ class AnalysisMode(StrEnum):
 
 class ModelVersion(StrEnum):
     V12 = "S15.3_V1.2"
-    V14 = "S15.3_V1.4"\n    V141 = "S15.3_V1.4.1"
+    V14 = "S15.3_V1.4"
+    V141 = "S15.3_V1.4.1"
