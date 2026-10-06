@@ -2,7 +2,7 @@
 
 ## Status
 
-**CODE COMPLETE — canonical V1.4 active; forecast probabilities remain evidence-backed and fail closed until a validated Market Prevalence calibration profile exists.**
+**COMPLETE — canonical V1.4 active and recovered empirical Market Prevalence calibration is implemented.**
 
 Dependency chain:
 
@@ -75,7 +75,20 @@ Phase 8 now has a persistence/binding pipeline for upstream Phase 6 calibration 
 
 Production calibration is restricted to `MARKET_PREVALENCE` evidence. Matched-challenge/case-control output is not accepted as market probability evidence. Required evidence includes walk-forward PASS, leakage-audit PASS, survivorship-audit PASS, and explicit proof that future outcome columns were absent from the feature matrix. Evidence is hashed before persistence and rechecked on load.
 
-The score/route-to-calibration-bucket selection rule remains intentionally external until an authoritative calibration mapping is supplied.
+Recovered prior calibration rules are now implemented in `core/forecast/empirical_provider.py`:
+
+- V1.4 score bands: 50–59 / 60–69 / 70–79 / 80–89 / 90+
+- same-route cohort first
+- if exact route cohort has <30 observations, widen to score-band cohort
+- <30 after widening => fail closed
+- N>=50 => normal sample; N=30–49 => reduced-sample metadata
+- positive / 2X+ / 5X+ / 10X+ are empirical realized cohort rates
+- Bear / Base / Bull = P20 / P50 / P80 realized 12M returns
+- only `MARKET_PREVALENCE` + READY historical observations are eligible
+- the old example percentage table is not hard-coded
+
+No new confidence-weight formula or LOW/MEDIUM/HIGH risk thresholds were invented.
+Forecast confidence reuses canonical model confidence and P20 downside is surfaced explicitly as historical risk evidence.
 
 
 ## Reproducibility and acceptance
@@ -93,4 +106,4 @@ Every persisted forecast run is tied to:
 - deterministic analysis id
 
 The Phase 8 completion gate is encoded in `core/forecast/acceptance.py`.
-Phase 8 code is complete. Runtime probability output intentionally remains unavailable when no validated Market Prevalence calibration profile is installed; this is a data/evidence state, not a missing formula.
+Phase 8 code and empirical calibration rules are complete. Runtime remains fail-closed only when the local Market Prevalence cohort is too small or unavailable.
