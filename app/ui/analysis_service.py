@@ -5,6 +5,11 @@ from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 from app.bootstrap import AppContainer
+from app.data_bootstrap import (
+    ensure_current_universe_sync,
+    ensure_price_history_sync,
+    ensure_sec_fundamentals_sync,
+)
 from app.ui.price_chart import PricePointView
 from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeaderView
 from core.features.s153_v12_input_loader import S153V12InputLoader
@@ -209,7 +214,7 @@ class DesktopAnalysisService:
         try:
             row = app.sqlite.connection.execute(
                 """
-                SELECT security_id,ticker,name,exchange
+                SELECT *
                 FROM security_master
                 WHERE ticker=?
                 ORDER BY active DESC, updated_at DESC
@@ -217,10 +222,31 @@ class DesktopAnalysisService:
                 """,
                 (ticker.upper(),),
             ).fetchone()
+
+            if row is None and as_of_date == date.today():
+                ensure_current_universe_sync(app)
+                row = app.sqlite.connection.execute(
+                    """
+                    SELECT *
+                    FROM security_master
+                    WHERE ticker=?
+                    ORDER BY active DESC, updated_at DESC
+                    LIMIT 1
+                    """,
+                    (ticker.upper(),),
+                ).fetchone()
+
             if row is None:
                 raise RuntimeError(
                     f'Ticker not found in canonical security_master: {ticker.upper()}'
                 )
+
+            ensure_price_history_sync(app, row, as_of_date=as_of_date)
+            try:
+                ensure_sec_fundamentals_sync(app, row, as_of_date=as_of_date)
+            except Exception:
+                # Price/UI data remains usable even if SEC is temporarily unavailable.
+                pass
 
             as_of = datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
             stock = self._load_stock(app, row, as_of_date)
