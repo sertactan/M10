@@ -71,7 +71,7 @@ Acceptance:
 
 ## Phase 2B — Global Security Master + Offline Seed
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Goal:
 - Put a very broad symbol/security reference layer inside M10 without weakening
@@ -114,7 +114,7 @@ Acceptance:
 
 ## Phase 2C — Embedded Japan / Turkey / Hong Kong Reference Seeds
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Goal:
 - Give clean Windows installs broad offline security-master coverage for the
@@ -143,7 +143,7 @@ Historical scope:
 
 ## Phase 3 — Background Data Sync Service
 
-Status: PLANNED
+Status: IN PROGRESS
 
 Deliverables:
 - Background scheduler separate from RUN ANALYSIS.
