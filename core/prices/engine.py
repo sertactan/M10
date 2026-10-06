@@ -198,53 +198,32 @@ class HistoricalPriceEngine:
         # versa. Yahoo may confirm a series but can never become authoritative.
         candidates = self._validation_provider_order(selected_source)
 
-        other_descriptor = None
-        for name in candidates:
-            if name == selected_source:
-                continue
-            p = self.providers.get(name)
-            if p is None or getattr(p, "configured", True) is False:
-                continue
-            if self.health is not None and not self.health.can_attempt(name):
-                continue
+        candidates = tuple(
+            name
+            for name in candidates
+            if self.providers.get(name) is not None
+            and getattr(self.providers[name], "configured", True) is not False
+            and (self.health is None or self.health.can_attempt(name))
+        )
 
-            started = perf_counter()
-            try:
-                if not await p.validate_symbol(security):
-                    if self.health is not None:
-                        self.health.record_failure(
-                            name,
-                            latency_ms=(perf_counter() - started) * 1000.0,
-                            message="validation provider rejected symbol",
-                        )
-                    continue
-                bars = list(await p.get_history(security, start, end))
-                if not bars:
-                    if self.health is not None:
-                        self.health.record_failure(
-                            name,
-                            latency_ms=(perf_counter() - started) * 1000.0,
-                            message="validation provider returned no bars",
-                        )
-                    continue
-                if self.health is not None:
-                    self.health.record_success(
-                        name,
-                        latency_ms=(perf_counter() - started) * 1000.0,
-                    )
-                self.policy.assert_single_source(bars)
-                other_descriptor = self.repository.save_series(bars)
-                break
-            except Exception as exc:
-                if self.health is not None:
-                    text = str(exc)
-                    self.health.record_failure(
-                        name,
-                        latency_ms=(perf_counter() - started) * 1000.0,
-                        rate_limited=("429" in text or "rate limit" in text.lower()),
-                        message=text[:500],
-                    )
-                continue
+        other_descriptor = None
+
+        def accept_validation(result: ProviderRaceResult[list]) -> bool:
+            nonlocal other_descriptor
+            if result.error is not None or result.value is None:
+                return False
+            bars = list(result.value)
+            self.policy.assert_single_source(bars)
+            other_descriptor = self.repository.save_series(bars)
+            return True
+
+        await race_in_canonical_order(
+            candidates,
+            lambda name: self._probe_history_provider(
+                name, security, start, end
+            ),
+            accept_validation,
+        )
         if other_descriptor is None:
             return
 
