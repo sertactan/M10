@@ -92,14 +92,22 @@ class MarketScannerDialog(QDialog):
     def _scan_complete(self, result) -> None:
         rows, summary = result
         self.rows = list(rows)
-        if summary.v12_scored == 0 and summary.v14_scored == 0:
+        v12_scored = max(
+            int(summary.v12_scored),
+            sum(1 for row in self.rows if row.v12_score is not None),
+        )
+        v14_scored = max(
+            int(summary.v14_scored),
+            sum(1 for row in self.rows if row.v14_score is not None),
+        )
+        if v12_scored == 0 and v14_scored == 0:
             self.status.setText(
-                f'{summary.total} universe rows · scored 0 · canonical feature cache is empty'
+                f'{summary.total} rows · scored 0 · canonical feature cache is empty'
             )
         else:
             self.status.setText(
-                f'{summary.total} universe · V1.2 scored {summary.v12_scored} · '
-                f'V1.4 scored {summary.v14_scored} · NASDAQ {summary.nasdaq} · '
+                f'{summary.total} rows · V1.2 scored {v12_scored} · '
+                f'V1.4 scored {v14_scored} · NASDAQ {summary.nasdaq} · '
                 f'NYSE {summary.nyse} · AMEX {summary.amex}'
             )
         self.progress.hide()
