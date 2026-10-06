@@ -11,8 +11,9 @@ from core.prices.models import (
     SourcePriceBar,
 )
 from core.prices.validation import compare_adjusted_close
+from core.universe.models import UniverseRecord
 from data.database.sqlite_store import SQLiteStore
-from data.repositories.price_repository import PriceRepository
+from data.repositories.security_repository import SecurityRepository
 from data.repositories.validation_repository import ValidationRepository
 
 
@@ -87,8 +88,19 @@ def test_validation_repository_makes_price_differences_queryable(tmp_path) -> No
     store = SQLiteStore(tmp_path / "ops.sqlite")
     store.initialize()
     try:
-        # price_validation_results intentionally has no FK to a price series;
-        # it is immutable comparison evidence with explicit provenance.
+        sid = SecurityRepository(store).upsert_record(
+            UniverseRecord(
+                ticker="TEST",
+                name="Test Corp",
+                exchange=Exchange.NASDAQ,
+                exchange_mic="XNAS",
+                active=True,
+                provider="SEC_EDGAR",
+                availability_date=NOW,
+                security_type="CS",
+                cik="0000001234",
+            )
+        )
         store.connection.execute(
             """
             INSERT INTO price_validation_results (
@@ -98,7 +110,7 @@ def test_validation_repository_makes_price_differences_queryable(tmp_path) -> No
             """,
             (
                 str(uuid.uuid4()),
-                "SEC_TEST",
+                sid,
                 "2026-01-01",
                 "2026-10-06",
                 "MASSIVE",
@@ -112,7 +124,7 @@ def test_validation_repository_makes_price_differences_queryable(tmp_path) -> No
         )
         store.connection.commit()
 
-        summary = ValidationRepository(store).summary("SEC_TEST")
+        summary = ValidationRepository(store).summary(sid)
 
         assert summary["price"]["counts"] == {"SUSPECT": 1}
         assert summary["price"]["diagnostics"][0]["source_a"] == "MASSIVE"
