@@ -62,3 +62,20 @@ SEC-derived mirror and records its snapshot date. Installed applications can
 refresh the current universe from SEC directly subject to SEC fair-access rules.
 
 This seed is security identity/reference metadata, not multi-year OHLCV history.
+
+
+## Stock-Data public PIT universe archive
+
+Project: Stock-Data  
+Repository: https://github.com/TylerJForstrom/Stock-Data  
+Dataset used: `data/symbols/pit/sec_company_tickers_exchange.jsonl`
+
+The upstream manifest identifies this PIT interval dataset as derived from
+US-government public-domain SEC data and exchange reference directories and
+marks the derived work freely redistributable. M10 verifies the published
+SHA256 before ingest and enforces the upstream `reconstructable_from` floor.
+
+M10 uses this source only for historical security-universe membership. It does
+not silently infer membership before the archive's provable boundary, and it
+does not treat the source as price, fundamental, analyst, catalyst, or S15.3
+factor evidence.

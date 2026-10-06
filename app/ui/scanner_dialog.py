@@ -16,6 +16,7 @@ from core.scanner.resultset import export_csv
 class ScannerSignals(QObject):
     completed = Signal(object)
     failed = Signal(str)
+    progress = Signal(object)
 
 
 class ScannerTask(QRunnable):
@@ -28,7 +29,10 @@ class ScannerTask(QRunnable):
     @Slot()
     def run(self) -> None:
         try:
-            result = self.factory().scan(as_of_date=self.as_of_date)
+            result = self.factory().scan(
+                as_of_date=self.as_of_date,
+                on_progress=self.signals.progress.emit,
+            )
         except Exception as exc:
             self.signals.failed.emit(str(exc))
             return
@@ -66,6 +70,7 @@ class MarketScannerDialog(QDialog):
         self.progress.setRange(0, 0)
         self.progress.setTextVisible(False)
         self.progress.setFixedWidth(140)
+        self.progress.setRange(0, 0)
         self.progress.hide()
         controls.addWidget(self.progress)
         root.addLayout(controls)
@@ -87,7 +92,22 @@ class MarketScannerDialog(QDialog):
         task = ScannerTask(self.scanner_service_factory, self.as_of_date)
         task.signals.completed.connect(self._scan_complete)
         task.signals.failed.connect(self._scan_failed)
+        task.signals.progress.connect(self._scan_progress)
         self.thread_pool.start(task)
+
+    def _scan_progress(self, progress) -> None:
+        total = max(0, int(getattr(progress, 'total', 0) or 0))
+        completed = max(0, int(getattr(progress, 'completed', 0) or 0))
+        ticker = getattr(progress, 'last_ticker', None)
+        if total > 0:
+            self.progress.setRange(0, total)
+            self.progress.setValue(min(completed, total))
+            suffix = f' · {ticker}' if ticker else ''
+            self.status.setText(
+                f'SCANNING {completed:,}/{total:,} @ {self.as_of_date.isoformat()}{suffix}'
+            )
+        else:
+            self.progress.setRange(0, 0)
 
     def _scan_complete(self, result) -> None:
         rows, summary = result
