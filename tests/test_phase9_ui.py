@@ -60,6 +60,29 @@ def test_phase9_shell_has_required_global_header_and_tabs(qapp):
         window.close()
 
 
+def test_phase9_model_page_shows_partial_dna_when_final_score_missing(qapp):
+    window = ResearchTerminalWindow()
+    try:
+        view = ModelView(
+            model_name="S15.3 V1.2",
+            status="INCONCLUSIVE",
+            score=None,
+            route="D10",
+        )
+        window.v12_page.set_model(
+            view,
+            {
+                "DNA60": 63.4,
+                "S15.2": None,
+                "MISSING_REQUIREMENTS": "S15.2, M10>=5/7",
+            },
+        )
+        assert window.v12_page.score.text() == "DNA60 63.4 · PARTIAL"
+        assert window.v12_page.status.text() == "INCONCLUSIVE"
+    finally:
+        window.close()
+
+
 def test_phase9_empty_ticker_does_not_dispatch_analysis(qapp):
     window = ResearchTerminalWindow()
     emitted = []
