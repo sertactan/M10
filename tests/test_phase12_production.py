@@ -12,6 +12,7 @@ from core.runtime.acceptance import (
     require_phase12_complete,
 )
 from core.runtime.logging import configure_logging, runtime_state_dir
+from core.runtime.readiness import check_release_readiness
 from core.runtime.paths import writable_runtime_root
 from core.runtime.settings import RuntimeSettings
 from core.runtime.update import (
@@ -92,3 +93,13 @@ def test_phase12_acceptance_gate_requires_exact_scope():
     ]
     require_phase12_complete(items)
     assert len(PHASE12_ACCEPTANCE_ITEMS) == 7
+
+
+
+def test_release_readiness_fails_closed_without_canonical_bundles():
+    root = Path(__file__).resolve().parents[1]
+    result = check_release_readiness(root)
+    assert result.ready is False
+    assert "PHASE5_V14_CANONICAL_BUNDLE_MISSING" in result.blockers
+    assert "PHASE6_BACKTEST_CANONICAL_BUNDLE_MISSING" in result.blockers
+    assert "PHASE5_V14_MODEL_DISABLED" in result.blockers
