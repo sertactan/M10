@@ -76,6 +76,14 @@ def control12(control: Mapping[str, float | None]) -> float | None:
 
 
 def dna60(core48_score: float | None, control12_score: float | None) -> float | None:
-    if core48_score is None or control12_score is None:
-        return None
-    return clip(0.70 * core48_score + 0.30 * control12_score)
+    """Canonical DNA60 with the global N/A renormalization rule.
+
+    The S1-S14 specification states that genuinely unavailable criteria are
+    excluded from both numerator and denominator. Requiring both blocks made
+    partially evidenced companies appear completely empty even when Core48 or
+    Control12 had valid PIT evidence.
+    """
+    return wa({
+        "Core48": (0.70, _validated(core48_score)),
+        "Control12": (0.30, _validated(control12_score)),
+    })
