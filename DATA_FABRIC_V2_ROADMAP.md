@@ -173,7 +173,7 @@ Acceptance:
 
 ## Phase 5 — Two-Source Confirmation
 
-Status: PLANNED
+Status: IN PROGRESS
 
 Deliverables:
 - Critical price windows validated against a second source when available.
