@@ -194,3 +194,28 @@ def test_s16_case_control_metrics_report_fpr_and_sample_precision() -> None:
     assert metrics.false_positive_rate == pytest.approx(0.0)
     assert metrics.case_control_precision == pytest.approx(1.0)
     assert metrics.real_world_precision_available is False
+
+
+def test_s16_v1_explosive_is_benchmarkable() -> None:
+    rows = [
+        S16BenchmarkRow(
+            "p1", "POSITIVE", 0, 0, 0, 0,
+            True, True, True, True, True, True,
+            v1_armed=80, v1_ignition=90, v1_explosive=87,
+        ),
+        S16BenchmarkRow(
+            "c1", "CONTROL", 0, 0, 0, 0,
+            False, False, False, False, False, False,
+            v1_armed=40, v1_ignition=45, v1_explosive=43,
+        ),
+    ]
+    metrics = evaluate_threshold(
+        rows,
+        score_field="v1_explosive",
+        label_field="hit_10x_high",
+        threshold=80,
+    )
+    assert metrics.tp == 1
+    assert metrics.fp == 0
+    assert metrics.recall == pytest.approx(1.0)
+    assert metrics.false_positive_rate == pytest.approx(0.0)
