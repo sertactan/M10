@@ -15,6 +15,10 @@ a = Analysis(
             os.path.join(project_root, "data", "database", "schema.sql"),
             os.path.join("data", "database"),
         ),
+        (
+            os.path.join(project_root, "data", "seeds", "sec_us_current.csv"),
+            os.path.join("data", "seeds"),
+        ),
     ],
     hiddenimports=[
         "PySide6.QtCharts",
