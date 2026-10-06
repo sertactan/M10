@@ -49,21 +49,21 @@ def _security_from_row(row) -> Security:
 async def ensure_current_universe(app: AppContainer, *, force_refresh: bool = False) -> int:
     repo = SecurityRepository(app.sqlite)
     existing = repo.current_us_common_stocks()
-    if len(existing) >= 1000:
+    if len(existing) >= 1000 and not force_refresh:
         return len(existing)
 
     health = ProviderHealthRepository(app.sqlite)
     if not health.can_attempt("SEC_EDGAR"):
-        if existing:
+        if existing and not force_refresh:
             return len(existing)
-        raise RuntimeError("SEC_EDGAR circuit is open and no cached universe is available")
+        raise RuntimeError("SEC_EDGAR circuit is open; background universe refresh deferred")
 
     provider = SECEdgarUniverseProvider(user_agent=_sec_user_agent())
     started = perf_counter()
     try:
         records = await provider.list_current_us_securities()
         if not records:
-            if existing:
+            if existing and not force_refresh:
                 return len(existing)
             raise RuntimeError("SEC EDGAR returned an empty US universe")
         health.record_success(
@@ -78,7 +78,7 @@ async def ensure_current_universe(app: AppContainer, *, force_refresh: bool = Fa
             rate_limited=("429" in text or "rate limit" in text.lower()),
             message=text[:500],
         )
-        if existing:
+        if existing and not force_refresh:
             return len(existing)
         raise
 
@@ -114,7 +114,7 @@ async def ensure_price_history(
             as_of_date.isoformat(),
         ),
     ).fetchone()
-    if existing is not None:
+    if existing is not None and not force_refresh:
         return 0
 
     last_known_good = app.sqlite.connection.execute(
@@ -176,7 +176,7 @@ async def ensure_price_history(
             rate_limited=("429" in text or "rate limit" in text.lower()),
             message=text[:500],
         )
-        if last_known_good is not None:
+        if last_known_good is not None and not force_refresh:
             return 0
         raise
 
@@ -241,11 +241,13 @@ async def ensure_sec_fundamentals(
         """,
         (security.security_id, cutoff.isoformat()),
     ).fetchone()
-    if existing is not None and int(existing["n"]) > 0:
+    if existing is not None and int(existing["n"]) > 0 and not force_refresh:
         return int(existing["n"])
 
     health = ProviderHealthRepository(app.sqlite)
     if not health.can_attempt("SEC_EDGAR"):
+        if force_refresh:
+            raise RuntimeError("SEC_EDGAR circuit is open; fundamentals refresh deferred")
         return 0
 
     provider = SECEdgarFundamentalsProvider(user_agent=_sec_user_agent())
