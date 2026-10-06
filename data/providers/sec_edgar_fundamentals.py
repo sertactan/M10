@@ -275,7 +275,7 @@ class SECEdgarFundamentalsProvider:
                 for unit, items in units.items():
                     for item in items or []:
                         form = str(item.get("form") or "").strip()
-                        if form not in SUPPORTED_FORMS:
+                        if form not in FACT_FORMS:
                             continue
                         end = _parse_date(item.get("end"))
                         if end is None:
