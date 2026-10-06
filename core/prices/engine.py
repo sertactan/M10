@@ -4,7 +4,12 @@ from datetime import date
 from time import perf_counter
 
 from core.contracts.entities import Security
-from core.prices.policy import DEFAULT_PROVIDER_PRIORITY, PriceSelectionPolicy, PriceSourceMixingError
+from core.prices.policy import (
+    FALLBACK_ONLY_PROVIDER_PRIORITY,
+    PriceSelectionPolicy,
+    PriceSourceMixingError,
+    auto_provider_priority,
+)
 from core.prices.validation import compare_adjusted_close
 from data.repositories.price_repository import PriceRepository
 from data.repositories.provider_health_repository import ProviderHealthRepository
@@ -23,10 +28,19 @@ class HistoricalPriceEngine:
         self.policy = PriceSelectionPolicy()
 
     def _provider_order(self, provider: str) -> tuple[str, ...]:
-        static = (provider.upper(),) if provider.upper() != "AUTO" else DEFAULT_PROVIDER_PRIORITY
-        if self.health is None or provider.upper() != "AUTO":
+        if provider.upper() != "AUTO":
+            return (provider.upper(),)
+
+        static = auto_provider_priority(self.providers)
+        if self.health is None:
             return static
-        return self.health.rank(static)
+
+        # Health may reorder eligible primary/free providers, but it must never
+        # promote fallback-only Yahoo ahead of authoritative candidates.
+        fallback_names = set(FALLBACK_ONLY_PROVIDER_PRIORITY)
+        eligible = tuple(name for name in static if name not in fallback_names)
+        fallback = tuple(name for name in static if name in fallback_names)
+        return self.health.rank(eligible) + self.health.rank(fallback)
 
     async def sync_history(
         self,
