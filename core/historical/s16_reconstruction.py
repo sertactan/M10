@@ -41,6 +41,7 @@ class S16RawHistoricalObservation:
     momentum20: float
     supply_kind: str = "FREE_FLOAT"
     source_quality: str = "PIT_EXACT"
+    market_cap: float | None = None
 
 
 @dataclass(frozen=True)
@@ -145,7 +146,7 @@ class S16HistoricalFeatureReconstructor:
     exact same as-of instant. Missing external evidence remains missing.
     """
 
-    VERSION = "s16-historical-reconstruction-v1"
+    VERSION = "s16-historical-reconstruction-v2"
 
     def __init__(self, evidence: S16EvidenceRepository) -> None:
         self.evidence = evidence
@@ -163,6 +164,12 @@ class S16HistoricalFeatureReconstructor:
         as_of = rows[0].as_of
 
         float_values = [math.log(max(row.float_shares, 1.0)) for row in rows]
+        market_cap_raw = [
+            (float(row.market_cap) if row.market_cap is not None and row.market_cap > 0
+             else row.price * row.float_shares)
+            for row in rows
+        ]
+        market_cap_values = [math.log(max(value, 1.0)) for value in market_cap_raw]
         turnover_raw = [
             row.last_volume / row.float_shares
             if row.float_shares > 0 else 0.0
@@ -251,6 +258,9 @@ class S16HistoricalFeatureReconstructor:
 
         snapshots: list[S16ReconstructedSnapshot] = []
         for i, row in enumerate(rows):
+            market_cap_scarcity = 100.0 - _percentile(
+                market_cap_values, math.log(max(market_cap_raw[i], 1.0))
+            )
             float_scarcity = 100.0 - _percentile(
                 float_values, math.log(max(row.float_shares, 1.0))
             )
@@ -326,6 +336,7 @@ class S16HistoricalFeatureReconstructor:
             data_risk = min(1.0, proxy_penalty + short_age_penalty)
 
             features: dict[str, float | None] = {
+                "market_cap_scarcity": market_cap_scarcity,
                 "float_scarcity": float_scarcity,
                 "short_pressure": short_pressure,
                 "float_turnover": turnover_score,
@@ -353,6 +364,11 @@ class S16HistoricalFeatureReconstructor:
                 "version": self.VERSION,
                 "cross_section_size": len(rows),
                 "raw": {
+                    "market_cap": market_cap_raw[i],
+                    "market_cap_source": (
+                        "PIT_MARKET_CAP" if row.market_cap is not None and row.market_cap > 0
+                        else "PRICE_X_FLOAT_PROXY"
+                    ),
                     "float_turnover": turnover_raw[i],
                     "rvol": rvol_raw[i],
                     "dollar_liquidity": dollar_liquidity[i],
