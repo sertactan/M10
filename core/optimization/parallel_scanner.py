@@ -165,4 +165,6 @@ class ParallelMarketScanner:
             nyse=sum(1 for row in rows if row.exchange == "NYSE"),
             amex=sum(1 for row in rows if row.exchange == "AMEX"),
             delisted=sum(1 for row in rows if row.delisted),
+            v12_scored=sum(1 for row in rows if row.v12_score is not None),
+            v14_scored=sum(1 for row in rows if row.v14_score is not None),
         )
