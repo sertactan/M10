@@ -46,7 +46,7 @@ def _security_from_row(row) -> Security:
     )
 
 
-async def ensure_current_universe(app: AppContainer) -> int:
+async def ensure_current_universe(app: AppContainer, *, force_refresh: bool = False) -> int:
     repo = SecurityRepository(app.sqlite)
     existing = repo.current_us_common_stocks()
     if len(existing) >= 1000:
@@ -96,6 +96,8 @@ async def ensure_price_history(
     *,
     as_of_date: date,
     lookback_days: int = 1095,
+    force_refresh: bool = False,
+    incremental: bool = False,
 ) -> int:
     existing = app.sqlite.connection.execute(
         """
@@ -135,14 +137,28 @@ async def ensure_price_history(
     security = _security_from_row(row)
     health = ProviderHealthRepository(app.sqlite)
     if not health.can_attempt("YAHOO_COMPAT"):
-        if last_known_good is not None:
+        if last_known_good is not None and not force_refresh:
             return 0
         raise RuntimeError(
-            f"YAHOO_COMPAT circuit is open and no cached price history exists for {security.ticker}"
+            f"YAHOO_COMPAT circuit is open; refresh deferred for {security.ticker}"
         )
 
     provider = YahooCompatiblePriceProvider()
     start = as_of_date - timedelta(days=lookback_days)
+    if incremental:
+        latest = app.sqlite.connection.execute(
+            """
+            SELECT end_date
+            FROM price_series_registry
+            WHERE security_id=? AND source='YAHOO_COMPAT'
+            ORDER BY end_date DESC
+            LIMIT 1
+            """,
+            (security.security_id,),
+        ).fetchone()
+        if latest is not None:
+            overlap_start = date.fromisoformat(latest["end_date"]) - timedelta(days=7)
+            start = max(start, overlap_start)
     started = perf_counter()
     try:
         bars = await provider.get_history(security, start, as_of_date)
@@ -176,7 +192,7 @@ async def ensure_price_history(
     # and is never promoted to authoritative backtest evidence.
     repo.select_series(
         security_id=security.security_id,
-        start=start,
+        start=descriptor.start_date,
         end=as_of_date,
         source=descriptor.source,
         source_symbol=descriptor.source_symbol,
@@ -210,6 +226,7 @@ async def ensure_sec_fundamentals(
     row,
     *,
     as_of_date: date,
+    force_refresh: bool = False,
 ) -> int:
     security = _security_from_row(row)
     if not security.cik:
