@@ -302,25 +302,28 @@ jobs:
             dist_installer/S153ResearchTerminal-Setup.exe
             dist_installer/SHA256.txt
 
-      - name: Publish GitHub Release v1.0.0
+      - name: Publish GitHub Release v1.0.1
         if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $repo = "${{ github.repository }}"
-          $tag = "v1.0.0"
+          $tag = "v1.0.1"
           $setup = "dist_installer/S153ResearchTerminal-Setup.exe"
           $sha = "dist_installer/SHA256.txt"
-          $title = "S15.3 Research Terminal v1.0.0"
+          $title = "S15.3 Research Terminal v1.0.1"
           $notes = @"
-          First production GitHub Release of S15.3 Research Terminal.
+          S15.3 Research Terminal v1.0.1.
 
           Includes:
           - Windows Setup installer
           - SHA256 checksum
-          - strict PIT / fail-closed model behavior
-          - Data Fabric V2 production audit gates
+          - canonical feature materialization bridge
+          - automatic SEC companyfacts bulk bootstrap
+          - automatic Stooq bulk scanner bootstrap
+          - scanner partial DNA60 / missing-gate diagnostics
+          - historical PIT auto-sync when MASSIVE_API_KEY is configured
           - scanner SQLite thread fix
           - Yahoo query2/query1 fallback hardening
           - Windows clean-install, recovery, migration and installer smoke tests
