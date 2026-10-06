@@ -52,6 +52,23 @@ jobs:
             throw "Bundled SEC seed is unexpectedly small: $rows"
           }
 
+      - name: Build bundled JP TR HK reference seed
+        shell: pwsh
+        run: |
+          python scripts/build_jp_tr_hk_seed.py
+          $seed = "data/seeds/jp_tr_hk_current.csv"
+          if (!(Test-Path $seed)) {
+            throw "Bundled JP/TR/HK reference seed was not produced"
+          }
+          $rows = Import-Csv $seed
+          $jp = @($rows | Where-Object { $_.market -eq "JP" }).Count
+          $tr = @($rows | Where-Object { $_.market -eq "TR" }).Count
+          $hk = @($rows | Where-Object { $_.market -eq "HK" }).Count
+          Write-Host "JP=$jp TR=$tr HK=$hk"
+          if ($jp -lt 3000) { throw "JP seed unexpectedly small: $jp" }
+          if ($tr -lt 300) { throw "TR seed unexpectedly small: $tr" }
+          if ($hk -lt 1500) { throw "HK seed unexpectedly small: $hk" }
+
       - name: Build Windows application
         shell: pwsh
         run: |
@@ -74,6 +91,21 @@ jobs:
           $seed = "dist\S153ResearchTerminal\_internal\data\seeds\sec_us_current.csv"
           if (!(Test-Path $seed)) {
             throw "Packaged SEC universe seed is missing: $seed"
+          }
+
+      - name: Verify packaged JP TR HK reference seed
+        shell: pwsh
+        run: |
+          $seed = "dist\S153ResearchTerminal\_internal\data\seeds\jp_tr_hk_current.csv"
+          if (!(Test-Path $seed)) {
+            throw "Packaged JP/TR/HK reference seed is missing: $seed"
+          }
+          $rows = Import-Csv $seed
+          $jp = @($rows | Where-Object { $_.market -eq "JP" }).Count
+          $tr = @($rows | Where-Object { $_.market -eq "TR" }).Count
+          $hk = @($rows | Where-Object { $_.market -eq "HK" }).Count
+          if ($jp -lt 3000 -or $tr -lt 300 -or $hk -lt 1500) {
+            throw "Packaged JP/TR/HK seed failed row-count validation"
           }
 
       - name: Smoke test executable from clean working directory

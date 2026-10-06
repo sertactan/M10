@@ -15,6 +15,9 @@ MIC_TO_EXCHANGE = {
     "XASE": Exchange.AMEX,
     "OTCM": Exchange.OTC,
     "BATS": Exchange.CBOE,
+    "XJPX": Exchange.JPX,
+    "XIST": Exchange.BIST,
+    "XHKG": Exchange.HKEX,
 }
 
 SEC_EXCHANGE_TO_EXCHANGE = {
@@ -37,6 +40,9 @@ EXCHANGE_TO_MIC = {
     Exchange.AMEX: "XASE",
     Exchange.OTC: "OTCM",
     Exchange.CBOE: "BATS",
+    Exchange.JPX: "XJPX",
+    Exchange.BIST: "XIST",
+    Exchange.HKEX: "XHKG",
 }
 
 

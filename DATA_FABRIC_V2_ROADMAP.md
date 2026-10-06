@@ -112,6 +112,35 @@ Acceptance:
 - Canonical US rows keep CANONICAL scope after global-reference enrichment.
 - Non-US reference rows can be queried by market/exchange.
 
+## Phase 2C — Embedded Japan / Turkey / Hong Kong Reference Seeds
+
+Status: IN PROGRESS
+
+Goal:
+- Give clean Windows installs broad offline security-master coverage for the
+  three priority non-US markets without requiring a paid API.
+
+Embedded reference markets:
+- Japan: JPX/TSE equities plus ETFs from the FinanceDatabase JPX export.
+- Turkey: Borsa Istanbul equities plus ETFs from the FinanceDatabase IST export.
+- Hong Kong: HKEX equities plus ETFs from the FinanceDatabase HKG export.
+
+Seed behavior:
+- Generated during Windows build from the current upstream MIT reference files.
+- Only active/non-delisted rows are packaged.
+- Yahoo-style source symbols are retained as aliases (7203.T, THYAO.IS,
+  0700.HK) while the canonical local ticker is suffix-free.
+- Rows are tagged REFERENCE_ONLY and cannot silently become authoritative S15.3
+  model evidence.
+- MIC / currency / ISIN / sector / FIGI metadata is retained where available.
+- Minimum build gates: JP >= 3000 rows, TR >= 300 rows, HK >= 1500 rows.
+
+Historical scope:
+- This embedded seed is a current security-master snapshot, not multi-year
+  OHLCV history.
+- Price/fundamental history remains in the canonical local Parquet/SQLite data
+  fabric and will be handled by later historical-pack/background-sync work.
+
 ## Phase 3 — Background Data Sync Service
 
 Status: PLANNED
