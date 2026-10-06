@@ -1,0 +1,30 @@
+{
+  "bundle_id": "S153_V14_RECOVERED_2026_10_05",
+  "artifacts": [
+    {
+      "name": "S15.3 V1.4 Canonical Specification",
+      "path": "canonical_specification.md",
+      "sha256": "9c792960ca458a94a422be7165950246fbd3836f06f0d0f4ed90b9acf4815631"
+    },
+    {
+      "name": "V1.4 Factor / DNA Definitions",
+      "path": "factor_dna_definitions.md",
+      "sha256": "c32e4d3fd67bff77d71d5dcea17a25c39238a31fa272bebd8568f65028620cfa"
+    },
+    {
+      "name": "V1.4 Router and Gate Specification",
+      "path": "router_gate_specification.md",
+      "sha256": "f9aa67192fd4210820694413402275aa4526258863fe880f15104dc34cb04c40"
+    },
+    {
+      "name": "Dual-Magnitude / Destination Specification",
+      "path": "dual_magnitude_destination_specification.md",
+      "sha256": "531ab18c84de04cf42c41519a2f3f4a5b65e625e3dd4e0b7eb649443421d9e08"
+    },
+    {
+      "name": "Golden Test Cases",
+      "path": "golden_test_cases.md",
+      "sha256": "c928e89ebaa8e0457020aa36a51d22b57ce71f70d3d392f08f9a0121b3559250"
+    }
+  ]
+}
