@@ -62,6 +62,7 @@ def main() -> int:
             security_id=security_id,
             start_date=start,
             end_date=end,
+            require_full_window=False,
         )
         if series is None:
             output.append({
