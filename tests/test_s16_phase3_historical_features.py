@@ -171,6 +171,7 @@ def test_s16_reconstruction_is_complete_only_with_real_external_evidence(tmp_pat
     snapshot = S16HistoricalFeatureReconstructor(repo).reconstruct_batch([raw])[0]
     assert snapshot.score_ready is True
     assert snapshot.missing == ()
+    assert snapshot.features["market_cap_scarcity"] == 50.0
     assert snapshot.features["short_pressure"] == 50.0
     assert snapshot.features["social_velocity"] == 50.0
     assert snapshot.features["news_velocity"] == 50.0
