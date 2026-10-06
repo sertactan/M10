@@ -93,7 +93,9 @@ async def sync_universe(root: Path, as_of: date, include_delisted: bool, ticker_
     try:
         service = USUniverseService(
             SecurityRepository(app.sqlite),
-            sec=SECEdgarUniverseProvider(),
+            sec=SECEdgarUniverseProvider(
+                mirror_root=app.resolve_data_path("sec_mirror")
+            ),
             massive=MassiveUniverseProvider(),
             finnhub=FinnhubUniverseProvider(),
         )
@@ -194,7 +196,9 @@ async def sync_fundamentals(root: Path, ticker: str, provider: str) -> int:
         security = _load_security(app, ticker)
         repository = FundamentalRepository(app.sqlite)
         providers = {
-            "SEC_EDGAR": SECEdgarFundamentalsProvider(),
+            "SEC_EDGAR": SECEdgarFundamentalsProvider(
+                mirror_root=app.resolve_data_path("sec_mirror")
+            ),
             "FINNHUB": FinnhubFundamentalsProvider(),
             "SIMFIN": SimFinFundamentalsProvider(os.getenv("SIMFIN_FUNDAMENTALS_PATH")),
             "FMP": FMPFundamentalsProvider(),

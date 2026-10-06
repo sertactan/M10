@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from core.universe.identity import EXCHANGE_TO_MIC, exchange_from_sec_name, normalize_cik
 from core.universe.models import UniverseRecord
+from data.cache.sec_json_mirror import SecJsonMirror
 from data.providers.http_json import JsonHttpClient
 
 
@@ -19,10 +21,12 @@ class SECEdgarUniverseProvider:
         user_agent: str | None = None,
         timeout_seconds: float = 30.0,
         max_retries: int = 3,
+        mirror_root: str | Path | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.user_agent = user_agent or os.getenv("SEC_USER_AGENT")
         self.http = JsonHttpClient(timeout_seconds, max_retries)
+        self.mirror = SecJsonMirror(mirror_root) if mirror_root is not None else None
 
     def _headers(self) -> dict[str, str]:
         if not self.user_agent:
@@ -37,10 +41,12 @@ class SECEdgarUniverseProvider:
         }
 
     async def list_current_us_securities(self) -> list[UniverseRecord]:
-        payload = await self.http.get_json(
-            f"{self.base_url}/files/company_tickers_exchange.json",
-            headers=self._headers(),
-        )
+        url = f"{self.base_url}/files/company_tickers_exchange.json"
+        if self.mirror is not None:
+            result = await self.mirror.fetch_json(self.http, url, headers=self._headers())
+            payload = result.payload
+        else:
+            payload = await self.http.get_json(url, headers=self._headers())
         return self.parse_ticker_exchange_payload(payload)
 
     @staticmethod
