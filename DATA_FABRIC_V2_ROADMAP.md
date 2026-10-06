@@ -159,7 +159,7 @@ Acceptance:
 
 ## Phase 4 — Free Active/Passive Provider Routing
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Baseline free routing:
 - Universe: SEC EDGAR primary; cached SEC snapshot passive.
