@@ -130,7 +130,19 @@ jobs:
           if (!(Test-Path $db)) {
             throw "Fresh install did not create operational.db"
           }
-          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute(\"select count(*) from security_master where market='US'\").fetchone()[0]; c.close(); print('Fresh US rows=',n); assert n>=1000" $db
+          $verifyFresh = @'
+          import sqlite3
+          import sys
+
+          conn = sqlite3.connect(sys.argv[1])
+          rows = conn.execute(
+              "select count(*) from security_master where market='US'"
+          ).fetchone()[0]
+          conn.close()
+          print("Fresh US rows=", rows)
+          assert rows >= 1000
+          '@
+          $verifyFresh | python - $db
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Corrupt database recovery smoke test
@@ -152,7 +164,21 @@ jobs:
           if ($backups.Count -lt 1) {
             throw "Corrupt SQLite database was not preserved as a backup"
           }
-          python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute(\"select count(*) from security_master where market='US'\").fetchone()[0]; q=c.execute('pragma quick_check').fetchone()[0]; c.close(); print('Recovered US rows=',n,'quick_check=',q); assert n>=1000 and q=='ok'" $db
+          $verifyRecovery = @'
+          import sqlite3
+          import sys
+
+          conn = sqlite3.connect(sys.argv[1])
+          rows = conn.execute(
+              "select count(*) from security_master where market='US'"
+          ).fetchone()[0]
+          quick_check = conn.execute("pragma quick_check").fetchone()[0]
+          conn.close()
+          print("Recovered US rows=", rows, "quick_check=", quick_check)
+          assert rows >= 1000
+          assert quick_check == "ok"
+          '@
+          $verifyRecovery | python - $db
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upgrade migration smoke test
