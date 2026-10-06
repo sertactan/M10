@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from app.bootstrap import AppContainer
+from app.data_bootstrap import ensure_current_universe_sync
 from core.optimization.parallel_scanner import ParallelMarketScanner
 from core.scanner.production import RepositoryCandidateSource
 from app.ui.parallel_scoring import WorkerLocalCanonicalScorer
@@ -19,6 +20,8 @@ class DesktopScannerService:
         app = AppContainer(self.root)
         app.initialize()
         try:
+            if as_of_date == date.today():
+                ensure_current_universe_sync(app)
             as_of = datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
             candidates = RepositoryCandidateSource(SecurityRepository(app.sqlite))
             workers = max(1, min(4, os.cpu_count() or 1))
