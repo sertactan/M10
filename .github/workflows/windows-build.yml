@@ -119,8 +119,8 @@ jobs:
           $env:S153_RUNTIME_ROOT = $runtime
           Push-Location $smoke
           try {
-            & $exe --doctor
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $doctor = Start-Process -FilePath $exe -ArgumentList "--doctor" -Wait -PassThru
+            if ($doctor.ExitCode -ne 0) { exit $doctor.ExitCode }
           }
           finally {
             Pop-Location
