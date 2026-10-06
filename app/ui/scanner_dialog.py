@@ -92,9 +92,16 @@ class MarketScannerDialog(QDialog):
     def _scan_complete(self, result) -> None:
         rows, summary = result
         self.rows = list(rows)
-        self.status.setText(
-            f'{summary.total} rows · NASDAQ {summary.nasdaq} · NYSE {summary.nyse} · AMEX {summary.amex}'
-        )
+        if summary.v12_scored == 0 and summary.v14_scored == 0:
+            self.status.setText(
+                f'{summary.total} universe rows · scored 0 · canonical feature cache is empty'
+            )
+        else:
+            self.status.setText(
+                f'{summary.total} universe · V1.2 scored {summary.v12_scored} · '
+                f'V1.4 scored {summary.v14_scored} · NASDAQ {summary.nasdaq} · '
+                f'NYSE {summary.nyse} · AMEX {summary.amex}'
+            )
         self.progress.hide()
         self.run_button.setEnabled(True)
         self.exchange.setEnabled(True)
@@ -102,6 +109,11 @@ class MarketScannerDialog(QDialog):
         self._render()
 
     def _scan_failed(self, message: str) -> None:
+        if "No canonical historical universe snapshot" in message:
+            message = (
+                "Historical PIT universe snapshot is not installed for this date; "
+                "current-universe substitution is forbidden by strict PIT"
+            )
         self.status.setText(f'BLOCKED / ERROR — {message}')
         self.progress.hide()
         self.run_button.setEnabled(True)
