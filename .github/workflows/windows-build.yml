@@ -302,22 +302,26 @@ jobs:
             dist_installer/S153ResearchTerminal-Setup.exe
             dist_installer/SHA256.txt
 
-      - name: Publish GitHub Release v1.0.3
+      - name: Publish GitHub Release v1.0.4
         if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $repo = "${{ github.repository }}"
-          $tag = "v1.0.3"
+          $tag = "v1.0.4"
           $setup = "dist_installer/S153ResearchTerminal-Setup.exe"
           $sha = "dist_installer/SHA256.txt"
-          $title = "S15.3 Research Terminal v1.0.3"
+          $title = "S15.3 Research Terminal v1.0.4"
           $notes = @"
-          S15.3 Research Terminal v1.0.3.
+          S15.3 Research Terminal v1.0.4.
 
           Includes:
           - Windows Setup installer
+          - canonical DNA60 N/A-weight renormalization
+          - live market-scanner progress
+          - SHA256-verified public PIT historical-universe fallback for dates from 2026-07-28
+          - strict refusal before the public PIT archive boundary
           - SHA256 checksum
           - on-demand single-ticker historical FM252/backtest from adjusted canonical price cache
           - progressive bounded SEC fallback for faster first-run scanner response
