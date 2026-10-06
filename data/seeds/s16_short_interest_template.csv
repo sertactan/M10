@@ -1,0 +1,2 @@
+ticker,settlement_date,short_interest,avg_daily_volume,float_shares,days_to_cover,available_at,source,source_ref,quality_status
+TEST,2024-01-15,1000000,250000,5000000,4.0,2024-01-18T12:00:00+00:00,EXAMPLE,archive://short/TEST/2024-01-15,EXAMPLE_ONLY
