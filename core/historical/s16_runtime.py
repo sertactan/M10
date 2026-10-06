@@ -45,18 +45,25 @@ def select_adjusted_series(
     security_id: str,
     start_date: date,
     end_date: date,
+    require_full_window: bool = True,
 ) -> dict | None:
+    if require_full_window:
+        window_sql = "start_date<=? AND end_date>=?"
+        params = (security_id, start_date.isoformat(), end_date.isoformat())
+    else:
+        window_sql = "end_date>=? AND start_date<=?"
+        params = (security_id, start_date.isoformat(), end_date.isoformat())
+
     rows = connection.execute(
-        """
+        f"""
         SELECT *
         FROM price_series_registry
         WHERE security_id=?
-          AND start_date<=?
-          AND end_date>=?
+          AND {window_sql}
           AND adjustment_status NOT IN ('RAW_ONLY','UNKNOWN')
           AND quality_status<>'FALLBACK_ONLY'
         """,
-        (security_id, start_date.isoformat(), end_date.isoformat()),
+        params,
     ).fetchall()
     if not rows:
         return None
