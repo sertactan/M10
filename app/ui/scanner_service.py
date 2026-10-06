@@ -96,7 +96,7 @@ class DesktopScannerService:
             )
         )
 
-    def scan(self, *, as_of_date: date):
+    def scan(self, *, as_of_date: date, on_progress=None):
         app = AppContainer(self.root)
         app.initialize()
         try:
@@ -139,9 +139,9 @@ class DesktopScannerService:
                 batch_size=500,
             )
             if as_of_date == date.today():
-                rows, summary = scanner.scan_current(as_of=as_of)
+                rows, summary = scanner.scan_current(as_of=as_of, on_progress=on_progress)
             else:
-                rows, summary = scanner.scan_historical(as_of=as_of)
+                rows, summary = scanner.scan_historical(as_of=as_of, on_progress=on_progress)
 
             # Put actionable rows first. Final canonical scores remain preferred;
             # partial DNA60 is only a discovery ordering aid and is never exposed
