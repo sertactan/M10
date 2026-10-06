@@ -228,7 +228,7 @@ Acceptance:
 
 ## Phase 9 — Windows First-Run / Recovery Hardening
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Deliverables:
 - Packaged schema verification.
