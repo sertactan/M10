@@ -14,7 +14,6 @@ from core.backtest.outcomes import CanonicalForwardOutcomeEngine
 from core.backtest.spec_bundle import Phase6SpecBundleError, load_verified_bundle
 from core.backtest.spec_manifest import REQUIRED_BACKTEST_SOURCES, Phase6SpecificationBinding
 from core.models.s153_v12_contracts import S153V12Input
-from core.models.s153_v14 import V14CanonicalSpecificationMissing
 from core.models.s153_v14_contracts import S153V14Input
 from core.prices.models import (
     AdjustmentStatus,
@@ -186,7 +185,7 @@ def test_phase6_binding_lists_all_authoritative_sources_when_unbound() -> None:
     assert len(binding.missing()) == 6
 
 
-def test_full_backtest_cannot_bypass_incomplete_phase5() -> None:
+def test_full_backtest_runs_with_canonical_v14_and_no_future_outcome_leakage() -> None:
     as_of = datetime(2025, 1, 1, tzinfo=timezone.utc)
     v12 = S153V12Input(
         security_id="SEC_TEST",
@@ -204,12 +203,14 @@ def test_full_backtest_cannot_bypass_incomplete_phase5() -> None:
         control_factors={},
         features={},
     )
-    with pytest.raises(V14CanonicalSpecificationMissing):
-        HistoricalBacktestEngine().evaluate(
-            v12_input=v12,
-            v14_input=v14,
-            bars=_series([20.0] * 252),
-        )
+    result = HistoricalBacktestEngine().evaluate(
+        v12_input=v12,
+        v14_input=v14,
+        bars=_series([20.0] * 252),
+    )
+    assert result.v14.status == "INCONCLUSIVE_V1_4_INPUTS"
+    assert result.outcome.outcome_status == "READY"
+    assert result.outcome.fm252 == pytest.approx(2.0)
 
 
 def _write_phase6_bundle(tmp_path: Path) -> Path:
