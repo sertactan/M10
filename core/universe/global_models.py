@@ -22,6 +22,7 @@ class GlobalReferenceListing:
     figi: str | None = None
     composite_figi: str | None = None
     shareclass_figi: str | None = None
+    market_code: str | None = None
     active: bool = True
     source: str = "ADANOS_REFERENCE"
     source_scope: str = "REFERENCE_ONLY"
@@ -29,5 +30,5 @@ class GlobalReferenceListing:
 
     @property
     def market(self) -> str:
-        code = (self.country_code or "").strip().upper()
+        code = (self.market_code or self.country_code or "").strip().upper()
         return code or "GLOBAL"
