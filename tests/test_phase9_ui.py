@@ -572,3 +572,5 @@ def test_phase9_computes_single_ticker_historical_backtest_from_adjusted_cache(t
         assert view.time_to_2x_sessions is not None
     finally:
         store.close()
+
+# v1.0.3 UI/backtest regression coverage
