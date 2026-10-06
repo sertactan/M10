@@ -24,6 +24,14 @@ a = Analysis(
             os.path.join("data", "seeds"),
         ),
         (
+            os.path.join(project_root, "data", "seeds", "s153_pilot_winners_46.csv"),
+            os.path.join("data", "seeds"),
+        ),
+        (
+            os.path.join(project_root, "data", "seeds", "s153_pilot_controls_150.csv"),
+            os.path.join("data", "seeds"),
+        ),
+        (
             os.path.join(project_root, "THIRD_PARTY_DATA_LICENSES.md"),
             ".",
         ),
