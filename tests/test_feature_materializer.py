@@ -184,6 +184,9 @@ def test_materializer_bridges_price_and_sec_into_model_features(tmp_path: Path, 
         assert loaded.current_market_cap is not None
         assert loaded.discovery_factors[1] is not None
         assert loaded.discovery_factors[3] is not None
+        assert loaded.discovery_factors[5] is not None
+        assert loaded.discovery_factors[6] is not None
+        assert loaded.discovery_factors[38] is not None
         assert loaded.control_factors["GP"] is not None
         assert loaded.control_factors["DIL"] is not None
         assert loaded.features["OL_Q"] is not None
