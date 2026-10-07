@@ -45,7 +45,7 @@ def expanding_folds(
     *,
     reference_start_year: int = 2013,
     first_test_year: int = 2018,
-    last_test_year: int = 2024,
+    last_test_year: int = 2023,
 ) -> tuple[WalkForwardFold,...]:
     if first_test_year <= reference_start_year:
         raise ValueError("first_test_year must be after reference_start_year")
@@ -80,7 +80,7 @@ class WF6WalkForwardEngine:
         source_wf5_run_id: str,
         reference_start_year: int=2013,
         first_test_year: int=2018,
-        last_test_year: int=2024,
+        last_test_year: int=2023,
     ) -> str:
         source=self.store.connection.execute(
             "SELECT * FROM wf5_replay_runs WHERE run_id=?",
@@ -233,7 +233,7 @@ class WF6WalkForwardEngine:
         source_wf5_run_id: str,
         reference_start_year: int=2013,
         first_test_year: int=2018,
-        last_test_year: int=2024,
+        last_test_year: int=2023,
         run_id: str | None=None,
     ) -> WF6RunReport:
         folds=expanding_folds(
