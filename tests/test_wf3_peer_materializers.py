@@ -55,11 +55,15 @@ def test_peer_observation_materializer_auto_classifies_bucket_and_allows_explici
         _save_feature(features,"SEC_T","RAW_CURRENT_MARKET_CAP",1000.0)
         _save_feature(features,"SEC_T","RAW_EV_TO_SALES_TTM",5.0)
         m=DestinationPeerObservationMaterializer(store,features,peers)
-        assert m.materialize(security_id="SEC_T",route="F10",as_of=AS_OF,market_cap_bucket="",profitability_state="STATE_A") is None
-        oid=m.materialize(security_id="SEC_T",route="F10",as_of=AS_OF,market_cap_bucket="BUCKET_A",profitability_state="STATE_A")
+        oid=m.materialize(
+            security_id="SEC_T",route="F10",as_of=AS_OF,
+            market_cap_bucket="",profitability_state="STATE_A",
+        )
         assert oid is not None
         row=peers.load_month(as_of_month="2024-06",as_of=AS_OF)[0]
         assert row.sales_multiple == 5.0
+        assert row.market_cap_bucket == "MICRO"
+        assert row.profitability_state == "STATE_A"
     finally:
         store.close()
 
