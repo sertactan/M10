@@ -177,6 +177,68 @@ def import_sec_companyfacts_zip(app: AppContainer, zip_path: str | Path) -> tupl
     return securities, facts_saved
 
 
+def ensure_sec_companyfacts_all_known(
+    app: AppContainer,
+    *,
+    minimum_coverage_ratio: float = 0.70,
+    force_refresh: bool = False,
+) -> tuple[int, int]:
+    """Populate SEC Company Facts for all known US securities with CIKs.
+
+    Unlike the current-scanner bootstrap, this includes inactive/historical
+    security_master rows. It uses the official SEC bulk archive so a historical
+    walk-forward build does not issue one network request per issuer.
+
+    The function does not fabricate CIKs and does not treat securities without
+    a CIK as covered.
+    """
+    universe = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(DISTINCT security_id) AS n
+        FROM security_master
+        WHERE market='US'
+          AND exchange IN ('NASDAQ','NYSE','AMEX')
+          AND cik IS NOT NULL
+          AND cik<>''
+        """
+    ).fetchone()
+    total = int(universe["n"] or 0)
+    if total <= 0:
+        return 0, 0
+
+    covered = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(DISTINCT f.security_id) AS n
+        FROM fundamental_facts_source f
+        JOIN security_master s ON s.security_id=f.security_id
+        WHERE f.source='SEC_EDGAR'
+          AND s.market='US'
+          AND s.exchange IN ('NASDAQ','NYSE','AMEX')
+          AND s.cik IS NOT NULL
+          AND s.cik<>''
+        """
+    ).fetchone()
+    current = int(covered["n"] or 0)
+    if not force_refresh and current / total >= minimum_coverage_ratio:
+        return current, 0
+
+    bulk_dir = app.resolve_data_path("bulk/sec")
+    zip_path = bulk_dir / "companyfacts.zip"
+    if force_refresh or not zip_path.exists():
+        _download(
+            SEC_COMPANYFACTS_ZIP,
+            zip_path,
+            headers={
+                "User-Agent": resolve_sec_user_agent(),
+                "Accept-Encoding": "gzip, deflate",
+            },
+            timeout_seconds=300.0,
+        )
+
+    securities, facts = import_sec_companyfacts_zip(app, zip_path)
+    return securities, facts
+
+
 class _SecRequestPacer:
     def __init__(self, interval_seconds: float = 0.13) -> None:
         self.interval_seconds = interval_seconds
@@ -445,6 +507,51 @@ def import_stooq_bulk_for_scanner(app: AppContainer, zip_path: str | Path) -> tu
         bars_count += len(group)
 
     return series_count, bars_count
+
+
+def ensure_stooq_raw_all_known(
+    app: AppContainer,
+    *,
+    minimum_coverage_ratio: float = 0.70,
+    force_refresh: bool = False,
+) -> tuple[int, int]:
+    """Bootstrap raw Stooq history for active and inactive known US securities.
+
+    This is deliberately RAW_ONLY/SCANNER_BOOTSTRAP. It improves feature and
+    discovery coverage but is never promoted to canonical adjusted backtest
+    evidence.
+    """
+    universe = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(DISTINCT security_id) AS n
+        FROM security_master
+        WHERE market='US' AND exchange IN ('NASDAQ','NYSE','AMEX')
+        """
+    ).fetchone()
+    total = int(universe["n"] or 0)
+    if total <= 0:
+        return 0, 0
+
+    covered = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(DISTINCT p.security_id) AS n
+        FROM price_series_registry p
+        JOIN security_master s ON s.security_id=p.security_id
+        WHERE p.source='STOOQ'
+          AND s.market='US'
+          AND s.exchange IN ('NASDAQ','NYSE','AMEX')
+        """
+    ).fetchone()
+    current = int(covered["n"] or 0)
+    if not force_refresh and current / total >= minimum_coverage_ratio:
+        return current, 0
+
+    bulk_dir = app.resolve_data_path("bulk/stooq")
+    zip_path = bulk_dir / "us_daily.zip"
+    if force_refresh or not zip_path.exists():
+        download_stooq_us_daily_ascii(zip_path)
+
+    return import_stooq_bulk_for_scanner(app, zip_path)
 
 
 def ensure_stooq_scanner_bulk(
