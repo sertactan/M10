@@ -19,7 +19,7 @@ from core.features.s153_v14_input_loader import S153V14InputLoader
 from core.models.s153_v12 import S153V12Model
 from core.models.s153_v141 import S153V141Model
 from core.forecast.calibration import ForecastCalibrationUnavailable
-from core.forecast.empirical_provider import MarketPrevalenceEmpiricalCalibrationProvider
+from core.forecast.wf7_validated_provider import WF7ValidatedMagnitudeCalibrationProvider
 from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
 from data.repositories.forecast_run_repository import ForecastReproducibilityError, ForecastRunRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
@@ -431,31 +431,31 @@ class DesktopAnalysisService:
                 and v14_result.score is not None
             ):
                 try:
-                    calibrated = MarketPrevalenceEmpiricalCalibrationProvider(
+                    calibrated = WF7ValidatedMagnitudeCalibrationProvider(
                         app.sqlite,
-                        model_version='S15.3_V1.4.1',
                     ).calibrate(
-                        v12=v12_result,
-                        v14=v14_result,
+                        score=v14_result.score,
                         as_of=as_of,
-                        horizon_months=12,
                     )
                     forecast = ForecastView(
-                        status='EMPIRICAL FORECAST',
-                        bull_return_pct=calibrated.bull_return_pct,
-                        base_return_pct=calibrated.base_return_pct,
-                        bear_return_pct=calibrated.bear_return_pct,
-                        probability_positive_return_pct=calibrated.probability_positive_return_pct,
+                        status='WF7 VALIDATED OOS MAGNITUDE',
+                        bull_return_pct=None,
+                        base_return_pct=None,
+                        bear_return_pct=None,
+                        probability_positive_return_pct=None,
                         probability_2x_plus_pct=calibrated.probability_2x_plus_pct,
                         probability_5x_plus_pct=calibrated.probability_5x_plus_pct,
                         probability_10x_plus_pct=calibrated.probability_10x_plus_pct,
-                        confidence_pct=calibrated.confidence_pct,
-                        risk=calibrated.risk,
+                        confidence_pct=v14_result.confidence,
+                        risk=(
+                            f'WF7_OOS_BUCKET {calibrated.bucket_label} · '
+                            f'N={calibrated.sample_size} · {calibrated.sample_quality}'
+                        ),
                         calibration_id=calibrated.calibration_id,
                     )
                 except ForecastCalibrationUnavailable as exc:
                     forecast = ForecastView(
-                        status=f'CALIBRATION NOT AVAILABLE — {exc}'
+                        status=f'WF7 CALIBRATION NOT AVAILABLE — {exc}'
                     )
 
             return DesktopAnalysisView(
