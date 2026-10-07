@@ -744,3 +744,53 @@ CREATE TABLE IF NOT EXISTS s153_historical_control_observations (
 );
 CREATE INDEX IF NOT EXISTS idx_s153_hist_control_available
 ON s153_historical_control_observations(label_available_at,as_of_date,outcome_class);
+
+
+-- WF5: resumable PIT whole-market replay orchestration.
+CREATE TABLE IF NOT EXISTS wf5_replay_runs (
+    run_id TEXT PRIMARY KEY,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    frequency TEXT NOT NULL,
+    v12_version TEXT NOT NULL,
+    v141_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    completed_at TEXT,
+    notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS wf5_replay_checkpoints (
+    run_id TEXT NOT NULL REFERENCES wf5_replay_runs(run_id),
+    snapshot_date TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    status TEXT NOT NULL,
+    universe_count INTEGER NOT NULL DEFAULT 0,
+    scored_count INTEGER NOT NULL DEFAULT 0,
+    ready_count INTEGER NOT NULL DEFAULT 0,
+    inconclusive_count INTEGER NOT NULL DEFAULT 0,
+    censored_count INTEGER NOT NULL DEFAULT 0,
+    error_count INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    message TEXT,
+    PRIMARY KEY(run_id,snapshot_date,phase)
+);
+
+CREATE TABLE IF NOT EXISTS wf5_replay_observations (
+    observation_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES wf5_replay_runs(run_id),
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    as_of_date TEXT NOT NULL,
+    primary_route TEXT,
+    v12_score REAL,
+    v12_status TEXT NOT NULL,
+    v141_score REAL,
+    v141_status TEXT NOT NULL,
+    score_created_at TEXT NOT NULL,
+    outcome_status TEXT NOT NULL DEFAULT 'NOT_JOINED',
+    outcome_joined_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_wf5_replay_date
+ON wf5_replay_observations(run_id,as_of_date,v141_status);
