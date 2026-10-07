@@ -128,6 +128,25 @@ class WF6WalkForwardEngine:
     ) -> WF6FoldReport:
         fold_id=f"{run_id}:F{fold.index:02d}"
         reference_ids=self._reference_security_ids(fold.test_start)
+        started_at=datetime.now(timezone.utc).isoformat()
+        # Persist the fold parent before OOS rows so SQLite foreign keys remain
+        # valid throughout the transaction.
+        self.store.connection.execute(
+            """
+            INSERT INTO wf6_walk_forward_folds (
+                fold_id,run_id,fold_index,reference_start_date,reference_end_date,
+                test_start_date,test_end_date,status,created_at
+            ) VALUES (?,?,?,?,?,?,?,'RUNNING',?)
+            ON CONFLICT(fold_id) DO UPDATE SET
+                status='RUNNING',completed_at=NULL
+            """,
+            (
+                fold_id,run_id,fold.index,fold.reference_start.isoformat(),
+                fold.reference_end.isoformat(),fold.test_start.isoformat(),
+                fold.test_end.isoformat(),started_at,
+            ),
+        )
+        self.store.connection.commit()
 
         rows=self.store.connection.execute(
             """
