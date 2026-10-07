@@ -14,7 +14,8 @@ Windows desktop research platform for **S15.3 V1.2** and **S15.3 V1.4 Dual-Magni
 
 ### Phase 1 — US Universe ✅
 - NASDAQ / NYSE / NYSE American universe
-- Massive PIT ticker snapshots and delisted archive
+- free Alpha Vantage dated listing-status PIT snapshots (2010+ with free key)
+- Massive PIT ticker snapshots and delisted archive as optional accelerator
 - SEC EDGAR CIK/ticker/exchange enrichment
 - Finnhub validation/fallback hook
 - stable security IDs with FIGI-first identity
@@ -146,9 +147,10 @@ The engine selects **one source for an entire requested backtest window**. It ma
 ## Provider roles outside prices
 
 1. **SEC EDGAR** — authoritative CIK/identity; Phase 3 filings and fundamentals
-2. **Massive** — US listing universe, historical PIT universe, delisted symbols, ticker events
-3. **Finnhub** — validation/fallback; later estimates/analyst/news
-4. **FMP** — optional future fallback only
+2. **Alpha Vantage LISTING_STATUS** — free-key historical PIT listing snapshots (2010+)
+3. **Massive** — optional historical PIT/delisted/ticker-event accelerator
+4. **Finnhub** — validation/fallback; later estimates/analyst/news
+5. **FMP** — optional future fallback only
 
 ## Local configuration
 
@@ -156,6 +158,7 @@ Copy `.env.example` to `.env` and fill only what you use:
 
 ```text
 SEC_USER_AGENT=Your Name your-email@example.com
+ALPHAVANTAGE_API_KEY=
 MASSIVE_API_KEY=
 FINNHUB_API_KEY=
 FMP_API_KEY=
@@ -181,7 +184,7 @@ python main.py --sync-universe
 python main.py --sync-universe --as-of 2025-05-05 --no-delisted
 ```
 
-Historical universe sync requires Massive because SEC/Finnhub symbol lists are current-reference sources.
+Historical universe sync is free-key capable through Alpha Vantage LISTING_STATUS for dates after 2010-01-01. Massive remains an optional accelerator; current SEC/Finnhub symbol lists are never substituted for historical PIT membership.
 
 ## Sync one ticker's historical prices
 
