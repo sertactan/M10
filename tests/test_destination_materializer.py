@@ -88,3 +88,31 @@ def test_destination_materializer_fails_closed_without_peer_or_forward_evidence(
         assert written == {}
     finally:
         store.close()
+
+
+
+def test_destination_materializer_writes_distressed_and_biotech_supported_mc(tmp_path: Path) -> None:
+    store, repo = _store(tmp_path)
+    try:
+        raw = {
+            "RAW_NORMALIZED_EBITDA_12": 100.0,
+            "RAW_DISTRESSED_PEER_MULTIPLE": 8.0,
+            "RAW_POST_RESTRUCTURING_NET_DEBT": 200.0,
+            "RAW_RESTRUCTURING_EVIDENCE_FACTOR": 0.80,
+            "RAW_RNPV_PIPELINE": 750.0,
+            "RAW_NET_CASH": 250.0,
+        }
+        for key, value in raw.items():
+            _save(repo, key, value)
+
+        written = DestinationFeatureMaterializer(repo).materialize(
+            security_id="SEC_TEST",
+            as_of=AS_OF,
+        )
+        assert "SUPPORTED_MC_12_D" in written
+        assert "SUPPORTED_MC_12_B" in written
+        rows = repo.load_as_of("SEC_TEST", AS_OF)
+        assert rows["SUPPORTED_MC_12_D"]["value"] == 480.0
+        assert rows["SUPPORTED_MC_12_B"]["value"] == 1000.0
+    finally:
+        store.close()
