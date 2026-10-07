@@ -63,8 +63,11 @@ Full execution:
 
 ```powershell
 python scripts/run_wf9_full_execution.py ^
-  --code-identity <CURRENT_BUILD_COMMIT>
+  --code-identity <CURRENT_BUILD_COMMIT> ^
+  --output release_evidence/WF9_PRODUCTION_EVIDENCE.json
 ```
+
+The release evidence file is accepted only when the full run returns `COMPLETE_AND_ACTIVATED`, all 144 requested snapshots are exact PIT, no preflight blocker remains, and the WF5/WF6/WF7/WF8/manifest/activation identifiers are present.
 
 A successful run ends at `COMPLETE_AND_ACTIVATED` and returns all WF5/WF6/WF7/
 WF8/manifest/activation identifiers.

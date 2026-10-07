@@ -401,6 +401,15 @@ jobs:
             dist_installer/WF8E_RELEASE_EVIDENCE.json
             dist_installer/SIGNING_STATUS.txt
 
+      - name: Verify v1.0.6 Final Production evidence
+        if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
+        shell: pwsh
+        run: |
+          python scripts/check_v106_final_gate.py `
+            --evidence "release_evidence/WF9_PRODUCTION_EVIDENCE.json" `
+            --current-commit "${{ github.sha }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Publish GitHub Release
         if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
         shell: pwsh
