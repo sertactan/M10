@@ -725,3 +725,22 @@ CREATE TABLE IF NOT EXISTS security_classification_history (
 );
 CREATE INDEX IF NOT EXISTS idx_security_classification_pit
 ON security_classification_history(security_id,effective_from,effective_to,available_at);
+
+
+-- WF4: leakage-safe historical-control vectors.
+CREATE TABLE IF NOT EXISTS s153_historical_control_observations (
+    observation_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    as_of_date TEXT NOT NULL,
+    primary_route TEXT,
+    feature_vector_json TEXT NOT NULL,
+    magnitude_vector_json TEXT NOT NULL,
+    fm252 REAL NOT NULL,
+    outcome_class TEXT NOT NULL,
+    label_available_at TEXT NOT NULL,
+    source_run_id TEXT,
+    vector_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_s153_hist_control_available
+ON s153_historical_control_observations(label_available_at,as_of_date,outcome_class);
