@@ -100,6 +100,19 @@ class AlphaVantagePitUniverseProvider:
             name = (row.get("name") or "").strip()
             if not ticker or not name:
                 continue
+            name_lower = name.lower()
+            non_common_markers = (
+                " warrant",
+                " warrants",
+                " unit",
+                " units",
+                " right",
+                " rights",
+                " preferred",
+                " preference share",
+            )
+            if any(marker in name_lower for marker in non_common_markers):
+                continue
             ipo_date = None
             ipo_raw = (row.get("ipoDate") or "").strip()
             if ipo_raw and ipo_raw.lower() not in {"null", "none", "n/a"}:
