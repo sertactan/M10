@@ -42,10 +42,18 @@ class S153V12InputLoader:
             "RAW_CURRENT_PRICE",
             "RAW_CURRENT_MARKET_CAP",
         }
+        # Raw/peer evidence is consumed by upstream materializers and must not
+        # leak into the 0..100 model-score feature map. SupportedMC and
+        # PLAUSIBLE_CEILING_MC are canonical model inputs and are intentionally
+        # retained because their names do not use the raw/peer prefixes.
         features = {
             key: row["value"]
             for key, row in rows.items()
             if key not in reserved
+            and not key.startswith("RAW_")
+            and not key.startswith("PEER_")
+            and not key.startswith("ROUTE_PEER_")
+            and key != "EVIDENCE_BACKED_COMPARABLE_MC"
         }
         return S153V12Input(
             security_id=security_id,
