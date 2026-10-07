@@ -735,6 +735,7 @@ CREATE TABLE IF NOT EXISTS s153_historical_control_observations (
     primary_route TEXT,
     feature_vector_json TEXT NOT NULL,
     magnitude_vector_json TEXT NOT NULL,
+    magnitude5_vector_json TEXT,
     fm252 REAL NOT NULL,
     outcome_class TEXT NOT NULL,
     label_available_at TEXT NOT NULL,
