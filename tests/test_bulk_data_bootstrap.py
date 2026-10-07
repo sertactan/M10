@@ -13,6 +13,7 @@ from app.bulk_data_bootstrap import (
     download_stooq_us_daily_ascii,
     ensure_sec_companyfacts_all_known,
     ensure_sec_companyfacts_bulk,
+    ensure_stooq_raw_all_known,
     import_sec_companyfacts_zip,
 )
 from data.database.sqlite_store import SQLiteStore
@@ -275,5 +276,54 @@ def test_sec_companyfacts_all_known_includes_inactive_historical_rows(tmp_path: 
         ).fetchone()
         assert row["security_id"] == "SEC_OLD"
         assert row["metric_name"] == "REVENUE"
+    finally:
+        store.close()
+
+
+
+def test_stooq_raw_all_known_includes_inactive_but_never_backtest_promotes(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "stooq-all.sqlite")
+    store.initialize()
+    try:
+        now = datetime(2026, 10, 6, tzinfo=timezone.utc).isoformat()
+        store.connection.execute(
+            """
+            INSERT INTO security_master (
+                security_id,ticker,name,exchange,market,cik,active,created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            """,
+            ("SEC_OLD","OLD","Old Inc.","NYSE","US",None,0,now,now),
+        )
+        store.connection.commit()
+
+        archive = tmp_path / "bulk" / "stooq" / "us_daily.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        text = (
+            "<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>\n"
+            "OLD.US,D,20200102,000000,10,11,9,10.5,1000,0\n"
+            "OLD.US,D,20200103,000000,10.5,12,10,11.5,1200,0\n"
+        )
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("data/us.txt", text)
+
+        class FakeApp:
+            sqlite = store
+            app_config = SimpleNamespace(
+                database=SimpleNamespace(parquet_root="parquet")
+            )
+            def resolve_data_path(self, value):
+                return tmp_path / value
+
+        series, bars = ensure_stooq_raw_all_known(
+            FakeApp(),
+            minimum_coverage_ratio=0.70,
+        )
+        assert series == 1
+        assert bars == 2
+        selected = store.connection.execute(
+            "SELECT purpose,source FROM canonical_price_selection WHERE security_id='SEC_OLD'"
+        ).fetchone()
+        assert selected["purpose"] == "SCANNER_BOOTSTRAP"
+        assert selected["source"] == "STOOQ"
     finally:
         store.close()
