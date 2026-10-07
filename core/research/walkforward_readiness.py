@@ -102,7 +102,7 @@ class WalkForwardReadinessAuditor:
         # only for dates its provider itself allows; the provider enforces that
         # floor before rows reach this table.
         exact_pit = bool(source_names) and all(
-            name in {"STOCK_DATA_PIT", "MASSIVE", "IMPORTED_PIT_CANONICAL"}
+            name in {"STOCK_DATA_PIT", "ALPHAVANTAGE_PIT", "MASSIVE", "IMPORTED_PIT_CANONICAL"}
             for name in source_names
         )
 
