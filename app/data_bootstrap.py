@@ -258,8 +258,25 @@ async def ensure_price_history(
     )
     return len(bars)
 
-def ensure_price_history_sync(app: AppContainer, row, *, as_of_date: date) -> int:
-    return asyncio.run(ensure_price_history(app, row, as_of_date=as_of_date))
+def ensure_price_history_sync(
+    app: AppContainer,
+    row,
+    *,
+    as_of_date: date,
+    lookback_days: int = 1095,
+    force_refresh: bool = False,
+    incremental: bool = False,
+) -> int:
+    return asyncio.run(
+        ensure_price_history(
+            app,
+            row,
+            as_of_date=as_of_date,
+            lookback_days=lookback_days,
+            force_refresh=force_refresh,
+            incremental=incremental,
+        )
+    )
 
 
 async def ensure_sec_fundamentals(

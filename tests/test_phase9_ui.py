@@ -42,14 +42,18 @@ def test_phase9_shell_has_required_global_header_and_tabs(qapp):
         assert window.market.count() == 1
         assert window.market.currentText() == "United States"
         assert window.horizon.currentData() == 12
-        assert window.tabs.count() == 3
-        assert [window.tabs.tabText(i) for i in range(3)] == [
-            "V1.2", "V1.4.1", "COMPARE"
+        assert window.tabs.count() == 5
+        assert [window.tabs.tabText(i) for i in range(5)] == [
+            "V1.2", "V1.4.1", "S16", "S16-EA", "COMPARE"
         ]
         assert window.v12_page.score.text() == "—"
         assert window.v12_page.status.text() == "NOT LOADED"
         assert window.v14_page.score.text() == "—"
         assert window.v14_page.status.text() == "NOT LOADED"
+        assert window.s16_page.score.text() == "—"
+        assert window.s16_page.status.text() == "NOT LOADED"
+        assert window.s16_ea_page.score.text() == "—"
+        assert window.s16_ea_page.status.text() == "NOT LOADED"
         assert window.stock_header.price.text() == "—"
         assert window.context_panel.backtest_status.text() == "NOT AVAILABLE"
         assert window.context_panel.forecast_status.text() == "NOT AVAILABLE"
@@ -156,8 +160,21 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
             destination=None,
             confidence=82.0,
         ),
+        s16=ModelView(
+            model_name="S16 V1.0 Canonical",
+            status="ARMED",
+            score=68.0,
+            destination="1–5 session explosive discovery",
+        ),
+        s16_ea=ModelView(
+            model_name="S16-EA V1.3 Canonical Hybrid FastPath",
+            status="INCONCLUSIVE — canonical intraday/news path evidence not loaded",
+            score=None,
+        ),
         v12_components={"Core15.3": 81.2},
         v14_components={"M10_D": 78.0, "M10_C": 74.0, "DMG": 4.0},
+        s16_components={"FUEL": 72.0, "IGNITION_SCORE": 68.0},
+        s16_ea_components={"MODEL_ID": "S16_EA_V1.3_CANONICAL_HYBRID_FASTPATH"},
     )
     try:
         window._apply_analysis(result)
@@ -169,10 +186,14 @@ def test_phase9_applies_real_result_surface_without_synthetic_consensus(qapp):
         assert window.context_panel.forecast_status.text() == "NOT AVAILABLE"
         assert len(window.v12_page.price_chart.chart.series()) == 2
         assert len(window.v14_page.price_chart.chart.series()) == 2
+        assert len(window.s16_page.price_chart.chart.series()) == 2
+        assert len(window.s16_ea_page.price_chart.chart.series()) == 2
         assert window.v12_page.score.text() == "81.2 / 100"
         assert window.v12_page.route.text() == "F10"
         assert window.v14_page.status.text() == "PRECISION_CONFIRMED_12M_10X"
         assert window.v14_page.score.text() == "84.5 / 100"
+        assert window.s16_page.score.text() == "68.0 / 100"
+        assert window.s16_ea_page.status.text().startswith("INCONCLUSIVE")
         assert window.compare_page.consensus.text() == "MODEL CONSENSUS: —"
         assert window.compare_page.winner.text() == "Winner: —"
         assert "LOADED TEST" in window.status.text()

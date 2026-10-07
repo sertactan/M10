@@ -1,6 +1,6 @@
 # S15.3 Research Terminal
 
-Windows desktop research platform for **S15.3 V1.2** and **S15.3 V1.4 Dual-Magnitude Architecture**.
+Windows desktop research platform for **S15.3 V1.2**, **S15.3 V1.4.1**, **S16 V1.0 Canonical**, and **S16-EA V1.3 Canonical Hybrid FastPath**.
 
 ## Status
 
@@ -96,43 +96,44 @@ validation_status
 - no new market/fundamental provider
 - run reproducibility with data/config hashes
 
-### Phase 5 — S15.3 V1.4 Dual-Magnitude Architecture 🚧 started / fail-closed
-- separate `S153V14Model` and V1.4 contracts
-- canonical PIT input loader reusing the Phase 1-3 normalized feature layer
-- no new market/fundamental provider
-- output contract reserved for route-specific destination, dual magnitude, acceleration,
-  large-winner probability, risk-adjusted conviction, confidence and probability buckets
-- no V1.2 score is silently reused as V1.4 model logic
-- V1.4 scoring remains disabled until the authoritative V1.4 specification set is bound
-- tests explicitly reject invented formulas, thresholds, probabilities and destination mappings
+### Phase 5 — S15.3 V1.4.1 Canonical ✅ implemented
+- V1.4.1 production canonical formula and completion specification are bound.
+- Dual-magnitude / route-aware production scoring is active.
+- Missing canonical evidence remains N/A/fail-closed; V1.2 math is never substituted silently.
+- Production Windows release gate packages and verifies the V1.4.1 specification.
 
-See `PHASE5_STATUS.md` for the required canonical artifacts and the no-invention gate.
-
-
-### Phase 6 — Historical Backtest Engine 🚧 dependent / started
-- branch is based on Phase 5; it cannot merge ahead of V1.4
-- no new market/fundamental provider
-- canonical Phase 2 price selection only
-- PIT model outputs must come from Phase 4 V1.2 + Phase 5 V1.4
-- canonical anchor-session / adjusted-close / next-252-session / FM252 outcome core
-- canonical winner/near-miss/failure classes
-- PARTIAL / CENSORED handling without silent imputation
-- cross-provider price stitching rejected
+### Phase 6 — Historical Backtest Engine ✅ implemented / production evidence pending
+- canonical anchor-session / adjusted-close / next-252-session / FM252 outcome engine
+- single-provider canonical price selection; no cross-provider stitching
+- PARTIAL / CENSORED handling without silent failure imputation
 - feature/outcome firewall and reproducible outcome hashes
-- benchmark + complete trading-calendar/corporate-action + Golden Backtest specs remain fail-closed if absent
+- production execution is delegated to WF9 and remains fail-closed without real PIT/adjusted data
 
-
-### Phase 7 — Market Scanner 🚧 dependent / implemented, production gate pending
+### Phase 7 — Market Scanner ✅ implemented
 - current + historical US universe scanner
 - NASDAQ / NYSE / AMEX coverage
 - canonical PIT feature loading
-- production adapter invokes Phase 4 V1.2 + Phase 5 V1.4 only
+- S15.3 V1.2 + V1.4.1 production scoring
 - historical delisted securities preserved
-- sort / filter / CSV export
-- 10,000+ security batch path
-- progress callback + background scanner worker
-- exact 15-item acceptance contract encoded
-- final completion remains blocked by canonical V1.4 production scoring
+- sort / filter / CSV export and background progress path
+
+### WF6–WF8 — Walk-forward validation / production hardening ✅ implemented
+- expanding OOS folds and leakage controls
+- empirical magnitude calibration with sample-size gates
+- reproducibility manifest, tamper detection, rollback-safe activation
+- Windows/runtime WF8-E release evidence gate
+
+### WF9 — Full historical execution ⚠️ real-data execution pending
+- default window: 2013-01 through 2024-12 (144 monthly PIT snapshots)
+- resumable PIT-universe + authoritative adjusted-price bootstrap
+- succeeds only when the run returns `COMPLETE_AND_ACTIVATED`
+- current-universe substitution, Yahoo authority, and Stooq RAW_ONLY promotion are forbidden
+
+### S16 / S16-EA
+- S16 V1.0 canonical model is present and exposed in the desktop UI.
+- S16 uses persisted `S16::` PIT features and fails closed when the 22 required features are incomplete.
+- S16-EA V1.3 frozen Hybrid FastPath engine is implemented in Python with canonical parity tests.
+- The S16-EA desktop tab intentionally reports INCONCLUSIVE until true PIT intraday/news evidence is loaded; daily data is never fabricated into an early-alert score.
 
 ## Historical price provider priority
 
@@ -244,7 +245,12 @@ python main.py --run-v12 AAPL --model-as-of 2025-05-05
 The model reads only PIT canonical model features materialized from Phases 1-3,
 historical controls, or deterministic canonical derivations. Missing factors remain N/A.
 
-## Next
+## WF9 production run
 
-Complete Phase 5 by binding the authoritative V1.4 canonical specifications and Golden Test Cases.
-Only after that should Phase 6 — Historical Backtester begin.
+```powershell
+python scripts/bootstrap_wf9_canonical_data.py --start 2013-01-01 --end 2024-12-31 --sync-universe --provider AUTO
+python scripts/run_wf9_full_execution.py --preflight-only --code-identity <CURRENT_BUILD_COMMIT>
+python scripts/run_wf9_full_execution.py --code-identity <CURRENT_BUILD_COMMIT>
+```
+
+A release must not claim WF9 completion unless the final command returns `COMPLETE_AND_ACTIVATED`.

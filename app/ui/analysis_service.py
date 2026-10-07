@@ -14,10 +14,17 @@ from app.feature_materializer import CanonicalFeatureMaterializer
 from app.ui.price_chart import PricePointView
 from app.ui.view_models import BacktestView, ForecastView, ModelView, StockHeaderView
 from core.backtest.outcomes import CanonicalForwardOutcomeEngine
+from core.historical.s16_feature_coverage import (
+    S16_REQUIRED_FEATURES,
+    assess_feature_coverage,
+    build_complete_s16_input,
+)
 from core.features.s153_v12_input_loader import S153V12InputLoader
 from core.features.s153_v14_input_loader import S153V14InputLoader
 from core.models.s153_v12 import S153V12Model
 from core.models.s153_v141 import S153V141Model
+from core.models.s16 import S16V1Model
+from core.models.s16_ea_v13 import S16_EA_V13_MODEL_ID
 from core.forecast.calibration import ForecastCalibrationUnavailable
 from core.forecast.wf7_validated_provider import WF7ValidatedMagnitudeCalibrationProvider
 from core.prices.models import AdjustmentStatus, PriceQualityStatus, SourcePriceBar
@@ -36,8 +43,12 @@ class DesktopAnalysisView:
     price_points: list[PricePointView]
     v12: ModelView
     v14: ModelView
+    s16: ModelView
+    s16_ea: ModelView
     v12_components: dict[str, object]
     v14_components: dict[str, object]
+    s16_components: dict[str, object]
+    s16_ea_components: dict[str, object]
 
 
 class DesktopAnalysisService:
@@ -391,6 +402,7 @@ class DesktopAnalysisService:
             forecast = self._load_forecast(app, row['security_id'], as_of_date)
             price_points = self._load_price_points(app, row['security_id'], as_of_date)
             features = ModelFeatureRepository(app.sqlite)
+            feature_rows = features.load_as_of(row['security_id'], as_of)
 
             v12_input = S153V12InputLoader(features).load(
                 security_id=row['security_id'],
@@ -424,6 +436,90 @@ class DesktopAnalysisService:
                 risk=None,
             )
             v14_components: dict[str, object] = dict(v14_result.components)
+
+            s16_feature_values = {
+                key: (
+                    None
+                    if feature_rows.get(f"S16::{key}") is None
+                    or feature_rows[f"S16::{key}"]["value"] is None
+                    else float(feature_rows[f"S16::{key}"]["value"])
+                )
+                for key in S16_REQUIRED_FEATURES
+            }
+            s16_coverage = assess_feature_coverage(s16_feature_values)
+            if s16_coverage.score_ready:
+                s16_input = build_complete_s16_input(
+                    security_id=row['security_id'],
+                    ticker=row['ticker'],
+                    as_of=as_of,
+                    route=None,
+                    features=s16_feature_values,
+                )
+                s16_result = S16V1Model().analyze(s16_input)
+                s16_view = ModelView(
+                    model_name='S16 V1.0 Canonical',
+                    status=s16_result.status,
+                    score=s16_result.explosive_score,
+                    route=s16_result.route,
+                    destination='1–5 session explosive discovery',
+                    confidence=None,
+                    risk=(
+                        'Fail-closed canonical PIT score · '
+                        f'coverage {s16_coverage.present}/{s16_coverage.required}'
+                    ),
+                )
+                s16_components: dict[str, object] = {
+                    **dict(s16_result.components),
+                    'ARMED_SCORE': s16_result.armed_score,
+                    'IGNITION_SCORE': s16_result.ignition_score,
+                    'FEATURE_COVERAGE_PCT': s16_coverage.coverage_pct,
+                    'MISSING_REQUIREMENTS': '—',
+                }
+            else:
+                missing = ', '.join(s16_coverage.missing)
+                s16_view = ModelView(
+                    model_name='S16 V1.0 Canonical',
+                    status=(
+                        'INCONCLUSIVE — canonical S16 PIT features incomplete '
+                        f'({s16_coverage.present}/{s16_coverage.required})'
+                    ),
+                    score=None,
+                    route=None,
+                    destination='1–5 session explosive discovery',
+                    confidence=None,
+                    risk=f'Missing: {missing}',
+                )
+                s16_components = {
+                    'FEATURE_COVERAGE_PCT': s16_coverage.coverage_pct,
+                    'PRESENT_FEATURES': s16_coverage.present,
+                    'REQUIRED_FEATURES': s16_coverage.required,
+                    'MISSING_REQUIREMENTS': missing or '—',
+                }
+
+            # S16-EA V1.3 needs true event timestamps plus canonical 1m/5m
+            # same-clock reaction evidence. The daily desktop pipeline must not
+            # manufacture those intraday inputs. Keep the tab fail-closed until
+            # a live/intraday evidence adapter persists a canonical-ready path.
+            s16_ea_view = ModelView(
+                model_name='S16-EA V1.3 Canonical Hybrid FastPath',
+                status='INCONCLUSIVE — canonical intraday/news path evidence not loaded',
+                score=None,
+                route=None,
+                destination='NEWS_AT_OPEN / ZERO_PM_BREAKOUT / inherited paths',
+                confidence=None,
+                risk='Requires true PIT 1m/5m + primary-source event evidence',
+            )
+            s16_ea_components: dict[str, object] = {
+                'MODEL_ID': S16_EA_V13_MODEL_ID,
+                'CANONICAL_READY': False,
+                'NEWS_WINDOW_ET': '09:20–10:00',
+                'ZERO_PM_WINDOW_ET': '09:31–09:44',
+                'ARBITRATION': 'max(all canonical-ready active path scores)',
+                'MISSING_REQUIREMENTS': (
+                    'canonical intraday bars, same-clock 20-session baselines, '
+                    'primary-source event timestamps and live path materialization'
+                ),
+            }
 
             if (
                 forecast.status == 'NOT AVAILABLE'
@@ -467,6 +563,8 @@ class DesktopAnalysisService:
                 price_points=price_points,
                 v12=v12_view,
                 v14=v14_view,
+                s16=s16_view,
+                s16_ea=s16_ea_view,
                 v12_components={
                     **dict(v12_result.components),
                     "MISSING_REQUIREMENTS": (
@@ -476,6 +574,8 @@ class DesktopAnalysisService:
                     ),
                 },
                 v14_components=v14_components,
+                s16_components=s16_components,
+                s16_ea_components=s16_ea_components,
             )
         finally:
             app.close()

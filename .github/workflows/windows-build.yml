@@ -27,12 +27,22 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+      WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+      WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Verify release version alignment
+        shell: pwsh
+        run: |
+          python scripts/check_release_version.py --root .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install application and build tools
         shell: pwsh
@@ -80,6 +90,53 @@ jobs:
           if (!(Test-Path "dist/S153ResearchTerminal/S153ResearchTerminal.exe")) {
             throw "PyInstaller executable was not produced"
           }
+
+      - name: Prepare Authenticode signing
+        shell: pwsh
+        run: |
+          if (
+            [string]::IsNullOrWhiteSpace($env:WINDOWS_CODESIGN_PFX_BASE64) -or
+            [string]::IsNullOrWhiteSpace($env:WINDOWS_CODESIGN_PASSWORD)
+          ) {
+            "SIGNING_ENABLED=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "SIGNING_STATUS=UNSIGNED_NO_CERTIFICATE" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "Authenticode signing certificate is not configured."
+            exit 0
+          }
+
+          $pfx = Join-Path $env:RUNNER_TEMP "m10-codesign.pfx"
+          try {
+            [System.IO.File]::WriteAllBytes(
+              $pfx,
+              [Convert]::FromBase64String($env:WINDOWS_CODESIGN_PFX_BASE64)
+            )
+          }
+          catch {
+            throw "WINDOWS_CODESIGN_PFX_BASE64 is not valid Base64."
+          }
+          "SIGNING_ENABLED=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SIGNING_STATUS=AUTHENTICODE_SIGNED" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SIGNING_PFX_PATH=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Sign Windows application
+        shell: pwsh
+        run: |
+          if ($env:SIGNING_ENABLED -ne "true") {
+            Write-Host "Skipping application signing: certificate not configured."
+            exit 0
+          }
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe was not found" }
+          $timestamp = $env:WINDOWS_CODESIGN_TIMESTAMP_URL
+          if ([string]::IsNullOrWhiteSpace($timestamp)) {
+            $timestamp = "http://timestamp.digicert.com"
+          }
+          & $signtool.FullName sign /fd SHA256 /f $env:SIGNING_PFX_PATH /p $env:WINDOWS_CODESIGN_PASSWORD /tr $timestamp /td SHA256 "dist\S153ResearchTerminal\S153ResearchTerminal.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $signtool.FullName verify /pa /v "dist\S153ResearchTerminal\S153ResearchTerminal.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify packaged V1.4.1 canonical completion spec
         shell: pwsh
@@ -298,6 +355,25 @@ jobs:
             throw "Installer was not produced"
           }
 
+      - name: Sign Windows installer
+        shell: pwsh
+        run: |
+          if ($env:SIGNING_ENABLED -eq "true") {
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+            if (-not $signtool) { throw "signtool.exe was not found" }
+            $timestamp = $env:WINDOWS_CODESIGN_TIMESTAMP_URL
+            if ([string]::IsNullOrWhiteSpace($timestamp)) {
+              $timestamp = "http://timestamp.digicert.com"
+            }
+            & $signtool.FullName sign /fd SHA256 /f $env:SIGNING_PFX_PATH /p $env:WINDOWS_CODESIGN_PASSWORD /tr $timestamp /td SHA256 "dist_installer\S153ResearchTerminal-Setup.exe"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & $signtool.FullName verify /pa /v "dist_installer\S153ResearchTerminal-Setup.exe"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          Set-Content -Path "dist_installer\SIGNING_STATUS.txt" -Value $env:SIGNING_STATUS -Encoding utf8
+
       - name: SHA256
         shell: pwsh
         run: |
@@ -323,6 +399,7 @@ jobs:
             dist_installer/S153ResearchTerminal-Setup.exe
             dist_installer/SHA256.txt
             dist_installer/WF8E_RELEASE_EVIDENCE.json
+            dist_installer/SIGNING_STATUS.txt
 
       - name: Publish GitHub Release
         if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
@@ -337,6 +414,11 @@ jobs:
           $setup = "dist_installer/S153ResearchTerminal-Setup.exe"
           $sha = "dist_installer/SHA256.txt"
           $wf8e = "dist_installer/WF8E_RELEASE_EVIDENCE.json"
+          $signing = "dist_installer/SIGNING_STATUS.txt"
+          $signingStatus = (Get-Content $signing -Raw).Trim()
+          if ($signingStatus -ne "AUTHENTICODE_SIGNED") {
+            throw "Production GitHub Release requires Authenticode signing. Status: $signingStatus"
+          }
           $title = "S15.3 Research Terminal v$version"
           $notes = @"
           S15.3 Research Terminal v$version.
@@ -349,17 +431,20 @@ jobs:
           - one-command production evidence orchestrator
           - Windows clean-install, corrupt-DB recovery and upgrade-migration smoke tests
           - WF8-E final runtime/release evidence
+          - S16 V1.0 desktop surface
+          - S16-EA V1.3 canonical Hybrid FastPath engine + fail-closed desktop surface
+          - Authenticode signing evidence
           - installer SHA-256
           "@
 
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $setup $sha $wf8e --clobber --repo $repo
+            gh release upload $tag $setup $sha $wf8e $signing --clobber --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             gh release edit $tag --target "${{ github.sha }}" --title $title --notes $notes --latest --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           else {
-            gh release create $tag $setup $sha $wf8e --target "${{ github.sha }}" --title $title --notes $notes --latest --repo $repo
+            gh release create $tag $setup $sha $wf8e $signing --target "${{ github.sha }}" --title $title --notes $notes --latest --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
