@@ -976,3 +976,25 @@ CREATE TABLE IF NOT EXISTS wf8_hardening_checks (
 );
 CREATE INDEX IF NOT EXISTS idx_wf8_hardening_status
 ON wf8_hardening_runs(status,created_at);
+
+
+-- WF8-C: deterministic reproducibility manifest for WF5 -> WF8 evidence chain.
+CREATE TABLE IF NOT EXISTS wf8_reproducibility_manifests (
+    manifest_id TEXT PRIMARY KEY,
+    hardening_id TEXT NOT NULL REFERENCES wf8_hardening_runs(hardening_id),
+    wf5_run_id TEXT NOT NULL REFERENCES wf5_replay_runs(run_id),
+    wf6_run_id TEXT NOT NULL REFERENCES wf6_walk_forward_runs(run_id),
+    wf7_run_id TEXT NOT NULL REFERENCES wf7_validation_runs(run_id),
+    code_identity TEXT NOT NULL,
+    manifest_version TEXT NOT NULL,
+    wf5_hash TEXT NOT NULL,
+    wf6_hash TEXT NOT NULL,
+    wf7_hash TEXT NOT NULL,
+    wf8_hash TEXT NOT NULL,
+    chain_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    verified_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_wf8_repro_chain
+ON wf8_reproducibility_manifests(hardening_id,status,created_at);
