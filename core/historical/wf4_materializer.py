@@ -15,7 +15,7 @@ from data.repositories.s153_historical_control_repository import S153HistoricalC
 
 
 class WF4HistoricalFeatureMaterializer:
-    VERSION="wf4-historical-features-v1"
+    VERSION="wf4-historical-features-v2-wf6-leakage-v1"
 
     def __init__(
         self,
@@ -43,9 +43,14 @@ class WF4HistoricalFeatureMaterializer:
             as_of=as_of,
             broad_target=broad,
             magnitude10_target=magnitude10,
+            target_security_id=security_id,
         )
 
-        eligible=self.controls.eligible_before(as_of,vector_version=VECTOR_VERSION)
+        eligible=self.controls.eligible_before(
+            as_of,
+            vector_version=VECTOR_VERSION,
+            exclude_security_id=security_id,
+        )
         winner5=[r for r in eligible if float(r["fm252"]) >= 5.0]
         near5=[r for r in eligible if 3.0 <= float(r["fm252"]) < 5.0]
         hard=[r for r in eligible if float(r["fm252"]) < 3.0]
@@ -98,6 +103,8 @@ class WF4HistoricalFeatureMaterializer:
                 computation_version=self.VERSION,
                 evidence={
                     "vector_version":VECTOR_VERSION,
+                    "leakage_policy":"WF6_LEAKAGE_POLICY_V1_2026-10-07",
+                    "target_security_excluded":True,
                     "true10_n":hist.get("WF4_TRUE10_N"),
                     "near10_n":hist.get("WF4_NEAR_MISS_N"),
                     "hard_n":hist.get("WF4_HARD_N"),
