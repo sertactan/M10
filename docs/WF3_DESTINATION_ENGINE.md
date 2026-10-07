@@ -1,6 +1,6 @@
 # WF3 — Destination Engine
 
-Status: STARTED / core peer engine implemented fail-closed.
+Status: COMPLETE — WF3 Peer Policy V1 frozen and whole-universe PIT materializer implemented.
 
 ## Canonical rules implemented
 
@@ -79,14 +79,18 @@ Raw valuation evidence and peer-statistics are upstream materializer inputs.
 They are excluded from the V1.2 0-100 model feature map, so a large multiple or
 market-cap value cannot be misinterpreted as a score.
 
-## Remaining WF3 blockers
+## WF3 completion
 
-1. Freeze S15.3-specific market-cap bucket boundaries.
-2. Freeze S15.3-specific profitability-state categories.
-3. Freeze exact N<30 peer expansion order.
-4. Populate PIT peer observations at scale from the historical data layer.
-5. Populate evidence-backed 12-month forward revenue/EBITDA/FCF inputs where
-   historical guidance/estimate evidence exists.
+The previously-unfrozen definitions are now versioned separately as
+`WF3_PEER_POLICY_V1_2026-10-07`:
 
-Until 1-3 are frozen, exact-cohort statistics work, but automatic expanded-peer
-statistics remain fail-closed.
+- market-cap bucket boundaries
+- profitability-state categories
+- N<30 expansion sequence
+- PIT sector/industry requirement
+
+Historical data coverage can still be incomplete; missing classification,
+forward evidence or peer observations remain N/A and are reported by the
+whole-universe materializer. That is a data-coverage state, not an unfinished
+WF3 formula/policy state.
+
