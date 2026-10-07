@@ -19,8 +19,13 @@ class WF4HistoricalControlEngine:
         as_of: datetime,
         broad_target: dict[str,float|None],
         magnitude10_target: dict[str,float|None],
+        target_security_id: str | None = None,
     ) -> dict[str,float|None]:
-        rows=self.repository.eligible_before(as_of,vector_version=VECTOR_VERSION)
+        rows=self.repository.eligible_before(
+            as_of,
+            vector_version=VECTOR_VERSION,
+            exclude_security_id=target_security_id,
+        )
 
         true10=[row for row in rows if row["outcome_class"]=="TRUE_10X"]
         near=[row for row in rows if row["outcome_class"]=="NEAR_MISS_10X"]
