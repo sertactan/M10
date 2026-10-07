@@ -9,6 +9,7 @@ from core.features.peer_observation_materializer import DestinationPeerObservati
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.destination_peer_repository import DestinationPeerRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
+from data.repositories.security_classification_repository import SecurityClassificationRepository
 
 
 AS_OF=datetime(2024,6,30,23,59,tzinfo=timezone.utc)
@@ -25,6 +26,15 @@ def _insert_security(store: SQLiteStore, sid: str, ticker: str = "T") -> None:
         (sid,ticker,ticker,"NASDAQ","US","Technology","Software",1,now,now),
     )
     store.connection.commit()
+    SecurityClassificationRepository(store).save(
+        security_id=sid,
+        sector="Technology",
+        industry="Software",
+        effective_from=AS_OF.date(),
+        effective_to=None,
+        available_at=AS_OF,
+        source="TEST_PIT",
+    )
 
 
 def _save_feature(repo: ModelFeatureRepository,sid: str,key: str,value: float) -> None:
