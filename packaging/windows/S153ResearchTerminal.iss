@@ -1,7 +1,7 @@
 [Setup]
 AppId={{B567D9EF-6C73-48CA-B058-57F19C2741D1}
 AppName=S15.3 Research Terminal
-AppVersion=0.0.1
+AppVersion=1.0.6
 AppPublisher=Tancodes
 DefaultDirName={autopf}\S15.3 Research Terminal
 DefaultGroupName=S15.3 Research Terminal
