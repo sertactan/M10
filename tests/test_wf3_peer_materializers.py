@@ -46,7 +46,7 @@ def _save_feature(repo: ModelFeatureRepository,sid: str,key: str,value: float) -
     )
 
 
-def test_peer_observation_materializer_requires_explicit_bucket_and_state(tmp_path: Path) -> None:
+def test_peer_observation_materializer_auto_classifies_bucket_and_allows_explicit_state(tmp_path: Path) -> None:
     store=SQLiteStore(tmp_path/"obs.sqlite"); store.initialize()
     try:
         _insert_security(store,"SEC_T","T")
