@@ -1,0 +1,5 @@
+WF8 production release marker
+Date: 2026-10-07
+Purpose: trigger the Windows Production Build publish path for the completed WF1-WF8 chain.
+Runtime behavior: none.
+Main baseline before marker: 5770e98662560a3d6dc9162539f38d794d68d363
