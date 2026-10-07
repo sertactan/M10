@@ -16,8 +16,10 @@ Default folds:
 2013-2020 reference -> 2021 OOS
 2013-2021 reference -> 2022 OOS
 2013-2022 reference -> 2023 OOS
-2013-2023 reference -> 2024 OOS
-```
+ ```
+
+Final holdout is reserved separately as 2024-2026 and is never part of the
+default development walk-forward folds.
 
 Only WF5 PIT replay observations enter the test panel. READY outcomes are
 evaluation rows; censored/partial observations remain censored and are not
