@@ -877,3 +877,76 @@ CREATE TABLE IF NOT EXISTS wf6_holdout_locks (
 );
 CREATE INDEX IF NOT EXISTS idx_wf6_holdout_source
 ON wf6_holdout_locks(source_wf5_run_id,status,holdout_start,holdout_end);
+
+
+-- WF7: out-of-sample validation and empirical magnitude calibration.
+CREATE TABLE IF NOT EXISTS wf7_validation_runs (
+    run_id TEXT PRIMARY KEY,
+    wf6_run_id TEXT NOT NULL REFERENCES wf6_walk_forward_runs(run_id),
+    model_version TEXT NOT NULL,
+    validation_policy TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS wf7_validation_summary (
+    run_id TEXT PRIMARY KEY REFERENCES wf7_validation_runs(run_id),
+    ready_oos_n INTEGER NOT NULL,
+    scored_ready_n INTEGER NOT NULL,
+    score_coverage_pct REAL,
+    true10_count INTEGER NOT NULL,
+    base_rate_10x_pct REAL,
+    pr_auc_average_precision REAL,
+    probability_head_status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wf7_threshold_metrics (
+    run_id TEXT NOT NULL REFERENCES wf7_validation_runs(run_id),
+    selector TEXT NOT NULL,
+    threshold REAL,
+    selected_n INTEGER NOT NULL,
+    true10_n INTEGER NOT NULL,
+    precision_10x_pct REAL,
+    recall_10x_pct REAL,
+    lift_vs_base REAL,
+    near_miss_rate_pct REAL,
+    magnitude_fp_rate_pct REAL,
+    strong_winner_fp_rate_pct REAL,
+    hard_fp_rate_pct REAL,
+    median_fm252 REAL,
+    median_time_to_10x_sessions REAL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(run_id,selector)
+);
+
+CREATE TABLE IF NOT EXISTS wf7_calibration_buckets (
+    run_id TEXT NOT NULL REFERENCES wf7_validation_runs(run_id),
+    bucket_label TEXT NOT NULL,
+    score_low REAL NOT NULL,
+    score_high REAL NOT NULL,
+    sample_size INTEGER NOT NULL,
+    true10_count INTEGER NOT NULL,
+    p2_plus_pct REAL,
+    p5_plus_pct REAL,
+    p7_plus_pct REAL,
+    p10_plus_pct REAL,
+    median_fm252 REAL,
+    sample_quality TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(run_id,bucket_label)
+);
+
+CREATE TABLE IF NOT EXISTS wf7_route_metrics (
+    run_id TEXT NOT NULL REFERENCES wf7_validation_runs(run_id),
+    route TEXT NOT NULL,
+    sample_size INTEGER NOT NULL,
+    true10_count INTEGER NOT NULL,
+    p10_plus_pct REAL,
+    p5_plus_pct REAL,
+    median_fm252 REAL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(run_id,route)
+);
