@@ -17,6 +17,10 @@ from core.optimization.parallel_scanner import ParallelMarketScanner
 from core.scanner.production import RepositoryCandidateSource
 from core.universe.service import USUniverseService
 from app.ui.parallel_scoring import WorkerLocalCanonicalScorer
+from data.providers.alpha_vantage_pit_universe import (
+    AlphaVantagePitUnavailable,
+    AlphaVantagePitUniverseProvider,
+)
 from data.providers.finnhub_universe import FinnhubUniverseProvider
 from data.providers.massive_universe import MassiveUniverseProvider
 from data.providers.sec_edgar_universe import SECEdgarUniverseProvider
@@ -96,6 +100,24 @@ class DesktopScannerService:
         except Exception as exc:
             public_error = f"public PIT archive unavailable: {exc}"
 
+        alpha_error: str | None = None
+        alpha = AlphaVantagePitUniverseProvider()
+        if alpha.configured:
+            try:
+                alpha_records = asyncio.run(
+                    alpha.list_historical_us_securities(as_of_date)
+                )
+                repository.bulk_upsert_historical_snapshot(
+                    alpha_records,
+                    snapshot_date=as_of_date,
+                )
+                if repository.universe_as_of(as_of_date):
+                    return
+            except AlphaVantagePitUnavailable as exc:
+                alpha_error = str(exc)
+            except Exception as exc:
+                alpha_error = f"Alpha Vantage PIT unavailable: {exc}"
+
         massive = MassiveUniverseProvider()
         if massive.configured:
             service = USUniverseService(
@@ -105,6 +127,7 @@ class DesktopScannerService:
                 ),
                 massive=massive,
                 finnhub=FinnhubUniverseProvider(),
+                alpha_vantage=alpha,
             )
             asyncio.run(
                 service.sync(
@@ -116,17 +139,18 @@ class DesktopScannerService:
             if repository.universe_as_of(as_of_date):
                 return
 
-        detail = (
-            f" Public fallback: {public_error}."
-            if public_error
-            else ""
-        )
+        details = []
+        if public_error:
+            details.append(f"Stock-Data PIT: {public_error}")
+        if alpha_error:
+            details.append(f"Alpha Vantage PIT: {alpha_error}")
+        detail = (" " + " | ".join(details) + ".") if details else ""
         raise RuntimeError(
             "Historical PIT universe is not available for this date."
             + detail
-            + " For older dates configure MASSIVE_API_KEY or import a "
-              "PIT-capable historical universe. Current-universe substitution "
-              "is forbidden."
+            + " Set free ALPHAVANTAGE_API_KEY, configure MASSIVE_API_KEY, or "
+              "import a PIT-capable historical universe. Current-universe "
+              "substitution is forbidden."
         )
 
     def scan(self, *, as_of_date: date, on_progress=None):

@@ -1,13 +1,15 @@
 universe:
   primary: SEC_EDGAR
   passive_cache: BUNDLED_SEC_SNAPSHOT
+  historical_pit_primary_free: ALPHAVANTAGE_PIT
   historical_pit_accelerator: MASSIVE
   validation_fallback: FINNHUB
   optional_fallback: FMP
   exchanges: [XNAS, XNYS, XASE]
   security_types: [CS]
   include_delisted_default: true
-  historical_requires_massive: true
+  historical_requires_massive: false
+  historical_requires_pit_source: true
 
 prices:
   optional_accelerators:
@@ -48,6 +50,12 @@ sec_edgar:
   max_requests_per_second: 8
   timeout_seconds: 30
   max_retries: 3
+
+alpha_vantage:
+  enabled: true
+  base_url: "https://www.alphavantage.co/query"
+  api_key_env: "ALPHAVANTAGE_API_KEY"
+  role: "free_historical_pit_universe"
 
 massive:
   enabled: true
@@ -97,6 +105,7 @@ async_racing:
   default_provider_concurrency: 2
   provider_concurrency_limits:
     SEC_EDGAR: 1
+    ALPHAVANTAGE_PIT: 1
     MASSIVE: 2
     STOOQ: 2
     SIMFIN: 2

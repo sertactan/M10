@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
+from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
 from data.providers.finnhub_universe import FinnhubUniverseProvider
 from data.providers.massive_universe import MassiveUniverseProvider
 from data.providers.sec_edgar_universe import SECEdgarUniverseProvider
@@ -29,11 +30,13 @@ class USUniverseService:
         sec: SECEdgarUniverseProvider,
         massive: MassiveUniverseProvider,
         finnhub: FinnhubUniverseProvider,
+        alpha_vantage: AlphaVantagePitUniverseProvider | None = None,
     ) -> None:
         self.repository = repository
         self.sec = sec
         self.massive = massive
         self.finnhub = finnhub
+        self.alpha_vantage = alpha_vantage or AlphaVantagePitUniverseProvider()
 
     async def sync(
         self,
@@ -76,16 +79,28 @@ class USUniverseService:
                     ticker_events_loaded += len(events)
         else:
             # Historical PIT membership cannot be reconstructed from current SEC
-            # symbol lists. Massive remains an optional accelerator required only
-            # for this explicit historical-PIT request.
-            if not self.massive.configured:
-                raise RuntimeError(
-                    "Historical US universe sync requires MASSIVE_API_KEY because SEC/Finnhub "
-                    "symbol lists are current-reference sources, not PIT universe archives."
+            # symbol lists. Prefer the free Alpha Vantage dated listing-status
+            # endpoint when configured; Massive remains an optional accelerator.
+            if self.alpha_vantage.configured:
+                active_records = await self.alpha_vantage.list_historical_us_securities(as_of)
+                active_loaded = self.repository.bulk_upsert_historical_snapshot(
+                    active_records,
+                    snapshot_date=as_of,
                 )
-            active_records = await self.massive.list_us_securities(as_of=as_of, active=True)
-            active_loaded = self.repository.bulk_upsert(active_records, snapshot_date=as_of)
-            source_mode = "MASSIVE_PIT"
+                source_mode = "ALPHAVANTAGE_PIT"
+            elif self.massive.configured:
+                active_records = await self.massive.list_us_securities(as_of=as_of, active=True)
+                active_loaded = self.repository.bulk_upsert_historical_snapshot(
+                    active_records,
+                    snapshot_date=as_of,
+                )
+                source_mode = "MASSIVE_PIT"
+            else:
+                raise RuntimeError(
+                    "Historical US universe sync requires a PIT-capable source. "
+                    "Set free ALPHAVANTAGE_API_KEY for dated LISTING_STATUS snapshots "
+                    "or configure MASSIVE_API_KEY."
+                )
 
         snapshot_count = len(self.repository.universe_as_of(as_of))
         return UniverseSyncResult(

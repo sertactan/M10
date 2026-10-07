@@ -155,7 +155,7 @@ class _MassiveOff:
 
 
 @pytest.mark.asyncio
-async def test_historical_pit_still_fails_closed_without_optional_massive(tmp_path) -> None:
+async def test_historical_pit_still_fails_closed_without_any_pit_source(tmp_path) -> None:
     store = SQLiteStore(tmp_path / "ops.sqlite")
     store.initialize()
     try:
@@ -166,7 +166,7 @@ async def test_historical_pit_still_fails_closed_without_optional_massive(tmp_pa
             finnhub=_FinnhubOff(),
         )
         historical = datetime.now(timezone.utc).date() - timedelta(days=30)
-        with pytest.raises(RuntimeError, match="Historical US universe sync requires MASSIVE_API_KEY"):
+        with pytest.raises(RuntimeError, match="requires a PIT-capable source"):
             await service.sync(as_of=historical)
     finally:
         store.close()
