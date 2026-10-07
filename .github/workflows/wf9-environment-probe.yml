@@ -1,0 +1,41 @@
+name: WF9 Environment Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/wf9-environment-probe.yml"
+      - "scripts/wf9_environment_probe.py"
+      - "scripts/sync_free_pit_universe.py"
+      - "scripts/bootstrap_wf9_canonical_data.py"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+      MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+      MARKETPARQUET_ROOT: ${{ vars.MARKETPARQUET_ROOT }}
+      SIMFIN_PRICE_BULK_PATH: ${{ vars.SIMFIN_PRICE_BULK_PATH }}
+      WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+      WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+      WF9_PROBE_OUTPUT: wf9_probe/WF9_ENVIRONMENT_PROBE.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Probe configured production inputs
+        run: python scripts/wf9_environment_probe.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WF9-Environment-Probe
+          path: wf9_probe/WF9_ENVIRONMENT_PROBE.json
