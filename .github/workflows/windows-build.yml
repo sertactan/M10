@@ -324,44 +324,39 @@ jobs:
             dist_installer/SHA256.txt
             dist_installer/WF8E_RELEASE_EVIDENCE.json
 
-      - name: Publish GitHub Release v1.0.4
+      - name: Publish GitHub Release
         if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $repo = "${{ github.repository }}"
-          $tag = "v1.0.4"
+          $version = (Get-Content "config/RELEASE_VERSION.txt" -Raw).Trim()
+          if (-not $version) { throw "config/RELEASE_VERSION.txt is empty" }
+          $tag = "v$version"
           $setup = "dist_installer/S153ResearchTerminal-Setup.exe"
           $sha = "dist_installer/SHA256.txt"
           $wf8e = "dist_installer/WF8E_RELEASE_EVIDENCE.json"
-          $title = "S15.3 Research Terminal v1.0.4"
+          $title = "S15.3 Research Terminal v$version"
           $notes = @"
-          S15.3 Research Terminal v1.0.4.
+          S15.3 Research Terminal v$version.
 
           Includes:
-          - Windows Setup installer
-          - canonical DNA60 N/A-weight renormalization
-          - live market-scanner progress
-          - SHA256-verified public PIT historical-universe fallback for dates from 2026-07-28
-          - strict refusal before the public PIT archive boundary
-          - SHA256 checksum
-          - on-demand single-ticker historical FM252/backtest from adjusted canonical price cache
-          - progressive bounded SEC fallback for faster first-run scanner response
-          - actionable scanner ordering (final scores first, then partial DNA60)
-          - expanded deterministic canonical factors D05/D06/D38
-          - partial DNA60/S15.2 display when final canonical gates remain incomplete
-          - explicit missing-gate diagnostics
-          - SEC bulk 403 fallback to paced data.sec.gov Company Facts API
-          - direct Stooq static US bulk ZIP fallback
-          - Windows clean-install, recovery, migration and installer smoke tests
+          - S15.3 V1.4.1 production scoring
+          - WF1-WF8 free/PIT walk-forward data and validation chain
+          - WF7 OOS empirical magnitude calibration
+          - WF8 production hardening, reproducibility manifest, tamper detection and rollback-safe activation
+          - one-command production evidence orchestrator
+          - Windows clean-install, corrupt-DB recovery and upgrade-migration smoke tests
+          - WF8-E final runtime/release evidence
+          - installer SHA-256
           "@
 
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $setup $sha $wf8e --clobber --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            gh release edit $tag --title $title --notes $notes --latest --repo $repo
+            gh release edit $tag --target "${{ github.sha }}" --title $title --notes $notes --latest --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           else {
