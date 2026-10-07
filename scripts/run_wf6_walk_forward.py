@@ -14,7 +14,7 @@ def main() -> int:
     parser.add_argument("--wf5-run-id", required=True)
     parser.add_argument("--reference-start-year", type=int, default=2013)
     parser.add_argument("--first-test-year", type=int, default=2018)
-    parser.add_argument("--last-test-year", type=int, default=2024)
+    parser.add_argument("--last-test-year", type=int, default=2023)
     parser.add_argument("--run-id", default=None)
     args=parser.parse_args()
 
