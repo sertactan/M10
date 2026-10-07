@@ -43,11 +43,34 @@ from data.repositories.validation_repository import ValidationRepository
 from data.storage.parquet_price_store import ParquetPriceStore
 
 
+WF8_RUNTIME_TABLES = (
+    "wf5_replay_runs",
+    "wf6_walk_forward_runs",
+    "wf7_validation_runs",
+    "wf8_hardening_runs",
+    "wf8_reproducibility_manifests",
+    "wf8_production_activations",
+    "wf8_activation_events",
+)
+
+
 def doctor(root: Path) -> int:
     app = AppContainer(root)
     app.initialize()
     try:
         readiness = check_release_readiness(root)
+        existing_tables = {
+            str(row["name"])
+            for row in app.sqlite.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        missing_wf8_tables = sorted(set(WF8_RUNTIME_TABLES) - existing_tables)
+        runtime_blockers = list(readiness.blockers)
+        runtime_blockers.extend(
+            f"WF8_SCHEMA_TABLE_MISSING:{name}"
+            for name in missing_wf8_tables
+        )
         print(f"APP: {app.app_config.app_name}")
         print(f"MARKET: {app.app_config.market}")
         print(f"PIT: {'STRICT' if app.app_config.strict_pit else 'OFF'}")
@@ -69,10 +92,19 @@ def doctor(root: Path) -> int:
             print(f"SQLITE RECOVERED FROM: {app.sqlite.last_recovery_backup}")
         else:
             print("SQLITE RECOVERY: NOT NEEDED")
-        print(f"RELEASE READY: {'YES' if readiness.ready else 'NO'}")
-        if readiness.blockers:
-            print("BLOCKERS: " + ", ".join(readiness.blockers))
-        return 0 if readiness.ready else 1
+        print(
+            "WF8 RUNTIME SCHEMA: "
+            + ("READY" if not missing_wf8_tables else "INCOMPLETE")
+        )
+        print(
+            "WF8 TABLES: "
+            + ", ".join(WF8_RUNTIME_TABLES)
+        )
+        ready = not runtime_blockers
+        print(f"RELEASE READY: {'YES' if ready else 'NO'}")
+        if runtime_blockers:
+            print("BLOCKERS: " + ", ".join(runtime_blockers))
+        return 0 if ready else 1
     finally:
         app.close()
 
