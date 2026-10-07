@@ -509,6 +509,51 @@ def import_stooq_bulk_for_scanner(app: AppContainer, zip_path: str | Path) -> tu
     return series_count, bars_count
 
 
+def ensure_stooq_raw_all_known(
+    app: AppContainer,
+    *,
+    minimum_coverage_ratio: float = 0.70,
+    force_refresh: bool = False,
+) -> tuple[int, int]:
+    """Bootstrap raw Stooq history for active and inactive known US securities.
+
+    This is deliberately RAW_ONLY/SCANNER_BOOTSTRAP. It improves feature and
+    discovery coverage but is never promoted to canonical adjusted backtest
+    evidence.
+    """
+    universe = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(DISTINCT security_id) AS n
+        FROM security_master
+        WHERE market='US' AND exchange IN ('NASDAQ','NYSE','AMEX')
+        """
+    ).fetchone()
+    total = int(universe["n"] or 0)
+    if total <= 0:
+        return 0, 0
+
+    covered = app.sqlite.connection.execute(
+        """
+        SELECT COUNT(DISTINCT p.security_id) AS n
+        FROM price_series_registry p
+        JOIN security_master s ON s.security_id=p.security_id
+        WHERE p.source='STOOQ'
+          AND s.market='US'
+          AND s.exchange IN ('NASDAQ','NYSE','AMEX')
+        """
+    ).fetchone()
+    current = int(covered["n"] or 0)
+    if not force_refresh and current / total >= minimum_coverage_ratio:
+        return current, 0
+
+    bulk_dir = app.resolve_data_path("bulk/stooq")
+    zip_path = bulk_dir / "us_daily.zip"
+    if force_refresh or not zip_path.exists():
+        download_stooq_us_daily_ascii(zip_path)
+
+    return import_stooq_bulk_for_scanner(app, zip_path)
+
+
 def ensure_stooq_scanner_bulk(
     app: AppContainer,
     *,
