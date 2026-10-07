@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.destination_peer_repository import DestinationPeerRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
+from data.repositories.security_classification_repository import SecurityClassificationRepository
 from core.features.wf3_peer_policy import (
     POLICY_VERSION,
     market_cap_bucket as classify_market_cap_bucket,
@@ -37,6 +38,7 @@ class DestinationPeerObservationMaterializer:
         self.store = store
         self.features = features
         self.peers = peers
+        self.classifications = SecurityClassificationRepository(store)
 
     def materialize(
         self,
@@ -50,15 +52,17 @@ class DestinationPeerObservationMaterializer:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
         security = self.store.connection.execute(
-            "SELECT sector,industry FROM security_master WHERE security_id=?",
+            "SELECT 1 FROM security_master WHERE security_id=?",
             (security_id,),
         ).fetchone()
         if security is None:
             raise ValueError(f"unknown security_id: {security_id}")
-        sector = str(security["sector"] or "").strip()
-        industry = str(security["industry"] or "").strip()
-        if not sector or not industry:
+
+        classification = self.classifications.as_of(security_id, as_of)
+        if classification is None:
             return None
+        sector = str(classification["sector"]).strip()
+        industry = str(classification["industry"]).strip()
 
         rows = self.features.load_as_of(security_id, as_of)
         def value(key: str) -> float | None:
@@ -104,5 +108,7 @@ class DestinationPeerObservationMaterializer:
             evidence={
                 "source_feature_keys": sorted(key for key in RAW_KEYS if key in rows and rows[key].get("value") is not None),
                 "classification_policy": POLICY_VERSION,
+                "classification_source": classification["source"],
+                "classification_available_at": classification["available_at"],
             },
         )
