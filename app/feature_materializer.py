@@ -374,6 +374,15 @@ class CanonicalFeatureMaterializer:
         put("F54_DIL", dil, diluted_share_cagr=share_cagr)
         put("DIL", dil, source="F54_DIL")
 
+        # WF3 profitability-state evidence. These are raw PIT values, never
+        # 0-100 model scores.
+        ttm_revenue_state = snapshot.ttm.get("REVENUE")
+        ttm_operating_income_state = snapshot.ttm.get("OPERATING_INCOME")
+        ttm_fcf_state = snapshot.ttm.get("FREE_CASH_FLOW")
+        put("RAW_TTM_REVENUE", ttm_revenue_state, source="PIT_TTM")
+        put("RAW_TTM_OPERATING_INCOME", ttm_operating_income_state, source="PIT_TTM")
+        put("RAW_TTM_FCF", ttm_fcf_state, source="PIT_TTM")
+
         # Current market cap uses canonical price × latest available shares.
         current_price = values.get("RAW_CURRENT_PRICE", (None, {}))[0]
         latest_shares = snapshot.facts.get("SHARES_OUTSTANDING")

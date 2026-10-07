@@ -6,6 +6,7 @@ from pathlib import Path
 from core.features.peer_cohort import (
     PeerObservation,
     evaluate_exact_peer_cohort,
+    evaluate_peer_cohort,
 )
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.destination_peer_repository import DestinationPeerRepository
@@ -99,3 +100,32 @@ def test_destination_peer_repository_preserves_pit_and_classifications(tmp_path:
         assert rows[0].market_cap_bucket == "BUCKET_A"
     finally:
         store.close()
+
+
+
+def test_policy_expands_from_exact_to_route_only_until_n30() -> None:
+    target=_obs(999)
+    # Exact cohort deliberately too small. Thirty route-matched peers exist
+    # outside the target sector; E5_ROUTE_ONLY is the first stage reaching 30.
+    peers=[]
+    for i in range(10):
+        peers.append(_obs(i))
+    for i in range(10,40):
+        row=_obs(i)
+        peers.append(PeerObservation(
+            security_id=row.security_id,
+            as_of_month=row.as_of_month,
+            route=row.route,
+            sector="Healthcare",
+            industry="Biotech",
+            market_cap_bucket=row.market_cap_bucket,
+            profitability_state=row.profitability_state,
+            market_cap=row.market_cap,
+            sales_multiple=row.sales_multiple,
+            ebitda_multiple=row.ebitda_multiple,
+            fcf_multiple=row.fcf_multiple,
+        ))
+    result=evaluate_peer_cohort(target,peers)
+    assert result.cohort_n == 40
+    assert result.expansion_stage == "E5_ROUTE_ONLY"
+    assert result.sales.p90 is not None

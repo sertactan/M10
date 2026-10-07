@@ -707,3 +707,21 @@ CREATE INDEX IF NOT EXISTS idx_destination_peer_lookup
 ON destination_peer_observations(
     as_of_month,route,sector,industry,market_cap_bucket,profitability_state,available_at
 );
+
+
+-- WF3: point-in-time sector/industry classification history.
+CREATE TABLE IF NOT EXISTS security_classification_history (
+    classification_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    sector TEXT NOT NULL,
+    industry TEXT NOT NULL,
+    effective_from TEXT NOT NULL,
+    effective_to TEXT,
+    available_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_document TEXT,
+    quality_status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_classification_pit
+ON security_classification_history(security_id,effective_from,effective_to,available_at);

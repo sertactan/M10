@@ -9,6 +9,7 @@ from core.features.peer_observation_materializer import DestinationPeerObservati
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.destination_peer_repository import DestinationPeerRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
+from data.repositories.security_classification_repository import SecurityClassificationRepository
 
 
 AS_OF=datetime(2024,6,30,23,59,tzinfo=timezone.utc)
@@ -25,6 +26,15 @@ def _insert_security(store: SQLiteStore, sid: str, ticker: str = "T") -> None:
         (sid,ticker,ticker,"NASDAQ","US","Technology","Software",1,now,now),
     )
     store.connection.commit()
+    SecurityClassificationRepository(store).save(
+        security_id=sid,
+        sector="Technology",
+        industry="Software",
+        effective_from=AS_OF.date(),
+        effective_to=None,
+        available_at=AS_OF,
+        source="TEST_PIT",
+    )
 
 
 def _save_feature(repo: ModelFeatureRepository,sid: str,key: str,value: float) -> None:
@@ -36,7 +46,7 @@ def _save_feature(repo: ModelFeatureRepository,sid: str,key: str,value: float) -
     )
 
 
-def test_peer_observation_materializer_requires_explicit_bucket_and_state(tmp_path: Path) -> None:
+def test_peer_observation_materializer_auto_classifies_bucket_and_allows_explicit_state(tmp_path: Path) -> None:
     store=SQLiteStore(tmp_path/"obs.sqlite"); store.initialize()
     try:
         _insert_security(store,"SEC_T","T")
@@ -45,11 +55,15 @@ def test_peer_observation_materializer_requires_explicit_bucket_and_state(tmp_pa
         _save_feature(features,"SEC_T","RAW_CURRENT_MARKET_CAP",1000.0)
         _save_feature(features,"SEC_T","RAW_EV_TO_SALES_TTM",5.0)
         m=DestinationPeerObservationMaterializer(store,features,peers)
-        assert m.materialize(security_id="SEC_T",route="F10",as_of=AS_OF,market_cap_bucket="",profitability_state="STATE_A") is None
-        oid=m.materialize(security_id="SEC_T",route="F10",as_of=AS_OF,market_cap_bucket="BUCKET_A",profitability_state="STATE_A")
+        oid=m.materialize(
+            security_id="SEC_T",route="F10",as_of=AS_OF,
+            market_cap_bucket="",profitability_state="STATE_A",
+        )
         assert oid is not None
         row=peers.load_month(as_of_month="2024-06",as_of=AS_OF)[0]
         assert row.sales_multiple == 5.0
+        assert row.market_cap_bucket == "MICRO"
+        assert row.profitability_state == "STATE_A"
     finally:
         store.close()
 

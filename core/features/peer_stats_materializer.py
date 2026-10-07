@@ -2,19 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from core.features.peer_cohort import PeerObservation, evaluate_exact_peer_cohort
+from core.features.peer_cohort import PeerObservation, evaluate_peer_cohort
+from core.features.wf3_peer_policy import POLICY_VERSION
 from data.repositories.destination_peer_repository import DestinationPeerRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
 
 
 class DestinationPeerStatsMaterializer:
-    """Write canonical peer statistics from an exact PIT cohort.
+    """Write PIT peer statistics using frozen WF3 Peer Policy V1."""
 
-    N<30 expansion is deliberately not performed because the canonical source
-    freezes neither bucket definitions nor the expansion sequence.
-    """
-
-    VERSION = "wf3-peer-stats-v1"
+    VERSION = "wf3-peer-stats-v2-policy-v1"
 
     def __init__(self, peers: DestinationPeerRepository, features: ModelFeatureRepository) -> None:
         self.peers = peers
@@ -38,6 +35,7 @@ class DestinationPeerStatsMaterializer:
                 "peer_metric_n": metric_n,
                 "peer_cohort_n": cohort_n,
                 "cohort_status": cohort_status,
+                "peer_policy": POLICY_VERSION,
                 "peer_key": {
                     "as_of_month": target.as_of_month,
                     "route": target.route,
@@ -54,7 +52,7 @@ class DestinationPeerStatsMaterializer:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
         rows = self.peers.load_month(as_of_month=target.as_of_month, as_of=as_of)
-        result = evaluate_exact_peer_cohort(target, rows)
+        result = evaluate_peer_cohort(target, rows)
         if result.cohort_n < 30:
             return {}
 

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from math import floor
 from typing import Iterable
 
+from core.features.wf3_peer_policy import POLICY_VERSION, expansion_stages
+
 
 @dataclass(frozen=True)
 class PeerObservation:
@@ -33,6 +35,7 @@ class PeerMetricStats:
 class PeerCohortResult:
     cohort_n: int
     cohort_status: str
+    expansion_stage: str
     sales: PeerMetricStats
     ebitda: PeerMetricStats
     fcf: PeerMetricStats
@@ -132,6 +135,97 @@ def evaluate_exact_peer_cohort(
     return PeerCohortResult(
         cohort_n=cohort_n,
         cohort_status=cohort_status,
+        expansion_stage="E0_EXACT",
+        sales=sales,
+        ebitda=ebitda,
+        fcf=fcf,
+        market_cap=market_cap,
+        blockers=tuple(dict.fromkeys(blockers)),
+    )
+
+
+
+def _matches_stage(
+    target: PeerObservation,
+    candidate: PeerObservation,
+    *,
+    stage,
+) -> bool:
+    if candidate.security_id == target.security_id:
+        return False
+    if candidate.as_of_month != target.as_of_month:
+        return False
+    if candidate.route != target.route:
+        return False
+    if stage.require_sector and candidate.sector != target.sector:
+        return False
+    if stage.require_industry and candidate.industry != target.industry:
+        return False
+    if stage.allowed_buckets is not None and candidate.market_cap_bucket not in stage.allowed_buckets:
+        return False
+    if stage.require_profitability and candidate.profitability_state != target.profitability_state:
+        return False
+    return True
+
+
+def evaluate_peer_cohort(
+    target: PeerObservation,
+    observations: Iterable[PeerObservation],
+) -> PeerCohortResult:
+    """WF3 Peer Policy V1 expansion.
+
+    The first stage with at least 30 peers is selected. If no stage reaches 30,
+    all percentile legs remain N/A. Month and route never relax.
+    """
+    rows = list(observations)
+    selected = []
+    selected_stage = None
+    for stage in expansion_stages(target.market_cap_bucket):
+        candidates = [
+            row for row in rows
+            if _matches_stage(target, row, stage=stage)
+        ]
+        if len(candidates) >= 30:
+            selected = candidates
+            selected_stage = stage
+            break
+
+    if selected_stage is None:
+        return PeerCohortResult(
+            cohort_n=0,
+            cohort_status="INSUFFICIENT_AFTER_EXPANSION",
+            expansion_stage="NONE",
+            sales=_stats([]),
+            ebitda=_stats([]),
+            fcf=_stats([]),
+            market_cap=_stats([]),
+            blockers=(
+                "PEER_N_LT_30_AFTER_EXPANSION",
+                f"PEER_POLICY={POLICY_VERSION}",
+            ),
+        )
+
+    cohort_n = len(selected)
+    cohort_status = "NORMAL" if cohort_n >= 50 else "LOW_CONFIDENCE_N_30_49"
+    sales = _stats(row.sales_multiple for row in selected)
+    ebitda = _stats(row.ebitda_multiple for row in selected)
+    fcf = _stats(row.fcf_multiple for row in selected)
+    market_cap = _stats(row.market_cap for row in selected)
+
+    blockers: list[str] = []
+    for key, stats in (
+        ("SALES_MULTIPLE", sales),
+        ("EBITDA_MULTIPLE", ebitda),
+        ("FCF_MULTIPLE", fcf),
+        ("MARKET_CAP", market_cap),
+    ):
+        if stats.n < 30:
+            blockers.append(f"{key}_PEER_N_LT_30")
+
+    return PeerCohortResult(
+        cohort_n=cohort_n,
+        cohort_status=cohort_status,
+        expansion_stage=selected_stage.name,
         sales=sales,
         ebitda=ebitda,
         fcf=fcf,
