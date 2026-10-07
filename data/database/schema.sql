@@ -795,3 +795,64 @@ CREATE TABLE IF NOT EXISTS wf5_replay_observations (
 );
 CREATE INDEX IF NOT EXISTS idx_wf5_replay_date
 ON wf5_replay_observations(run_id,as_of_date,v141_status);
+
+
+-- WF6: expanding-window out-of-sample validation panel.
+CREATE TABLE IF NOT EXISTS wf6_walk_forward_runs (
+    run_id TEXT PRIMARY KEY,
+    source_wf5_run_id TEXT NOT NULL REFERENCES wf5_replay_runs(run_id),
+    reference_start_year INTEGER NOT NULL,
+    first_test_year INTEGER NOT NULL,
+    last_test_year INTEGER NOT NULL,
+    v12_version TEXT NOT NULL,
+    v141_version TEXT NOT NULL,
+    leakage_policy TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS wf6_walk_forward_folds (
+    fold_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES wf6_walk_forward_runs(run_id),
+    fold_index INTEGER NOT NULL,
+    reference_start_date TEXT NOT NULL,
+    reference_end_date TEXT NOT NULL,
+    test_start_date TEXT NOT NULL,
+    test_end_date TEXT NOT NULL,
+    status TEXT NOT NULL,
+    oos_observations INTEGER NOT NULL DEFAULT 0,
+    ready_outcomes INTEGER NOT NULL DEFAULT 0,
+    censored_outcomes INTEGER NOT NULL DEFAULT 0,
+    v141_ready INTEGER NOT NULL DEFAULT 0,
+    same_security_overlap INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_wf6_fold_run
+ON wf6_walk_forward_folds(run_id,fold_index,test_start_date);
+
+CREATE TABLE IF NOT EXISTS wf6_oos_observations (
+    fold_id TEXT NOT NULL REFERENCES wf6_walk_forward_folds(fold_id),
+    source_observation_id TEXT NOT NULL,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    ticker TEXT NOT NULL,
+    as_of_date TEXT NOT NULL,
+    primary_route TEXT,
+    v12_score REAL,
+    v12_status TEXT NOT NULL,
+    v141_score REAL,
+    v141_status TEXT NOT NULL,
+    outcome_status TEXT NOT NULL,
+    fm252 REAL,
+    outcome_class TEXT,
+    time_to_2x_sessions INTEGER,
+    time_to_5x_sessions INTEGER,
+    time_to_10x_sessions INTEGER,
+    max_multiple_observed REAL,
+    repeated_security INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(fold_id,source_observation_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wf6_oos_ready
+ON wf6_oos_observations(fold_id,outcome_status,v141_score,primary_route);
