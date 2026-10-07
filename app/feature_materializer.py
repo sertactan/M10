@@ -5,6 +5,11 @@ from statistics import median
 
 from app.bootstrap import AppContainer
 from core.fundamentals.snapshot import FundamentalSnapshotService
+from core.features.wf_raw_metrics import (
+    exact_period_per_share_series,
+    latest_cagr,
+    latest_growth,
+)
 from core.scoring.math import accel_score, piecewise_score, pos_score, wa
 from data.repositories.fundamental_repository import FundamentalRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
@@ -106,7 +111,7 @@ class CanonicalFeatureMaterializer:
     absent. No synthetic 50s/defaults are written.
     """
 
-    VERSION = "canonical-materializer-v2"
+    VERSION = "canonical-materializer-v3-wf2-raw-evidence"
 
     def __init__(self, app: AppContainer) -> None:
         self.app = app
@@ -197,6 +202,47 @@ class CanonicalFeatureMaterializer:
         shares = _metric_series(facts, "SHARES_OUTSTANDING")
         eps = _annual_series(facts, "DILUTED_EPS")
         fcf = _annual_fcf(facts)
+
+        # WF2 raw evidence: the canonical sources define RPS/FPS concepts, but
+        # their final 0-100 normalization is not frozen. Persist conservative
+        # raw evidence only; never promote these raw rows to F52/F53 scores.
+        rps_points = exact_period_per_share_series(rev, shares)
+        fcf_rows = [{"period_end": p, "value": v} for p, v, _available in fcf]
+        fps_points = exact_period_per_share_series(fcf_rows, shares)
+        if rps_points:
+            put(
+                "RAW_REVENUE_PER_SHARE",
+                rps_points[-1].value,
+                period_end=rps_points[-1].period_end,
+                rule="exact-period revenue / shares; no cross-period share proxy",
+            )
+            put(
+                "RAW_RPS_GROWTH_1Y",
+                latest_growth(rps_points),
+                periods=[p.period_end for p in rps_points[-2:]],
+            )
+            put(
+                "RAW_RPS_CAGR_3Y",
+                latest_cagr(rps_points, 3),
+                periods=[p.period_end for p in rps_points[-4:]],
+            )
+        if fps_points:
+            put(
+                "RAW_FCF_PER_SHARE",
+                fps_points[-1].value,
+                period_end=fps_points[-1].period_end,
+                rule="exact-period FCF / shares; no cross-period share proxy",
+            )
+            put(
+                "RAW_FPS_GROWTH_1Y",
+                latest_growth(fps_points),
+                periods=[p.period_end for p in fps_points[-2:]],
+            )
+            put(
+                "RAW_FPS_CAGR_3Y",
+                latest_cagr(fps_points, 3),
+                periods=[p.period_end for p in fps_points[-4:]],
+            )
 
         rev_vals = [float(x["value"]) for x in rev]
         rev_1y = _growth(rev_vals[-1], rev_vals[-2]) if len(rev_vals) >= 2 else None
@@ -334,6 +380,46 @@ class CanonicalFeatureMaterializer:
         if current_price is not None and latest_shares is not None:
             mc = current_price * float(latest_shares["value"])
             put("RAW_CURRENT_MARKET_CAP", mc, price=current_price, shares=float(latest_shares["value"]))
+
+            # WF2 raw valuation evidence. PIR_VAL remains N/A until the frozen
+            # growth-adjusted peer-percentile construction is fully available.
+            ttm_revenue = snapshot.ttm.get("REVENUE")
+            ttm_fcf = snapshot.ttm.get("FREE_CASH_FLOW")
+            if ttm_revenue is not None and ttm_revenue > 0:
+                put(
+                    "RAW_PRICE_TO_SALES_TTM",
+                    mc / float(ttm_revenue),
+                    market_cap=mc,
+                    ttm_revenue=float(ttm_revenue),
+                )
+            if ttm_fcf is not None and ttm_fcf > 0:
+                put(
+                    "RAW_PRICE_TO_FCF_TTM",
+                    mc / float(ttm_fcf),
+                    market_cap=mc,
+                    ttm_fcf=float(ttm_fcf),
+                )
+            cash = snapshot.facts.get("CASH")
+            debt = snapshot.facts.get("LONG_TERM_DEBT")
+            if cash is not None or debt is not None:
+                cash_value = float(cash["value"]) if cash is not None else 0.0
+                debt_value = float(debt["value"]) if debt is not None else 0.0
+                net_debt = debt_value - cash_value
+                put(
+                    "RAW_NET_DEBT",
+                    net_debt,
+                    long_term_debt=debt_value,
+                    cash=cash_value,
+                    note="long-term debt minus cash; no unverified short-term-debt proxy",
+                )
+                if ttm_revenue is not None and ttm_revenue > 0:
+                    enterprise_value = mc + net_debt
+                    put(
+                        "RAW_EV_TO_SALES_TTM",
+                        enterprise_value / float(ttm_revenue),
+                        enterprise_value=enterprise_value,
+                        ttm_revenue=float(ttm_revenue),
+                    )
 
         # Viability: canonical CASH leg, plus DIL via model.
         current_fcf = snapshot.ttm.get("FREE_CASH_FLOW")
