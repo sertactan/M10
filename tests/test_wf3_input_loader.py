@@ -23,6 +23,16 @@ def _save(repo: ModelFeatureRepository, key: str, value: float) -> None:
 def test_v12_loader_excludes_raw_and_peer_evidence_but_keeps_destination_inputs(tmp_path: Path) -> None:
     store=SQLiteStore(tmp_path/"loader.sqlite"); store.initialize()
     try:
+        now=AS_OF.isoformat()
+        store.connection.execute(
+            """
+            INSERT INTO security_master
+            (security_id,ticker,name,exchange,market,active,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?)
+            """,
+            ("SEC_TEST","TEST","Test","NASDAQ","US",1,now,now),
+        )
+        store.connection.commit()
         repo=ModelFeatureRepository(store)
         for key,value in {
             "RAW_CURRENT_PRICE":10.0,
