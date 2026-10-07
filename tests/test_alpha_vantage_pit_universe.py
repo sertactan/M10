@@ -15,6 +15,9 @@ AAA,AAA Corp,NASDAQ,Stock,2012-01-03,null,Active
 BBB,BBB Corp,NYSE,Stock,2005-06-01,null,Active
 CCC,CCC Corp,NYSE MKT,Stock,2010-04-05,null,Active
 ETF1,ETF Fund,NYSE ARCA,ETF,2018-01-01,null,Active
+SPACU,Example Acquisition Corp - Units,NASDAQ,Stock,2021-01-01,null,Active
+SPACW,Example Acquisition Corp - Warrants,NASDAQ,Stock,2021-01-01,null,Active
+PREF,Example Corp Preferred Series A,NYSE,Stock,2020-01-01,null,Active
 OLD,Old Corp,NASDAQ,Stock,2000-01-01,2014-01-01,Delisted
 """
     rows = AlphaVantagePitUniverseProvider.parse_csv(
