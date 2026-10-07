@@ -14,6 +14,7 @@ Authoritative/free sources already available in the repository:
 - SEC EDGAR Company Facts / filings for PIT fundamentals
 - Stooq bulk/local Parquet for free historical price bootstrap where eligible
 - current SEC universe
+- free-key Alpha Vantage LISTING_STATUS historical snapshots for dates after 2010-01-01
 - public STOCK_DATA_PIT archive only inside its provider-declared reconstructable interval
 
 ### Historical-universe rule
@@ -80,3 +81,16 @@ python scripts/audit_walkforward_readiness.py --all-snapshots
 ```
 
 This audit never upgrades missing evidence to READY.
+
+
+## Free historical-universe backfill
+
+With a free Alpha Vantage key in `ALPHAVANTAGE_API_KEY`:
+
+```
+python scripts/sync_free_pit_universe.py --start 2013-01-01 --end 2024-12-31
+```
+
+The script writes deterministic month-end snapshots, skips already-populated dates,
+and stops cleanly on API/rate-limit responses without deleting completed snapshots.
+This makes the free workflow resumable while preserving PIT provenance.
