@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from math import floor
 from typing import Iterable
 
+from core.features.wf3_peer_policy import POLICY_VERSION, expansion_stages
+
 
 @dataclass(frozen=True)
 class PeerObservation:
@@ -33,6 +35,7 @@ class PeerMetricStats:
 class PeerCohortResult:
     cohort_n: int
     cohort_status: str
+    expansion_stage: str
     sales: PeerMetricStats
     ebitda: PeerMetricStats
     fcf: PeerMetricStats
@@ -132,6 +135,7 @@ def evaluate_exact_peer_cohort(
     return PeerCohortResult(
         cohort_n=cohort_n,
         cohort_status=cohort_status,
+        expansion_stage="E0_EXACT",
         sales=sales,
         ebitda=ebitda,
         fcf=fcf,
