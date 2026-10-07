@@ -304,12 +304,25 @@ jobs:
           Get-FileHash "dist_installer/S153ResearchTerminal-Setup.exe" -Algorithm SHA256 |
             Format-List | Out-File "dist_installer/SHA256.txt"
 
+      - name: WF8-E final release gate
+        shell: pwsh
+        run: |
+          python scripts/check_wf8e_release_gate.py `
+            --root "." `
+            --packaged-root "dist/S153ResearchTerminal/_internal" `
+            --installer "dist_installer/S153ResearchTerminal-Setup.exe" `
+            --sha-file "dist_installer/SHA256.txt" `
+            --commit "${{ github.sha }}" `
+            --output "dist_installer/WF8E_RELEASE_EVIDENCE.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - uses: actions/upload-artifact@v4
         with:
           name: S153ResearchTerminal-Windows
           path: |
             dist_installer/S153ResearchTerminal-Setup.exe
             dist_installer/SHA256.txt
+            dist_installer/WF8E_RELEASE_EVIDENCE.json
 
       - name: Publish GitHub Release v1.0.4
         if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
@@ -321,6 +334,7 @@ jobs:
           $tag = "v1.0.4"
           $setup = "dist_installer/S153ResearchTerminal-Setup.exe"
           $sha = "dist_installer/SHA256.txt"
+          $wf8e = "dist_installer/WF8E_RELEASE_EVIDENCE.json"
           $title = "S15.3 Research Terminal v1.0.4"
           $notes = @"
           S15.3 Research Terminal v1.0.4.
@@ -345,12 +359,12 @@ jobs:
 
           gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $setup $sha --clobber --repo $repo
+            gh release upload $tag $setup $sha $wf8e --clobber --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             gh release edit $tag --title $title --notes $notes --latest --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           else {
-            gh release create $tag $setup $sha --target "${{ github.sha }}" --title $title --notes $notes --latest --repo $repo
+            gh release create $tag $setup $sha $wf8e --target "${{ github.sha }}" --title $title --notes $notes --latest --repo $repo
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
