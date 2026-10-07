@@ -11,6 +11,7 @@ import pytest
 from core.contracts.entities import Security
 from core.contracts.enums import Exchange
 from core.prices.adjustment import split_adjust_raw_close
+from core.prices.engine import HistoricalPriceEngine
 from core.prices.models import (
     AdjustmentStatus,
     PriceQualityStatus,
@@ -25,6 +26,7 @@ from data.providers.massive_price import MassivePriceProvider
 from data.providers.simfin_price import SimFinPriceProvider
 from data.providers.stooq_price import StooqPriceProvider
 from data.providers.yahoo_price import YahooCompatiblePriceProvider
+from data.repositories.price_repository import PriceRepository
 from data.storage.parquet_price_store import ParquetPriceStore, REQUIRED_PRICE_COLUMNS
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -268,3 +270,74 @@ async def test_stooq_symbol_validation_uses_recent_window(monkeypatch) -> None:
     monkeypatch.setattr(provider, "get_history", fake_history)
     assert await provider.validate_symbol(SEC)
     assert seen["days"] == 15
+
+
+@pytest.mark.asyncio
+async def test_historical_price_engine_persists_actual_provider_coverage(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "coverage.db")
+    store.initialize(ROOT / "data" / "database" / "schema.sql")
+    now = NOW.isoformat()
+    store.connection.execute(
+        """
+        INSERT INTO security_master (
+            security_id,ticker,name,exchange,market,active,created_at,updated_at
+        ) VALUES ('SEC_TEST','TEST','Test Corp','NASDAQ','US',1,?,?)
+        """,
+        (now, now),
+    )
+    store.connection.commit()
+
+    class Provider:
+        configured = True
+
+        async def validate_symbol(self, security):
+            return True
+
+        async def get_history(self, security, start, end):
+            return [
+                SourcePriceBar(
+                    security.security_id,
+                    "SIMFIN",
+                    security.ticker,
+                    date(2020, 1, 2),
+                    10, 11, 9, 10, 9.5, 1000,
+                    NOW,
+                    PriceQualityStatus.SECONDARY,
+                    AdjustmentStatus.DUAL_RAW_ADJUSTED,
+                ),
+                SourcePriceBar(
+                    security.security_id,
+                    "SIMFIN",
+                    security.ticker,
+                    date(2024, 12, 31),
+                    20, 21, 19, 20, 19.0, 2000,
+                    NOW,
+                    PriceQualityStatus.SECONDARY,
+                    AdjustmentStatus.DUAL_RAW_ADJUSTED,
+                ),
+            ]
+
+    repo = PriceRepository(store, ParquetPriceStore(tmp_path / "prices"))
+    engine = HistoricalPriceEngine(repo, {"SIMFIN": Provider()})
+    try:
+        await engine.sync_history(
+            SEC,
+            date(2010, 1, 1),
+            date(2026, 1, 1),
+            provider="SIMFIN",
+            require_adjusted=True,
+            validate_with_fallback=False,
+        )
+        row = store.connection.execute(
+            """
+            SELECT start_date,end_date
+            FROM canonical_price_selection
+            WHERE security_id='SEC_TEST' AND purpose='BACKTEST_ADJUSTED'
+            ORDER BY selected_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        assert row["start_date"] == "2020-01-02"
+        assert row["end_date"] == "2024-12-31"
+    finally:
+        store.close()
