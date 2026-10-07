@@ -998,3 +998,36 @@ CREATE TABLE IF NOT EXISTS wf8_reproducibility_manifests (
 );
 CREATE INDEX IF NOT EXISTS idx_wf8_repro_chain
 ON wf8_reproducibility_manifests(hardening_id,status,created_at);
+
+
+-- WF8-D: rollback-safe activation pointer and audit events.
+CREATE TABLE IF NOT EXISTS wf8_production_activations (
+    activation_id TEXT PRIMARY KEY,
+    model_version TEXT NOT NULL,
+    manifest_id TEXT NOT NULL REFERENCES wf8_reproducibility_manifests(manifest_id),
+    hardening_id TEXT NOT NULL REFERENCES wf8_hardening_runs(hardening_id),
+    policy_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    previous_activation_id TEXT REFERENCES wf8_production_activations(activation_id),
+    activated_at TEXT NOT NULL,
+    deactivated_at TEXT,
+    reason TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wf8_one_active_per_model
+ON wf8_production_activations(model_version)
+WHERE status='ACTIVE';
+
+CREATE INDEX IF NOT EXISTS idx_wf8_activation_history
+ON wf8_production_activations(model_version,status,activated_at);
+
+CREATE TABLE IF NOT EXISTS wf8_activation_events (
+    event_id TEXT PRIMARY KEY,
+    model_version TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    from_activation_id TEXT,
+    to_activation_id TEXT,
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wf8_activation_events_model
+ON wf8_activation_events(model_version,created_at);
