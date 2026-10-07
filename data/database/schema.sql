@@ -679,3 +679,31 @@ CREATE TABLE IF NOT EXISTS s16_feature_evidence_source (
 );
 CREATE INDEX IF NOT EXISTS idx_s16_feature_evidence_pit
 ON s16_feature_evidence_source(security_id,feature_key,observed_at,available_at,source);
+
+
+-- WF3: PIT destination peer observations for same-date valuation cohorts.
+CREATE TABLE IF NOT EXISTS destination_peer_observations (
+    observation_id TEXT PRIMARY KEY,
+    security_id TEXT NOT NULL REFERENCES security_master(security_id),
+    as_of_month TEXT NOT NULL,
+    route TEXT NOT NULL,
+    sector TEXT NOT NULL,
+    industry TEXT NOT NULL,
+    market_cap_bucket TEXT NOT NULL,
+    profitability_state TEXT NOT NULL,
+    market_cap REAL,
+    sales_multiple REAL,
+    ebitda_multiple REAL,
+    fcf_multiple REAL,
+    feature_as_of TEXT NOT NULL,
+    available_at TEXT NOT NULL,
+    source_ref TEXT NOT NULL,
+    quality_status TEXT NOT NULL,
+    computation_version TEXT NOT NULL,
+    evidence_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_destination_peer_lookup
+ON destination_peer_observations(
+    as_of_month,route,sector,industry,market_cap_bucket,profitability_state,available_at
+);
