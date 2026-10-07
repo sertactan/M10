@@ -115,6 +115,7 @@ class WalkForwardReadinessAuditor:
               AND u.exchange IN ('NASDAQ','NYSE','AMEX')
               AND p.start_date<=?
               AND p.end_date>=?
+              AND p.purpose IN ('BACKTEST','BACKTEST_ADJUSTED')
             """,
             (d, d, d),
         ).fetchone()
