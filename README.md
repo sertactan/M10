@@ -250,7 +250,7 @@ historical controls, or deterministic canonical derivations. Missing factors rem
 ```powershell
 python scripts/bootstrap_wf9_canonical_data.py --start 2013-01-01 --end 2024-12-31 --sync-universe --provider AUTO
 python scripts/run_wf9_full_execution.py --preflight-only --code-identity <CURRENT_BUILD_COMMIT>
-python scripts/run_wf9_full_execution.py --code-identity <CURRENT_BUILD_COMMIT>
+python scripts/run_wf9_full_execution.py --code-identity <CURRENT_BUILD_COMMIT> --output release_evidence/WF9_PRODUCTION_EVIDENCE.json
 ```
 
-A release must not claim WF9 completion unless the final command returns `COMPLETE_AND_ACTIVATED`.
+A release must not claim WF9 completion unless the final command returns `COMPLETE_AND_ACTIVATED`. The Windows publication workflow also verifies this evidence file and refuses release if runtime code changed after the evidence commit (other than the evidence file and release marker).
