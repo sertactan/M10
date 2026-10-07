@@ -1,6 +1,6 @@
 # WF8 — Production Hardening
 
-Status: STARTED.
+Status: IMPLEMENTED — WF8-A through WF8-E are present; activation of a new historical evidence chain remains dependent on WF9.
 
 Policy: `WF8_PRODUCTION_HARDENING_V1_2026-10-07`.
 
@@ -46,10 +46,11 @@ Only a fully valid evidence chain produces:
 PRODUCTION_EVIDENCE_READY
 ```
 
-## Next WF8 milestones
+## Implemented WF8 milestones
 
-- WF8-B: bind validated WF7 empirical evidence to production forecast/calibration
-  adapters without using legacy/unvalidated cohorts.
-- WF8-C: reproducibility manifest + hashes for WF5/WF6/WF7/WF8 chain.
-- WF8-D: corruption/tamper tests and rollback-safe activation.
-- WF8-E: Windows/runtime smoke test and final release checklist.
+- WF8-B: validated WF7 empirical evidence is bound to production forecast/calibration adapters.
+- WF8-C: reproducibility manifest and hashes protect the WF5/WF6/WF7/WF8 chain.
+- WF8-D: tamper detection and rollback-safe Last-Known-Good activation are implemented.
+- WF8-E: Windows/runtime release gate verifies packaged schema, clean install, corrupt-DB recovery, upgrade migration, installer hash, and release evidence.
+
+These implementation gates do not manufacture a historical production run. A newly generated chain is eligible for production activation only after WF9 supplies real PIT universe and canonical adjusted-price evidence.
