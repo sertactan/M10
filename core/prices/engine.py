@@ -136,9 +136,10 @@ class HistoricalPriceEngine:
         )
         downloaded = []
         selection = None
+        selected_descriptor = None
 
         def accept(result: ProviderRaceResult[list]) -> bool:
-            nonlocal selection
+            nonlocal selection, selected_descriptor
             if result.error is not None or result.value is None:
                 return False
 
@@ -152,6 +153,12 @@ class HistoricalPriceEngine:
                     require_adjusted=require_adjusted,
                     authoritative=True,
                 )
+                selected_descriptor = next(
+                    item
+                    for item in downloaded
+                    if item.source == selection.source
+                    and item.source_symbol == selection.source_symbol
+                )
                 return True
             except PriceSourceMixingError:
                 return False
@@ -164,15 +171,18 @@ class HistoricalPriceEngine:
             accept,
         )
 
-        if selection is None:
+        if selection is None or selected_descriptor is None:
             raise PriceSourceMixingError(
                 "No authoritative single-provider series satisfies this price request"
             )
 
+        # Persist only the dates the selected provider actually supplied.
+        # The previous implementation recorded the requested window, which could
+        # falsely claim canonical coverage before an IPO or after a delisting.
         self.repository.select_series(
             security_id=security.security_id,
-            start=start,
-            end=end,
+            start=selected_descriptor.start_date,
+            end=selected_descriptor.end_date,
             source=selection.source,
             source_symbol=selection.source_symbol,
             purpose="BACKTEST_ADJUSTED" if require_adjusted else "RAW_BOOTSTRAP",

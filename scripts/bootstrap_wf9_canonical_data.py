@@ -96,7 +96,14 @@ def _existing_snapshot_dates(app: AppContainer, start: date, end: date) -> int:
     return int(row["n"] if row is not None else 0)
 
 
-def _already_covered(app: AppContainer, target: WF9PriceTarget, start: date, end: date) -> bool:
+def _already_covered(app: AppContainer, target: WF9PriceTarget) -> bool:
+    """Return true only when canonical prices span the security's PIT membership window.
+
+    A stock is not required to have bars before its IPO or after delisting.
+    Requiring the global WF9 price window would force impossible coverage for
+    legitimate historical names; checking the actual first/last PIT membership
+    dates is the fail-closed condition relevant to WF9 readiness.
+    """
     row = app.sqlite.connection.execute(
         """
         SELECT 1
@@ -107,7 +114,11 @@ def _already_covered(app: AppContainer, target: WF9PriceTarget, start: date, end
           AND end_date>=?
         LIMIT 1
         """,
-        (target.security_id, start.isoformat(), end.isoformat()),
+        (
+            target.security_id,
+            target.first_snapshot.isoformat(),
+            target.last_snapshot.isoformat(),
+        ),
     ).fetchone()
     return row is not None
 
@@ -161,7 +172,7 @@ async def _sync_prices(
 
     async def one(index: int, target: WF9PriceTarget) -> None:
         nonlocal complete
-        if _already_covered(app, target, price_start, price_end):
+        if _already_covered(app, target):
             complete += 1
             print(f"PRICE SKIP {index}/{len(selected_targets)} {target.ticker}: already canonical")
             return
@@ -224,7 +235,8 @@ async def run(
             raise RuntimeError(
                 f"WF9 requires {expected_snapshots} exact monthly PIT snapshots; "
                 f"database has {snapshots}. Run with --sync-universe and a configured "
-                "ALPHAVANTAGE_API_KEY (or import an equivalent PIT-capable archive)."
+                "ALPHAVANTAGE_API_KEY or MASSIVE_API_KEY (or import an equivalent "
+                "PIT-capable archive)."
             )
         if not targets:
             raise RuntimeError("WF9 PIT universe is empty")
