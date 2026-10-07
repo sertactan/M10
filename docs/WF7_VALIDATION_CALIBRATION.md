@@ -1,6 +1,6 @@
 # WF7 — OOS Validation & Empirical Magnitude Calibration
 
-Status: STARTED.
+Status: IMPLEMENTED — production calibration activation remains dependent on a real-data WF9 execution.
 
 Policy: `WF7_VALIDATION_POLICY_V1_2026-10-07`.
 
@@ -51,3 +51,7 @@ N=30-49 is REDUCED_SAMPLE; N>=50 NORMAL.
 
 The S15.3 score itself is **not a probability**. Probability calibration error
 is therefore not reported until an explicit probability head exists.
+
+## Production state
+
+Validation metrics, score-bucket calibration, persistence, and the validated forecast provider are implemented. Production empirical probabilities are released only from a completed WF6/WF7 evidence chain hardened by WF8. No synthetic or empty calibration is promoted while WF9 is pending.
