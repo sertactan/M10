@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from core.features.destination_evidence import (
     capped_peer_multiple,
     plausible_ceiling_mc,
+    supported_mc_biotech,
+    supported_mc_distressed,
     supported_mc_fundamental_inflection,
 )
 from data.repositories.model_feature_repository import ModelFeatureRepository
@@ -21,6 +23,18 @@ FI_RAW_KEYS = {
     "PEER_MEDIAN_EBITDA_MULTIPLE",
     "PEER_P90_FCF_MULTIPLE",
     "PEER_MEDIAN_FCF_MULTIPLE",
+}
+
+D_RAW_KEYS = {
+    "RAW_NORMALIZED_EBITDA_12",
+    "RAW_DISTRESSED_PEER_MULTIPLE",
+    "RAW_POST_RESTRUCTURING_NET_DEBT",
+    "RAW_RESTRUCTURING_EVIDENCE_FACTOR",
+}
+
+B_RAW_KEYS = {
+    "RAW_RNPV_PIPELINE",
+    "RAW_NET_CASH",
 }
 
 CEILING_RAW_KEYS = {
@@ -101,6 +115,52 @@ class DestinationFeatureMaterializer:
                     "single_method_model_fit_penalty": fi.model_fit_penalty,
                     "blockers": list(fi.blockers),
                     "multiple_cap_rule": "min(peer_p90, 2*peer_median)",
+                },
+            )
+
+        distressed = supported_mc_distressed(
+            normalized_ebitda_12=self._value(rows, "RAW_NORMALIZED_EBITDA_12"),
+            peer_multiple=self._value(rows, "RAW_DISTRESSED_PEER_MULTIPLE"),
+            post_restructuring_net_debt=self._value(rows, "RAW_POST_RESTRUCTURING_NET_DEBT"),
+            restructuring_evidence_factor=self._value(rows, "RAW_RESTRUCTURING_EVIDENCE_FACTOR"),
+        )
+        if distressed is not None:
+            available = self._latest_availability(rows, D_RAW_KEYS, as_of)
+            written["SUPPORTED_MC_12_D"] = self.repository.save_feature(
+                security_id=security_id,
+                feature_key="SUPPORTED_MC_12_D",
+                value=distressed,
+                feature_as_of=as_of,
+                available_at=available,
+                source_phase="DERIVED_CANONICAL",
+                source_ref=f"WF3_DESTINATION_D:{security_id}:{as_of.isoformat()}",
+                quality_status="CANONICAL_DERIVED",
+                computation_version="wf3-destination-materializer-v1",
+                evidence={
+                    "rule": "NormalizedEBITDA12*PeerMultiple-PostRestructuringNetDebt, then evidence factor",
+                    "inputs": sorted(key for key in D_RAW_KEYS if key in rows and rows[key].get("value") is not None),
+                },
+            )
+
+        biotech = supported_mc_biotech(
+            pipeline_rnpv=self._value(rows, "RAW_RNPV_PIPELINE"),
+            net_cash=self._value(rows, "RAW_NET_CASH"),
+        )
+        if biotech is not None:
+            available = self._latest_availability(rows, B_RAW_KEYS, as_of)
+            written["SUPPORTED_MC_12_B"] = self.repository.save_feature(
+                security_id=security_id,
+                feature_key="SUPPORTED_MC_12_B",
+                value=biotech,
+                feature_as_of=as_of,
+                available_at=available,
+                source_phase="DERIVED_CANONICAL",
+                source_ref=f"WF3_DESTINATION_B:{security_id}:{as_of.isoformat()}",
+                quality_status="CANONICAL_DERIVED",
+                computation_version="wf3-destination-materializer-v1",
+                evidence={
+                    "rule": "probability-adjusted pipeline rNPV + NetCash",
+                    "inputs": sorted(key for key in B_RAW_KEYS if key in rows and rows[key].get("value") is not None),
                 },
             )
 
