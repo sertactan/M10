@@ -77,16 +77,27 @@ class S153HistoricalControlRepository:
         )
         self.store.connection.commit()
 
-    def eligible_before(self, as_of: datetime, *, vector_version: str) -> list[dict]:
+    def eligible_before(
+        self,
+        as_of: datetime,
+        *,
+        vector_version: str,
+        exclude_security_id: str | None = None,
+    ) -> list[dict]:
+        where_exclude = "AND security_id<>?" if exclude_security_id else ""
+        params: list[object] = [_iso(as_of), vector_version]
+        if exclude_security_id:
+            params.append(exclude_security_id)
         rows=self.store.connection.execute(
-            """
+            f"""
             SELECT *
             FROM s153_historical_control_observations
             WHERE label_available_at<=?
               AND vector_version=?
+              {where_exclude}
             ORDER BY as_of_date,security_id,observation_id
             """,
-            (_iso(as_of),vector_version),
+            tuple(params),
         ).fetchall()
         out=[]
         for row in rows:
