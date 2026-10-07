@@ -80,3 +80,26 @@ def test_provider_fails_closed_when_bucket_under_30(tmp_path: Path) -> None:
             WF7ValidatedMagnitudeCalibrationProvider(store).calibrate(score=82,as_of=NOW)
     finally:
         store.close()
+
+
+
+def test_provider_refuses_unhardened_chain(tmp_path: Path) -> None:
+    store=_store(tmp_path)
+    try:
+        with pytest.raises(ForecastCalibrationUnavailable, match="PRODUCTION_EVIDENCE_READY"):
+            WF7ValidatedMagnitudeCalibrationProvider(store).calibrate(score=82,as_of=NOW)
+    finally:
+        store.close()
+
+
+def test_provider_refuses_future_calibration_cutoff(tmp_path: Path) -> None:
+    store=_store(tmp_path)
+    try:
+        _seed_chain(store,bucket_n=40)
+        before_cutoff=datetime(2024,6,1,tzinfo=timezone.utc)
+        with pytest.raises(ForecastCalibrationUnavailable, match="later than forecast"):
+            WF7ValidatedMagnitudeCalibrationProvider(store).calibrate(
+                score=82,as_of=before_cutoff
+            )
+    finally:
+        store.close()
