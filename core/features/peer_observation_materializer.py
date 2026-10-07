@@ -5,6 +5,11 @@ from datetime import datetime, timezone
 from data.database.sqlite_store import SQLiteStore
 from data.repositories.destination_peer_repository import DestinationPeerRepository
 from data.repositories.model_feature_repository import ModelFeatureRepository
+from core.features.wf3_peer_policy import (
+    POLICY_VERSION,
+    market_cap_bucket as classify_market_cap_bucket,
+    profitability_state as classify_profitability_state,
+)
 
 
 RAW_KEYS = {
@@ -12,6 +17,9 @@ RAW_KEYS = {
     "RAW_EV_TO_SALES_TTM",
     "RAW_EV_TO_EBITDA_TTM",
     "RAW_PRICE_TO_FCF_TTM",
+    "RAW_TTM_REVENUE",
+    "RAW_TTM_OPERATING_INCOME",
+    "RAW_TTM_FCF",
 }
 
 
@@ -23,14 +31,22 @@ class DestinationPeerObservationMaterializer:
     inferred from unrelated legacy classification rules.
     """
 
-    VERSION = "wf3-peer-observation-v1"
+    VERSION = "wf3-peer-observation-v2-policy-v1"
 
     def __init__(self, store: SQLiteStore, features: ModelFeatureRepository, peers: DestinationPeerRepository) -> None:
         self.store = store
         self.features = features
         self.peers = peers
 
-    def materialize(self, *, security_id: str, route: str, as_of: datetime, market_cap_bucket: str, profitability_state: str) -> str | None:
+    def materialize(
+        self,
+        *,
+        security_id: str,
+        route: str,
+        as_of: datetime,
+        market_cap_bucket: str | None = None,
+        profitability_state: str | None = None,
+    ) -> str | None:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
         security = self.store.connection.execute(
@@ -42,8 +58,6 @@ class DestinationPeerObservationMaterializer:
         sector = str(security["sector"] or "").strip()
         industry = str(security["industry"] or "").strip()
         if not sector or not industry:
-            return None
-        if not market_cap_bucket.strip() or not profitability_state.strip():
             return None
 
         rows = self.features.load_as_of(security_id, as_of)
@@ -57,6 +71,15 @@ class DestinationPeerObservationMaterializer:
         if market_cap is None or market_cap <= 0:
             return None
 
+        bucket = market_cap_bucket or classify_market_cap_bucket(market_cap)
+        state = profitability_state or classify_profitability_state(
+            ttm_revenue=value("RAW_TTM_REVENUE"),
+            ttm_operating_income=value("RAW_TTM_OPERATING_INCOME"),
+            ttm_fcf=value("RAW_TTM_FCF"),
+        )
+        if not bucket or not state:
+            return None
+
         used = [rows[key] for key in RAW_KEYS if key in rows and rows[key].get("value") is not None]
         latest_available = max(
             (datetime.fromisoformat(str(row["available_at"])) for row in used),
@@ -68,8 +91,8 @@ class DestinationPeerObservationMaterializer:
             route=route,
             sector=sector,
             industry=industry,
-            market_cap_bucket=market_cap_bucket,
-            profitability_state=profitability_state,
+            market_cap_bucket=bucket,
+            profitability_state=state,
             market_cap=market_cap,
             sales_multiple=value("RAW_EV_TO_SALES_TTM"),
             ebitda_multiple=value("RAW_EV_TO_EBITDA_TTM"),
@@ -80,6 +103,6 @@ class DestinationPeerObservationMaterializer:
             computation_version=self.VERSION,
             evidence={
                 "source_feature_keys": sorted(key for key in RAW_KEYS if key in rows and rows[key].get("value") is not None),
-                "classification_policy": "explicit canonical inputs; no inferred bucket/state",
+                "classification_policy": POLICY_VERSION,
             },
         )
