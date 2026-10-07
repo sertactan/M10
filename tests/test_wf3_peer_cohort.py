@@ -25,8 +25,8 @@ def _obs(i: int, *, sales=5.0, ebitda=15.0, fcf=25.0, mc=1_000.0):
         profitability_state="STATE_A",
         market_cap=mc+i,
         sales_multiple=sales+i/100.0,
-        ebitda_multiple=ebitda+i/100.0,
-        fcf_multiple=fcf+i/100.0,
+        ebitda_multiple=(None if ebitda is None else ebitda+i/100.0),
+        fcf_multiple=(None if fcf is None else fcf+i/100.0),
     )
 
 
