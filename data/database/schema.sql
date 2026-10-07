@@ -856,3 +856,24 @@ CREATE TABLE IF NOT EXISTS wf6_oos_observations (
 );
 CREATE INDEX IF NOT EXISTS idx_wf6_oos_ready
 ON wf6_oos_observations(fold_id,outcome_status,v141_score,primary_route);
+
+
+-- WF6: immutable final-holdout freeze/open registry.
+CREATE TABLE IF NOT EXISTS wf6_holdout_locks (
+    lock_id TEXT PRIMARY KEY,
+    source_wf5_run_id TEXT NOT NULL REFERENCES wf5_replay_runs(run_id),
+    holdout_start TEXT NOT NULL,
+    holdout_end TEXT NOT NULL,
+    v12_version TEXT NOT NULL,
+    v141_version TEXT NOT NULL,
+    feature_version TEXT NOT NULL,
+    threshold_version TEXT NOT NULL,
+    leakage_policy TEXT NOT NULL,
+    holdout_policy TEXT NOT NULL,
+    dataset_identity_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    frozen_at TEXT NOT NULL,
+    opened_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_wf6_holdout_source
+ON wf6_holdout_locks(source_wf5_run_id,status,holdout_start,holdout_end);
