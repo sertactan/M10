@@ -795,3 +795,17 @@ CREATE TABLE IF NOT EXISTS wf5_replay_observations (
 );
 CREATE INDEX IF NOT EXISTS idx_wf5_replay_date
 ON wf5_replay_observations(run_id,as_of_date,v141_status);
+
+
+-- WF7: out-of-sample validation and empirical calibration summaries.
+CREATE TABLE IF NOT EXISTS wf7_validation_runs (
+    validation_id TEXT PRIMARY KEY,
+    wf6_run_id TEXT NOT NULL,
+    policy_version TEXT NOT NULL,
+    ready_n INTEGER NOT NULL,
+    metrics_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wf7_validation_wf6
+ON wf7_validation_runs(wf6_run_id,created_at);
