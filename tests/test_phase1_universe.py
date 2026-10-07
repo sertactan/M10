@@ -139,16 +139,63 @@ class _FinnhubOff:
     configured = False
 
 
+class _AlphaOff:
+    configured = False
+
+
+class _AlphaHistory:
+    configured = True
+
+    async def list_historical_us_securities(self, as_of: date):
+        return [
+            UniverseRecord(
+                ticker="HIST",
+                name="Historical Corp",
+                exchange=Exchange.NASDAQ,
+                exchange_mic="XNAS",
+                active=False,
+                provider="ALPHAVANTAGE_PIT",
+                availability_date=NOW,
+                security_type="CS",
+            )
+        ]
+
+
 @pytest.mark.asyncio
-async def test_historical_sync_fails_closed_without_massive(tmp_path: Path) -> None:
+async def test_historical_sync_fails_closed_without_pit_source(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path / "op.db")
     store.initialize(ROOT / "data" / "database" / "schema.sql")
     service = USUniverseService(
-        SecurityRepository(store), sec=_SEC(), massive=_MassiveOff(), finnhub=_FinnhubOff()
+        SecurityRepository(store),
+        sec=_SEC(),
+        massive=_MassiveOff(),
+        finnhub=_FinnhubOff(),
+        alpha_vantage=_AlphaOff(),
     )
-    with pytest.raises(RuntimeError, match="Historical US universe sync requires MASSIVE_API_KEY"):
+    with pytest.raises(RuntimeError, match="requires a PIT-capable source"):
         await service.sync(as_of=date(2025, 5, 5))
     store.close()
+
+
+@pytest.mark.asyncio
+async def test_historical_sync_uses_free_alpha_vantage_pit_when_configured(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path / "alpha.db")
+    store.initialize(ROOT / "data" / "database" / "schema.sql")
+    try:
+        service = USUniverseService(
+            SecurityRepository(store),
+            sec=_SEC(),
+            massive=_MassiveOff(),
+            finnhub=_FinnhubOff(),
+            alpha_vantage=_AlphaHistory(),
+        )
+        result = await service.sync(as_of=date(2025, 5, 5))
+        assert result.source_mode == "ALPHAVANTAGE_PIT"
+        assert result.snapshot_count == 1
+        rows = SecurityRepository(store).universe_as_of(date(2025, 5, 5))
+        assert [row["ticker"] for row in rows] == ["HIST"]
+    finally:
+        store.close()
 
 
 def test_exchange_mapping_and_cik_normalization() -> None:
