@@ -25,7 +25,12 @@ AS_OF_DATE = date(2026, 8, 20)
 AS_OF = datetime(2026, 8, 20, 23, 59, tzinfo=timezone.utc)
 
 
-def _store(tmp_path: Path, *, snapshot_source: str = "STOCK_DATA_PIT") -> SQLiteStore:
+def _store(
+    tmp_path: Path,
+    *,
+    snapshot_source: str = "STOCK_DATA_PIT",
+    price_purpose: str = "BACKTEST",
+) -> SQLiteStore:
     store = SQLiteStore(tmp_path / "wf.sqlite")
     store.initialize(ROOT / "data" / "database" / "schema.sql")
     now = AS_OF.isoformat()
@@ -56,7 +61,7 @@ def _store(tmp_path: Path, *, snapshot_source: str = "STOCK_DATA_PIT") -> SQLite
         VALUES (?,?,?,?,?,?,?,?,?)
         """,
         (
-            "SEL","SEC_TEST","BACKTEST","2020-01-01","2026-12-31",
+            "SEL","SEC_TEST",price_purpose,"2020-01-01","2026-12-31",
             "STOOQ","TEST.US","test",now,
         ),
     )
@@ -130,5 +135,16 @@ def test_walkforward_readiness_rejects_current_universe_as_historical_pit(tmp_pa
         row = WalkForwardReadinessAuditor(store).audit(AS_OF_DATE)
         assert row.exact_pit_universe is False
         assert "UNIVERSE_NOT_EXACT_PIT" in row.blockers
+    finally:
+        store.close()
+
+
+
+def test_walkforward_readiness_does_not_count_scanner_raw_price_as_backtest_ready(tmp_path: Path) -> None:
+    store = _store(tmp_path, price_purpose="SCANNER_BOOTSTRAP")
+    try:
+        row = WalkForwardReadinessAuditor(store).audit(AS_OF_DATE)
+        assert row.price_covered == 0
+        assert "PARTIAL_PRICE_COVERAGE" in row.blockers
     finally:
         store.close()
