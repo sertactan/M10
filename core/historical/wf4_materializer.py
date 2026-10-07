@@ -7,6 +7,7 @@ from core.historical.wf4_policy import hmg5, xr_score
 from core.historical.wf4_vector_policy import (
     VECTOR_VERSION,
     broad_vector,
+    magnitude5_vector,
     magnitude10_vector,
 )
 from data.repositories.model_feature_repository import ModelFeatureRepository
@@ -36,11 +37,12 @@ class WF4HistoricalFeatureMaterializer:
         same_month_rows: list[dict],
     ) -> dict[str,str]:
         broad=broad_vector(components,primary_route=primary_route)
-        magnitude=magnitude10_vector(components,primary_route=primary_route)
+        magnitude5=magnitude5_vector(components,primary_route=primary_route)
+        magnitude10=magnitude10_vector(components,primary_route=primary_route)
         hist=self.engine.compute(
             as_of=as_of,
             broad_target=broad,
-            magnitude10_target=magnitude,
+            magnitude10_target=magnitude10,
         )
 
         eligible=self.controls.eligible_before(as_of,vector_version=VECTOR_VERSION)
@@ -49,9 +51,15 @@ class WF4HistoricalFeatureMaterializer:
         hard=[r for r in eligible if float(r["fm252"]) < 3.0]
 
         from core.historical.s153_controls import cohort_similarity
-        w5=cohort_similarity(magnitude,[r["magnitude_vector"] for r in winner5])
-        n5=cohort_similarity(magnitude,[r["magnitude_vector"] for r in near5])
-        h5=cohort_similarity(magnitude,[r["magnitude_vector"] for r in hard])
+        # Stored WF4 V1 rows carry the 10X magnitude vector. HMG5 requires
+        # a dedicated DF5/MCH5 vector in newly materialized observations;
+        # rows lacking it are not silently reused.
+        winner5_vectors=[r.get("magnitude5_vector") for r in winner5 if r.get("magnitude5_vector")]
+        near5_vectors=[r.get("magnitude5_vector") for r in near5 if r.get("magnitude5_vector")]
+        hard5_vectors=[r.get("magnitude5_vector") for r in hard if r.get("magnitude5_vector")]
+        w5=cohort_similarity(magnitude5,winner5_vectors)
+        n5=cohort_similarity(magnitude5,near5_vectors)
+        h5=cohort_similarity(magnitude5,hard5_vectors)
         hmg5_score=hmg5(w5,n5,h5)
 
         xr=xr_score(
