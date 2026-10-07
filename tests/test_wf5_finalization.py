@@ -28,8 +28,8 @@ def _bar(day: date) -> SourcePriceBar:
         volume=1000.0,
         vwap=None,
         retrieved_at=datetime(2026,1,1,tzinfo=timezone.utc),
-        quality_status=PriceQualityStatus.CANONICAL,
-        adjustment_status=AdjustmentStatus.ADJUSTED,
+        quality_status=PriceQualityStatus.PRIMARY,
+        adjustment_status=AdjustmentStatus.PROVIDER_ADJUSTED,
         raw_payload_hash=None,
     )
 
