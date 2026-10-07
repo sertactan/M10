@@ -10,6 +10,10 @@ BROAD_KEYS = (
     "ETRQ","RER","CMAG","FCVX",
 )
 
+MAGNITUDE5_KEYS = (
+    "DF5","MCH5","ETRQ","RER","CMAG","FCVX",
+)
+
 MAGNITUDE10_KEYS = (
     "DF10","MCH10","ETRQ","RER","CMAG","FCVX",
 )
@@ -28,6 +32,17 @@ def broad_vector(
 ) -> dict[str,float|None]:
     return {
         **{key: components.get(key) for key in BROAD_KEYS},
+        **_route_one_hot(primary_route),
+    }
+
+
+def magnitude5_vector(
+    components: Mapping[str,float|None],
+    *,
+    primary_route: str | None,
+) -> dict[str,float|None]:
+    return {
+        **{key: components.get(key) for key in MAGNITUDE5_KEYS},
         **_route_one_hot(primary_route),
     }
 
