@@ -17,6 +17,7 @@ from core.models.s153_v12 import S153V12Model
 from core.prices.engine import HistoricalPriceEngine
 from core.runtime.readiness import check_release_readiness
 from core.universe.service import USUniverseService
+from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
 from data.providers.company_ir import CompanyInvestorRelationsProvider
 from data.providers.adanos_global_reference import AdanosGlobalReferenceProvider
 from data.providers.finnhub_fundamentals import FinnhubFundamentalsProvider
@@ -112,6 +113,7 @@ async def sync_universe(root: Path, as_of: date, include_delisted: bool, ticker_
             ),
             massive=MassiveUniverseProvider(),
             finnhub=FinnhubUniverseProvider(),
+            alpha_vantage=AlphaVantagePitUniverseProvider(),
         )
         result = await service.sync(
             as_of=as_of,
