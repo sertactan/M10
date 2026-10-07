@@ -950,3 +950,29 @@ CREATE TABLE IF NOT EXISTS wf7_route_metrics (
     created_at TEXT NOT NULL,
     PRIMARY KEY(run_id,route)
 );
+
+
+-- WF8: production evidence hardening / fail-closed release gate.
+CREATE TABLE IF NOT EXISTS wf8_hardening_runs (
+    hardening_id TEXT PRIMARY KEY,
+    wf5_run_id TEXT NOT NULL REFERENCES wf5_replay_runs(run_id),
+    wf6_run_id TEXT NOT NULL REFERENCES wf6_walk_forward_runs(run_id),
+    wf7_run_id TEXT NOT NULL REFERENCES wf7_validation_runs(run_id),
+    policy_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    blockers_json TEXT NOT NULL DEFAULT '[]',
+    warnings_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wf8_hardening_checks (
+    hardening_id TEXT NOT NULL REFERENCES wf8_hardening_runs(hardening_id),
+    check_name TEXT NOT NULL,
+    passed INTEGER NOT NULL,
+    blocking INTEGER NOT NULL,
+    evidence TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(hardening_id,check_name)
+);
+CREATE INDEX IF NOT EXISTS idx_wf8_hardening_status
+ON wf8_hardening_runs(status,created_at);
