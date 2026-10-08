@@ -3,6 +3,8 @@ Six Yahoo research tools. Unofficial DAILY quotes; no PIT, orders, or canonical 
 Public anonymous endpoint with per-process rate limiter, not a secure private service.
 """
 import contextlib
+import asyncio
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -103,7 +105,15 @@ class SimpleRateLimit:
 @contextlib.asynccontextmanager
 async def lifespan(app):
     async with mcp.session_manager.run():
-        yield
+        task = None
+        if os.getenv('MERIDYEN_SMOKE_ON_START') == '1':
+            from mcp_smoke import run as smoke_run
+            task = asyncio.create_task(smoke_run())
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
 
 app = Starlette(
     routes=OAUTH_ROUTES + [
