@@ -180,3 +180,28 @@ def test_bad_stored_form_is_not_accepted(tmp_path):
     result = reconcile(db, folder)
     assert result["counts"]["rejected_fact_form_mismatch"] == 1
     assert not result["evidence_candidates"]
+
+
+def test_accession_pages_do_not_repeat_evidence(tmp_path):
+    db, folder = _fixture(tmp_path)
+    first = reconcile(db, folder, max_accessions=1, accession_offset=0)
+    second = reconcile(db, folder, max_accessions=1, accession_offset=1)
+    assert first["next_accession_offset"] == 1
+    assert second["next_accession_offset"] is None
+    assert first["evidence_candidates"][0]["accession_number"] != (
+        second["evidence_candidates"][0]["accession_number"]
+    )
+
+
+def test_malformed_duplicate_rejects_previously_valid_source(tmp_path):
+    db, folder = _fixture(tmp_path, archival=False)
+    root = folder / f"CIK{CIK}.json"
+    payload = json.loads(root.read_text())
+    recent = payload["filings"]["recent"]
+    for k in ("accessionNumber", "acceptanceDateTime", "form", "filingDate"):
+        recent[k] *= 2
+    recent["acceptanceDateTime"][1] = "2025-08-09T19:00:00"  # missing offset
+    root.write_text(json.dumps(payload))
+    result = reconcile(db, folder)
+    assert result["counts"]["acceptance_missing_offset"] == 1
+    assert not result["evidence_candidates"]
