@@ -1,13 +1,18 @@
 name: Meridyen external MCP HTTPS smoke
 on:
   push:
-    branches: [feature/remote-mcp-health-audit-20261009]
+    branches: [feature/remote-mcp-health-audit-20261009, feature/mobile-meridyen-readiness-v2-20261009]
     paths:
       - scripts/remote_mcp_health_audit.py
       - .github/workflows/meridyen-remote-mcp-health.yml
   workflow_dispatch:
+  schedule:
+    - cron: '20 23 * * *' # daily ~08:20 Asia/Tokyo, timing may be delayed
 permissions:
   contents: read
+concurrency:
+  group: meridyen-remote-health-\${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   three-service-public-https-check:
     runs-on: ubuntu-latest
@@ -21,3 +26,8 @@ jobs:
         run: python -m py_compile scripts/remote_mcp_health_audit.py
       - name: External Render HTTPS and security regression
         run: python scripts/remote_mcp_health_audit.py
+      - name: Record scope in workflow summary
+        if: always()
+        run: |
+          echo "Only public Render HTTPS, unauthorized 401 and Social read-only MCP calls are checked." >> "$GITHUB_STEP_SUMMARY"
+          echo "No ChatGPT owner-OAuth, S16 canonical score, realtime quote or PIT certification." >> "$GITHUB_STEP_SUMMARY"
