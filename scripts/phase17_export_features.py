@@ -15,6 +15,7 @@ from pathlib import Path
 import sqlite3
 
 from core.learning_v3.challenger import SCHEMA,SAFE_FEATURE,BAD_FEATURE,_timestamp,_finite
+from core.learning_v2.wf5_outcome_bridge import READY_STATUSES
 
 
 def _conn(path):
@@ -46,10 +47,11 @@ def export(operational_db,learning_db,*,wf5_run_id,batch_sha256,features,cutoff)
                  v141_score,v141_status,outcome_status
                  FROM wf5_replay_observations WHERE run_id=?
                  ORDER BY as_of_date,security_id""",(wf5_run_id,)).fetchall()
-        labels={
-            (r["security_id"],r["signal_date"]):r
-            for r in b.execute("""SELECT * FROM learning_v2_wf5_mature_labels WHERE digest=?""",(batch_sha256,))
-        }
+        label_rows=list(b.execute(
+            "SELECT * FROM learning_v2_wf5_mature_labels WHERE digest=?",(batch_sha256,)))
+        labels={(r["security_id"],r["signal_date"]):r for r in label_rows}
+        if len(labels)!=len(label_rows):
+            raise ValueError("Duplicate security/date in mature-label evidence batch")
         if not wf5:
             raise ValueError("No historical candidate observations")
         bydate=defaultdict(list)
@@ -66,7 +68,7 @@ def export(operational_db,learning_db,*,wf5_run_id,batch_sha256,features,cutoff)
                 key=(row["security_id"],day)
                 label=labels.get(key)
                 if (row["outcome_status"]!="READY" or row["v141_score"] is None
-                    or str(row["v141_status"]).startswith(("BLOCKED","INCONCLUSIVE"))):
+                    or row["v141_status"] not in READY_STATUSES):
                     reasons["NOT_CANONICAL_READY"]+=1
                     continue
                 if label is None:
