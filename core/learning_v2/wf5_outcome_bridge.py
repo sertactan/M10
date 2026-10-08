@@ -91,7 +91,16 @@ def _qualified(row, cutoff):
     outcome = row["f_status"]
     if outcome != "READY":
         return None, "CENSORED_FORWARD_LABEL"
-    if int(row["horizon_sessions_available"]) < 252:
+    # Known delisting consideration closes the canonical 252-session
+    # event without inventing post-delisting daily prices or time-to-Kx.
+    # Otherwise all 252 real market sessions must be present.
+    diagnostic = json.loads(row["diagnostics_json"])
+    verified_terminal = (
+        diagnostic.get("terminal_consideration_used") is True
+        and diagnostic.get("terminal_horizon_verified") is True
+        and bool(diagnostic.get("terminal_source_ref"))
+    )
+    if int(row["horizon_sessions_available"]) < 252 and not verified_terminal:
         return None, "CENSORED_SHORT_PRICE_SERIES"
     if row["label_available_at"] is None:
         return None, "CENSORED_MISSING_LABEL_DATE"
@@ -108,15 +117,26 @@ def _qualified(row, cutoff):
     if row["anchor_session"] is None or _date(row["anchor_session"],"anchor") > signal:
         raise ValueError("Invalid anchor session")
     x = float(row["fm252"])
+    mx = float(row["max_multiple_observed"])
     cx = float(row["control_fm252"])
-    if not math.isfinite(x) or x < 0 or not math.isfinite(cx) or abs(x-cx)>1e-8:
+    if (not math.isfinite(x) or x < 0
+        or not math.isfinite(mx) or mx < x - 1e-8
+        or not math.isfinite(cx) or abs(x-cx)>1e-8):
         raise ValueError("Canonical 252-session outcome does not tie to cohort")
+    # In M10 the historical FM252 outcome means MAXIMUM observed multiple,
+    # NOT last-session close. A verified delisting terminal payout may raise
+    # FM252 without a computable time-to-hit trading-session index.
+    terminal = verified_terminal
+    if diagnostic.get("terminal_consideration_used") and not verified_terminal:
+        raise ValueError("Unverified terminal consideration in READY outcome")
     for key,threshold in (("time_to_2x_sessions",2),("time_to_5x_sessions",5),("time_to_10x_sessions",10)):
         t=row[key]
         if t is not None and (not 1 <= int(t) <= 252 or int(t)!=t):
             raise ValueError(f"Invalid {key} index")
-        if bool(t is not None) != (x >= threshold):
-            raise ValueError(f"{key} incompatible with fm252")
+        if t is not None and mx < threshold:
+            raise ValueError(f"{key} contradicts maximum observed multiple")
+        if t is None and mx >= threshold and not terminal:
+            raise ValueError(f"{key} missing without verified terminal consideration")
     _assert_outcome_hash(row)
     if row["outcome_class"] != row["control_outcome_class"]:
         raise ValueError("Forward cohort outcome class mismatch")
