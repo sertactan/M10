@@ -1,0 +1,22 @@
+{
+  "as_of": "2026-10-08T15:30:07.236164Z",
+  "module": "MERIDYEN_SOCIAL_PIT_PHASE3",
+  "note": "Sampling coverage only, not representative market coverage; 72+24 elapsed hours required",
+  "s15_s16": "UNCHANGED_NOT_COMPUTED",
+  "source_coverage": {
+    "bluesky": {
+      "baseline_observed_hours": 0,
+      "current_observed_hours": 1,
+      "required_baseline_hours": 65,
+      "required_current_hours": 22
+    },
+    "mastodon": {
+      "baseline_observed_hours": 0,
+      "current_observed_hours": 1,
+      "required_baseline_hours": 65,
+      "required_current_hours": 22
+    }
+  },
+  "status": "BASELINE_NOT_READY",
+  "trade_signal": false
+}
