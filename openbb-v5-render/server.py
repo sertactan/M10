@@ -93,9 +93,9 @@ def openbb_spy_test() -> dict:
     return _safe_history("cboe", "SPY", start.isoformat(), end.isoformat())
 
 async def healthz(_request: Request):
-    tools = await mcp.get_tools()
+    tools = await mcp.list_tools()
     return JSONResponse({"service": NAME, "status": "READY", "mcp_path": "/mcp",
-                         "registered_tools": sorted(tools.keys()),
+                         "registered_tools": sorted(tool.name for tool in tools),
                          "upstream_spy_probe": dict(PROBE)})
 
 async def _probe():
