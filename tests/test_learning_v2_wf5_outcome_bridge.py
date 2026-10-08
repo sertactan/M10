@@ -39,7 +39,7 @@ def _sample(tmp_path, *, run_status="COMPLETE"):
     return db
 
 
-def _put(conn, ticker, security, stamp, multiple, *, label_date="2025-01-02",
+def _put(conn, ticker, security, stamp, multiple, *, label_date="2025-01-02T23:59:59+00:00",
          ready=True, hash_valid=True, cohort=True, points=252, override_class=None):
     obs=f"wf5-{security}-{stamp}"
     cls=override_class or ("TRUE_10X" if multiple>=10 else "MODERATE_WINNER" if multiple>=2 else "FAILURE")
@@ -76,7 +76,7 @@ def test_mature_2x_and_10x_are_imported_without_double_count(tmp_path):
     c=sqlite3.connect(src)
     _put(c,"INOD","SEC-A","2024-01-02",10.3)
     _put(c,"TMDX","SEC-B","2024-01-02",2.2)
-    _put(c,"CRMD","SEC-C","2024-01-02",11.2,label_date="2027-01-02")
+    _put(c,"CRMD","SEC-C","2024-01-02",11.2,label_date="2027-01-02T23:59:59+00:00")
     _put(c,"FAIL","SEC-D","2024-01-02",.4,ready=False)
     c.commit();c.close()
     learn=tmp_path/"private-learning.sqlite3"
@@ -115,7 +115,7 @@ def test_incomplete_run_rejected(tmp_path):
 def test_censored_only_never_creates_false_success(tmp_path):
     db=_sample(tmp_path)
     c=sqlite3.connect(db)
-    _put(c,"CRMD","SEC-C","2024-01-02",10.0,label_date="2028-01-02")
+    _put(c,"CRMD","SEC-C","2024-01-02",10.0,label_date="2028-01-02T23:59:59+00:00")
     c.commit();c.close()
     learning=tmp_path/"learning.sqlite3"
     with pytest.raises(ValueError,match="No verifiably mature"):
