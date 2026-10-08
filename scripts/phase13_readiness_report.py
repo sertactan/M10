@@ -28,6 +28,8 @@ DEFAULT_END = date(2024, 12, 31)
 
 
 def _iso(value, field):
+    if isinstance(value, date):
+        return value
     try:
         return date.fromisoformat(value)
     except (TypeError, ValueError):
@@ -98,7 +100,7 @@ def evaluate(db_path, start=DEFAULT_START, end=DEFAULT_END):
 
     try:
         # URI ro ensures the diagnostic cannot create a new empty database.
-        conn = sqlite3.connect(f"file:{db.resolve().as_posix()}?mode=ro", uri=True)
+        conn = sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
         try:
             integrity = conn.execute("PRAGMA quick_check").fetchone()
