@@ -1,11 +1,15 @@
 """Opt-in one-shot MCP transport + Yahoo quote diagnostic. No credential logging."""
 import asyncio
+import hashlib
+import base64
+import re
+from urllib.parse import urlparse, parse_qs
 import logging
 import os
 import time
 
 import httpx
-from oauth_gate import ORIGIN, RESOURCE, SCOPE, _token
+from oauth_gate import ORIGIN, RESOURCE, SCOPE, CLIENT, _token
 
 log = logging.getLogger("meridyen.mcp.smoke")
 
@@ -70,5 +74,50 @@ async def run():
                         data.get("isError", False), structured.get("status"),
                         structured.get("price", structured.get("close")),
                         structured.get("data_as_of", structured.get("date")))
+            # Exercise real OAuth PKCE registration, password consent, code exchange,
+            # replay rejection, token-gated tool discovery. No secret values logged.
+            redirect = "https://chatgpt.com/connector/oauth/meridyen-smoke"
+            reg = await client.post("http://127.0.0.1:" + port + "/register", json={
+                "redirect_uris": [redirect], "grant_types": ["authorization_code"],
+                "response_types": ["code"], "token_endpoint_auth_method": "none"
+            })
+            log.warning("SMOKE OAuth register http=%s", reg.status_code)
+            verifier = "A" * 64
+            chall = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+            auth_url = "http://127.0.0.1:" + port + "/authorize"
+            auth = await client.get(auth_url, params={
+                "client_id": CLIENT, "redirect_uri": redirect, "response_type": "code",
+                "scope": SCOPE, "resource": RESOURCE, "state": "smoke-state",
+                "code_challenge": chall, "code_challenge_method": "S256"
+            })
+            ticket_match = re.search(r'name="ticket" value="([^"]+)"', auth.text)
+            log.warning("SMOKE OAuth authorize http=%s ticket=%s", auth.status_code, bool(ticket_match))
+            if not ticket_match:
+                return
+            consent = await client.post("http://127.0.0.1:" + port + "/authorize/login",
+                                        data={"ticket": ticket_match.group(1),
+                                              "password": os.environ["MERIDYEN_OAUTH_PASSWORD"]},
+                                        follow_redirects=False)
+            callback = urlparse(consent.headers.get("Location", ""))
+            args = parse_qs(callback.query)
+            log.warning("SMOKE OAuth consent http=%s state_match=%s",
+                        consent.status_code, args.get("state") == ["smoke-state"])
+            auth_code = args.get("code", [""])[0]
+            if not auth_code:
+                return
+            token_url = "http://127.0.0.1:" + port + "/token"
+            form = {"grant_type": "authorization_code", "code": auth_code,
+                    "client_id": CLIENT, "redirect_uri": redirect,
+                    "resource": RESOURCE, "code_verifier": verifier}
+            ex = await client.post(token_url, data=form)
+            token = ex.json().get("access_token", "") if ex.status_code == 200 else ""
+            log.warning("SMOKE OAuth PKCE token http=%s present=%s", ex.status_code, bool(token))
+            replay = await client.post(token_url, data=form)
+            log.warning("SMOKE OAuth code_replay http=%s", replay.status_code)
+            if token:
+                authed = await client.post(base, headers=dict(headers, Authorization="Bearer " + token), json={
+                    "jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {}
+                })
+                log.warning("SMOKE OAuth issued_token tools_list http=%s", authed.status_code)
         except Exception as exc:
             log.warning("SMOKE failed type=%s", type(exc).__name__)
