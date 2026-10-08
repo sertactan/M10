@@ -10,6 +10,7 @@ import unittest
 HERE = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 import pit_capture
+import pit_readiness
 import social_v5_free as core
 from mcp_auth import BearerGuard
 
@@ -104,6 +105,37 @@ class SecurityTests(unittest.TestCase):
 
     def test_too_short_secret_rejected(self):
         self.assertRaises(ValueError, BearerGuard, self.underlying, "short")
+
+
+class BaselineReadinessTests(unittest.TestCase):
+    def test_new_collection_does_not_fabricate_96h_history(self):
+        with tempfile.TemporaryDirectory() as td:
+            now = core.iso(dt.datetime.now(dt.timezone.utc))
+            path = pathlib.Path(td) / "capture_runs.jsonl"
+            payload = {
+                "schema": "SOCIAL_PIT_V1_RESEARCH_NONCANONICAL",
+                "capture_ended_at": now,
+                "sources": {"bluesky": {"status": "OK", "matched": 11},
+                            "mastodon": {"status": "OK", "matched": 0}},
+            }
+            path.write_text(json.dumps(payload) + "\\n", encoding="utf-8")
+            result = pit_readiness.readiness(path, now)
+            self.assertEqual(result["status"], "BASELINE_NOT_READY")
+            self.assertEqual(result["source_coverage"]["bluesky"]["baseline_observed_hours"], 0)
+            self.assertFalse(result["trade_signal"])
+
+    def test_outage_not_counted_as_successful_coverage(self):
+        with tempfile.TemporaryDirectory() as td:
+            now = core.iso(dt.datetime.now(dt.timezone.utc))
+            path = pathlib.Path(td) / "capture_runs.jsonl"
+            payload = {
+                "schema": "SOCIAL_PIT_V1_RESEARCH_NONCANONICAL",
+                "capture_ended_at": now,
+                "sources": {"bluesky": {"status": "PUBLIC_SOURCE_UNAVAILABLE"}}
+            }
+            path.write_text(json.dumps(payload) + "\\n", encoding="utf-8")
+            result = pit_readiness.readiness(path, now)
+            self.assertEqual(result["source_coverage"]["bluesky"]["current_observed_hours"], 0)
 
 
 if __name__ == "__main__":
