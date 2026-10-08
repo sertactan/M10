@@ -12,6 +12,7 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Mount, Route
 from yfinance_readonly import invoke
+from oauth_gate import OAUTH_ROUTES, OAuthGate
 
 mcp = FastMCP(
     "meridyen-yfinance-readonly",
@@ -66,7 +67,7 @@ def get_insider_transactions(symbol: str) -> dict:
 async def health(request):
     return JSONResponse({
         "status": "ready", "transport": "streamable-http", "tools": 6,
-        "public_anonymous": True, "live_yahoo_tested": False,
+        "public_anonymous": False, "oauth_required": True, "live_yahoo_tested": False,
         "point_in_time_canonical": False
     })
 
@@ -105,11 +106,11 @@ async def lifespan(app):
         yield
 
 app = Starlette(
-    routes=[
+    routes=OAUTH_ROUTES + [
         Route("/health", endpoint=health),
         Route("/", endpoint=root),
         Mount("/", app=mcp.streamable_http_app()),
     ],
     lifespan=lifespan,
 )
-app = SimpleRateLimit(app)
+app = OAuthGate(SimpleRateLimit(app))
