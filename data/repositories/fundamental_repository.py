@@ -187,7 +187,7 @@ class FundamentalRepository:
         # observations for a fiscal period *after* the as-of date must not
         # enter historical fundamental scores. Forward estimates/guidance
         # have their own dedicated repository paths and remain unaffected.
-        params: list[object] = [security_id, _iso(as_of), as_of.date().isoformat()]
+        params: list[object] = [security_id, _iso(as_of), as_of.astimezone(timezone.utc).date().isoformat()]
         metric_sql = ""
         if metric_name:
             metric_sql = " AND metric_name=?"
