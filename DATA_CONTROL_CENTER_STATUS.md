@@ -72,3 +72,39 @@ to install UI updates. See tests/test_data_control_center.py.
 Phase 3 remains: reliable SEC import checkpoint persistence, detailed
 historical evidence diagnostics, exclusive-lock job orchestration,
 and independently confirmed WF9 + original PIT acceptance timestamps.
+
+## Phase 3 — SEC checkpoint/quality and exclusive-guarded future imports
+
+- New future SEC Companyfacts ZIP runs acquire `bulk/sec/companyfacts-import.lock`
+  exclusively; a second instrumented importer fails closed (and does NOT
+  launch per-issuer API fallback). The lock is never automatically removed
+  when merely observed from another process. The owning importer releases
+  it when it exits normally or raises a handled exception.
+- New atomic `bulk/sec/companyfacts-progress.json` records run ID, PID,
+  timestamps, stage STARTING/IMPORTING/FINALIZING/FINISHED/FAILED, total
+  archive entries, scanned entries, issuer count and fact inserts. Errors
+  log exception CLASS only, never SEC payloads, account data or API keys.
+  These progress numbers represent **only the current instrumented ZIP run**;
+  ZIP entry counts are not financial fact counts or PIT completeness.
+- The DATA CONTROL window reads these checkpoints and lock status manually,
+  displays elapsed/stale flags and samples at most 250 SEC facts from latest
+  5000 physical rowids to diagnose missing original SEC acceptance timestamps,
+  missing accession, invalid available_at and temporal conflicts.
+- **Critical legacy distinction:** imports started BEFORE this code was
+  deployed do NOT report checkpoints or hold this lock. A missing lock is
+  NEVER permission to launch another importer; confirm with Windows Task
+  Manager and operator approval. The ongoing user's 1.3GB SEC import remains
+  untouched. Progress applies only after the code is updated AND a new
+  invocation begins. Do not restart the current import just to see telemetry.
+- No progress/quality report independently certifies SEC original acceptance,
+  historical data, canonical S15/S16 score, adjusted prices, WF9, or outcomes.
+- Data Control Center remains readonly: SQLite mode=ro, query_only, short
+  timeout, no API calls or automatic operation. The **future** SEC importer
+  writes only operational facts through its existing ingestion path, plus
+  its local progress JSON/lock. The GUI has NO dangerous start/stop controls.
+- No automatic stale-lock removal. Resolve after verifying the owning process
+  has exited and making a backup; do not delete locks blindly.
+
+**Deployment:** merge PR and pull source after running import finishes. The
+installed Windows EXE requires a separate new build to display this panel;
+git pull alone does not update a running compiled application.

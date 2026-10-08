@@ -19,6 +19,7 @@ import sys
 
 from core.runtime.logging import runtime_state_dir
 from app.ui.data_control_center_phase2 import Phase2Diagnostics, phase2_diagnostics
+from app.ui.data_control_center_phase3 import Phase3Diagnostics, phase3_diagnostics
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class ControlCenterSnapshot:
     warnings: tuple[str, ...]
     wf9_activated_by_this_panel: bool = False
     phase2: Phase2Diagnostics | None = None
+    phase3: Phase3Diagnostics | None = None
 
 
 def _monthly_ends(start: date, end: date) -> list[str]:
@@ -90,6 +92,7 @@ class DataControlCenterService:
         ]
         db = self.db_path
         phase2: Phase2Diagnostics | None = None
+        phase3: Phase3Diagnostics | None = None
         existing_months: set[str] = set()
         if not db.is_file() or db.is_symlink():
             blockers.append("LOCAL_OPERATIONAL_DB_NOT_FOUND")
@@ -171,9 +174,11 @@ class DataControlCenterService:
                     )
 
                 phase2 = phase2_diagnostics(conn, names, existing_months, self.runtime_root, now)
+                phase3 = phase3_diagnostics(conn, names, self.runtime_root, now)
 
         if phase2 is None:
             phase2 = phase2_diagnostics(None, set(), set(), self.runtime_root, now)
+            phase3 = phase3_diagnostics(None, set(), self.runtime_root, now)
 
         daily_file = self.runtime_root / "data/runtime/pit_daily_sync/latest_status.json"
         daily_status, daily_date = "NO_AUTOMATION_REPORT", None
@@ -211,5 +216,6 @@ class DataControlCenterService:
             pit_daily_date_utc=daily_date,
             blockers=tuple(dict.fromkeys(blockers)),
             phase2=phase2,
+            phase3=phase3,
             warnings=tuple(warnings),
         )
