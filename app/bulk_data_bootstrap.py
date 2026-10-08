@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 import httpx
 
 from app.bootstrap import AppContainer
-from app.sec_import_progress import SECImportProgress, SECImportBusy
+from app.sec_import_progress import SECImportProgress, SECImportBusy, LOCK_FILE
 from core.fundamentals.metrics import XBRL_CANONICAL_ALIASES
 from data.providers.sec_access import resolve_sec_user_agent
 from data.providers.sec_edgar_fundamentals import SECEdgarFundamentalsProvider
@@ -249,6 +249,8 @@ def ensure_sec_companyfacts_all_known(
 
     bulk_dir = app.resolve_data_path("bulk/sec")
     zip_path = bulk_dir / "companyfacts.zip"
+    if (bulk_dir / LOCK_FILE).exists() or (bulk_dir / LOCK_FILE).is_symlink():
+        raise SECImportBusy("SEC ZIP importer already holds the progress lock")
     if force_refresh or not zip_path.exists():
         _download(
             SEC_COMPANYFACTS_ZIP,
@@ -441,6 +443,8 @@ def ensure_sec_companyfacts_bulk(
     bulk_dir = app.resolve_data_path("bulk/sec")
     zip_path = bulk_dir / "companyfacts.zip"
     marker = bulk_dir / "companyfacts-import.json"
+    if (bulk_dir / LOCK_FILE).exists() or (bulk_dir / LOCK_FILE).is_symlink():
+        raise SECImportBusy("SEC ZIP importer already holds the progress lock")
 
     # A successful import can be reused. The regular per-security SEC mirror and
     # background sync remain responsible for incremental freshness.
