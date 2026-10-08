@@ -163,19 +163,25 @@ def reconcile(db: Path, folder: Path, *, max_issuers: int = 5,
                     if not ACCESSION.fullmatch(acc):
                         counts["invalid_accession"] += 1
                         continue
+                    key = (cik, acc)
                     accepted = exact_utc(entry["accepted"])
                     if accepted is None:
                         counts["acceptance_missing_offset"] += 1
+                        conflicting.add(key)
+                        valid_accessions.pop(key, None)
                         continue
                     try:
                         filed = date.fromisoformat(str(entry["filing_date"]))
                     except ValueError:
                         counts["invalid_filing_date"] += 1
+                        conflicting.add(key)
+                        valid_accessions.pop(key, None)
                         continue
                     if accepted.date() < filed:
                         counts["acceptance_before_filing_date"] += 1
+                        conflicting.add(key)
+                        valid_accessions.pop(key, None)
                         continue
-                    key = (cik, acc)
                     value = {
                         "cik": cik, "security_id": next(iter(ids)),
                         "accession_number": acc,
@@ -252,6 +258,7 @@ def reconcile(db: Path, folder: Path, *, max_issuers: int = 5,
             # A deterministic accession-level review index; original fact
             # records are NOT modified and no per-fact approval is implied.
             report["evidence_candidates"].append(entry)
+    counts["valid_accessions_indexed"] = len(valid_accessions)
     report["counts"] = dict(sorted(counts.items()))
     report["archival_coverage_complete"] = (
         counts["missing_archival_documents"] == 0
