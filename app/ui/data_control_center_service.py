@@ -18,6 +18,7 @@ import sqlite3
 import sys
 
 from core.runtime.logging import runtime_state_dir
+from app.ui.data_control_center_phase2 import Phase2Diagnostics, phase2_diagnostics
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ class ControlCenterSnapshot:
     blockers: tuple[str, ...]
     warnings: tuple[str, ...]
     wf9_activated_by_this_panel: bool = False
+    phase2: Phase2Diagnostics | None = None
 
 
 def _monthly_ends(start: date, end: date) -> list[str]:
@@ -87,6 +89,8 @@ class DataControlCenterService:
             "WF5/WF6/WF8 row counts are not proof of WF9 activation or model accuracy.",
         ]
         db = self.db_path
+        phase2: Phase2Diagnostics | None = None
+        existing_months: set[str] = set()
         if not db.is_file() or db.is_symlink():
             blockers.append("LOCAL_OPERATIONAL_DB_NOT_FOUND")
         else:
@@ -166,6 +170,11 @@ class DataControlCenterService:
                         + purpose + "'"
                     )
 
+                phase2 = phase2_diagnostics(conn, names, existing_months, self.runtime_root, now)
+
+        if phase2 is None:
+            phase2 = phase2_diagnostics(None, set(), set(), self.runtime_root, now)
+
         daily_file = self.runtime_root / "data/runtime/pit_daily_sync/latest_status.json"
         daily_status, daily_date = "NO_AUTOMATION_REPORT", None
         if daily_file.is_file() and not daily_file.is_symlink():
@@ -201,5 +210,6 @@ class DataControlCenterService:
             pit_daily_status=daily_status,
             pit_daily_date_utc=daily_date,
             blockers=tuple(dict.fromkeys(blockers)),
+            phase2=phase2,
             warnings=tuple(warnings),
         )
