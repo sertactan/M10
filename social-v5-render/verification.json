@@ -1,5 +1,5 @@
 {
-  "as_of_utc": "2026-10-08T14:55:39.194069+00:00",
+  "as_of_utc": "2026-10-08T14:59:06.206314+00:00",
   "target": "https://meridyen-social-v5-free.onrender.com/mcp",
   "model_firewall": "UNCHANGED",
   "tools_discovered": [
@@ -17,8 +17,8 @@
   },
   "social_bluesky": {
     "is_error": false,
-    "status": "PUBLIC_SOURCE_UNAVAILABLE",
-    "posts": 0,
+    "status": "OK",
+    "posts": 5,
     "source_status": null,
     "module": "MERIDYEN_SOCIAL_V5_FREE"
   },
@@ -32,11 +32,11 @@
   "social_scan": {
     "is_error": false,
     "status": "OK",
-    "posts": 0,
+    "posts": 11,
     "source_status": {
       "bluesky": {
-        "status": "PUBLIC_SOURCE_UNAVAILABLE",
-        "reason": "HTTP Error 403: Forbidden"
+        "status": "OK",
+        "captured": 11
       },
       "mastodon": {
         "status": "OK",
