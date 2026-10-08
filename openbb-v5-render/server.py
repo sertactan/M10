@@ -99,7 +99,9 @@ async def healthz(_request: Request):
                          "upstream_spy_probe": dict(PROBE)})
 
 async def _probe():
-    value = await asyncio.to_thread(openbb_spy_test)
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=12)
+    value = await asyncio.to_thread(_safe_history, "cboe", "SPY", start.isoformat(), end.isoformat())
     PROBE.update({"status": value.get("status", "OPENBB_FREE_BLOCKED"),
                   "checked_at": datetime.now(timezone.utc).isoformat(),
                   "bar_count": value.get("bar_count", 0),
