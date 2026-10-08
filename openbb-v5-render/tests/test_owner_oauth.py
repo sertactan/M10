@@ -6,6 +6,7 @@ import re
 import sys
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 
@@ -63,6 +64,22 @@ class OwnerOAuthTests(unittest.TestCase):
         r=self.client.post("/authorize/login",data={"ticket":self.issue_ticket(),
             "password":os.environ["MERIDYEN_OPENBB_OAUTH_PASSWORD"]},follow_redirects=False)
         self.assertEqual(r.status_code,429)
+
+    def test_opt_in_disabled_revokes_oauth_and_retains_bearer(self):
+        from server import BearerGate
+        from starlette.responses import JSONResponse
+        async def ok(request):
+            return JSONResponse({"ok":True})
+        client=TestClient(BearerGate(Starlette(routes=[Route("/mcp",ok,methods=["POST"])])))
+        access=auth._token({"iss":auth.ORIGIN,"aud":auth.RESOURCE,"scope":auth.SCOPE,
+            "sub":"meridyen-owner","exp":int(time.time())+300})
+        with patch.object(auth, "AUTH_ENABLED", False):
+            self.assertFalse(auth.verify_token(access))
+            resp=self.client.get("/authorize")
+            self.assertEqual(resp.status_code,503)
+            self.assertEqual(client.post("/mcp",headers={"Authorization":"Bearer "+access}).status_code,401)
+            legacy=os.environ["MERIDYEN_MCP_BEARER_TOKEN"]
+            self.assertEqual(client.post("/mcp",headers={"Authorization":"Bearer "+legacy}).status_code,200)
 
     def test_wrong_redirect_or_pkce_is_rejected(self):
         bad=self.client.get("/authorize",params={
