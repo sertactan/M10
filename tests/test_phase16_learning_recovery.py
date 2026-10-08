@@ -86,7 +86,7 @@ def _fake_crypt_runner(monkeypatch, *, tamper_roundtrip=False):
         source,target=cmd[2:4]
         if source.startswith("meridyen_crypt:"):
             blob=storage[source]
-            if tamper_roundtrip:
+            if tamper_roundtrip and source.endswith(".sqlite3"):
                 blob=b"remote corrupted"
             Path(target).parent.mkdir(parents=True,exist_ok=True)
             Path(target).write_bytes(blob)
