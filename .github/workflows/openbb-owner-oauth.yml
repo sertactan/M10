@@ -1,0 +1,25 @@
+name: OpenBB Owner OAuth Regression
+on:
+  push:
+    branches: [feature/openbb-owner-oauth-20261009]
+    paths: ['openbb-v5-render/**', '.github/workflows/openbb-owner-oauth.yml']
+  pull_request:
+    paths: ['openbb-v5-render/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oauth-security-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install only MCP/auth unit test dependencies
+        run: pip install 'fastmcp==3.4.0' 'httpx>=0.28,<1' 'python-multipart>=0.0.9'
+      - name: Compile and test isolated OAuth + Bearer gate
+        run: |
+          python -m compileall -q openbb-v5-render
+          python -m unittest discover -s openbb-v5-render/tests -p 'test_*.py' -v
