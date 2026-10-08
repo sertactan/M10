@@ -11,6 +11,8 @@ on:
       - "scripts/sync_free_pit_universe.py"
       - "scripts/bootstrap_wf9_canonical_data.py"
       - "scripts/phase13_readiness_report.py"
+      - "scripts/phase14_dataset_audit.py"
+      - "data/providers/marketparquet_price.py"
 
 permissions:
   contents: read
@@ -41,8 +43,13 @@ jobs:
           python scripts/phase13_readiness_report.py --db data/runtime/operational.db --out-dir wf9_probe --report-only
           cat wf9_probe/PHASE13_READINESS.md
 
+      - name: Phase 14 PIT and physical Parquet audit (hosted runner only)
+        run: |
+          python scripts/phase14_dataset_audit.py --db data/runtime/operational.db --parquet-root data/runtime/parquet --out wf9_probe/PHASE14_DATASET_AUDIT.json --report-only
+          python -c "import json; p=json.load(open('wf9_probe/PHASE14_DATASET_AUDIT.json')); print('PHASE14:',p['status'],'BLOCKERS:',p['blockers'])"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: WF9-Environment-and-Phase13-Readiness
+          name: WF9-Environment-Phase13-Phase14-Readiness
           path: wf9_probe/
           if-no-files-found: error

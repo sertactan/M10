@@ -23,8 +23,19 @@ $reportFile = Join-Path $reportDir "PHASE13_READINESS.json"
 $report = Get-Content $reportFile -Raw | ConvertFrom-Json
 Write-Host "Phase 13: $($report.status)"
 Write-Host "Readiness report: $reportFile"
-if ($report.status -ne "PREFLIGHT_READY_NOT_ACTIVATED") {
-    Write-Warning "Blocked. Resolve the report's missing PIT/fundamental/adjusted-price inputs first."
+
+# Phase14 strengthens the existing WF9 gate: an adjusted-price selection
+# without its physical Parquet partition is NOT sufficient production evidence.
+$phase14File = Join-Path $reportDir "PHASE14_DATASET_AUDIT.json"
+$phase14Args = @("scripts/phase14_dataset_audit.py", "--start", $Start, "--end", $End, "--out", $phase14File, "--price-checks", "500000", "--report-only")
+if ($DbPath) { $phase14Args += @("--db", $DbPath) }
+python @phase14Args
+if ($LASTEXITCODE -ne 0) { throw "Phase 14 dataset audit could not be produced" }
+$phase14 = Get-Content $phase14File -Raw | ConvertFrom-Json
+Write-Host "Phase 14: $($phase14.status)"
+Write-Host "Dataset audit: $phase14File"
+if ($report.status -ne "PREFLIGHT_READY_NOT_ACTIVATED" -or $phase14.status -ne "PREFLIGHT_INPUT_COVERAGE_ASSERTED_NOT_PIT_CERTIFIED") {
+    Write-Warning "Blocked. Resolve missing PIT, SEC fundamentals, adjusted prices, Parquet partitions, or source identity first."
     exit 2
 }
 if (-not $Execute) {

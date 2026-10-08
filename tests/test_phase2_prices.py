@@ -166,8 +166,8 @@ def test_marketparquet_parser_accepts_delisted_symbol() -> None:
     )
     assert len(bars) == 1
     assert bars[0].source_symbol == "TEST-DELISTED"
-    assert bars[0].quality_status is PriceQualityStatus.SURVIVORSHIP_AWARE
-    assert bars[0].adjustment_status is AdjustmentStatus.ADJUSTED_ONLY
+    assert bars[0].quality_status is PriceQualityStatus.REQUIRES_ADJUSTMENT
+    assert bars[0].adjustment_status is AdjustmentStatus.RAW_ONLY
 
 
 def test_parquet_frame_contains_required_lineage_columns() -> None:
@@ -341,3 +341,53 @@ async def test_historical_price_engine_persists_actual_provider_coverage(tmp_pat
         assert row["end_date"] == "2024-12-31"
     finally:
         store.close()
+
+
+def test_marketparquet_only_explicit_adjusted_close_is_backtest_eligible() -> None:
+    frame = pd.DataFrame([{
+        "symbol": "TEST-DELISTED", "date": "2025-01-02", "open": 10,
+        "high": 12, "low": 9, "close": 11, "adjusted_close": 5.5, "volume": 1000,
+    }])
+    bars = MarketParquetPriceProvider.parse_frame(
+        "SEC_TEST", "TEST", frame, date(2025, 1, 1), date(2025, 1, 3), retrieved_at=NOW
+    )
+    assert len(bars) == 1
+    assert bars[0].raw_close == 11
+    assert bars[0].adjusted_close == 5.5
+    assert bars[0].adjustment_status is AdjustmentStatus.DUAL_RAW_ADJUSTED
+    assert PriceSelectionPolicy().select(
+        [_desc("MARKETPARQUET", bars[0].quality_status, bars[0].adjustment_status)],
+        require_adjusted=True,
+    ).source == "MARKETPARQUET"
+
+
+def test_marketparquet_raw_only_is_not_authoritative_adjusted() -> None:
+    frame = pd.DataFrame([{
+        "symbol": "TEST", "date": "2025-01-02", "open": 10, "high": 12,
+        "low": 9, "close": 11, "volume": 1000,
+    }])
+    bars = MarketParquetPriceProvider.parse_frame(
+        "SEC_TEST", "TEST", frame, date(2025, 1, 1), date(2025, 1, 3), retrieved_at=NOW
+    )
+    with pytest.raises(PriceSourceMixingError):
+        PriceSelectionPolicy().select(
+            [_desc("MARKETPARQUET", bars[0].quality_status, bars[0].adjustment_status)],
+            require_adjusted=True,
+        )
+
+
+def test_marketparquet_rejects_bad_adjusted_values_and_duplicate_dates() -> None:
+    good = {
+        "symbol": "TEST", "date": "2025-01-02", "open": 10, "high": 12,
+        "low": 9, "close": 11, "adjusted_close": 5.5, "volume": 1000,
+    }
+    with pytest.raises(ValueError, match="duplicate"):
+        MarketParquetPriceProvider.parse_frame(
+            "SEC_TEST", "TEST", pd.DataFrame([good, good]),
+            date(2025, 1, 1), date(2025, 1, 3), retrieved_at=NOW,
+        )
+    with pytest.raises(ValueError, match="invalid price"):
+        MarketParquetPriceProvider.parse_frame(
+            "SEC_TEST", "TEST", pd.DataFrame([{**good, "adjusted_close": 0}]),
+            date(2025, 1, 1), date(2025, 1, 3), retrieved_at=NOW,
+        )
