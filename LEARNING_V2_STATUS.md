@@ -94,3 +94,55 @@ the private SQLite database is **NOT** mirrored to Google Drive by this
 import and encrypted rclone backup still needs local user configuration.
 Never commit private research DBs, positions, client information, or paid
 vendor data to public GitHub. No API secrets are required for local ZIP import.
+
+## WF5 252-session mature-label bridge — 2026-10-08
+
+Run after real WF5 `COMPLETE` on the **same Windows M10 runtime**:
+
+```powershell
+python scripts/learning_v2.py --db data/runtime/meridyen_learning.sqlite3 wf5-labels-import --operational-db data/runtime/operational.db --run-id <COMPLETE_WF5_RUN_ID> --cutoff 2026-10-08
+python scripts/learning_v2.py --db data/runtime/meridyen_learning.sqlite3 wf5-labels-audit
+```
+
+This new bridge reuses **existing canonical** `forward_outcomes` and
+`s153_historical_control_observations`; it does **not** compute 10X
+from ticker charts, infer acquisition-adjusted returns, score new S15
+features or train the ChatGPT model. It requires:
+- the source WF5 run is `COMPLETE`, its S15 score/status are valid,
+  its forward outcome is `READY`, and 252 forward sessions exist;
+- the WF4 label belongs to the same source run and security, matches
+  `fm252` and `outcome_class`, includes a UTC `label_available_at`
+  **after** the signal date and **no later** than cutoff;
+- the complete forward outcome payload passes its original stored SHA256
+  integrity check;
+- 2X/5X/10X threshold hits and their session indices are consistent.
+
+All censored/inconclusive/immature rows are counted separately; none
+becomes a negative training example. Mature rows are appended to **new**
+`learning_v2_wf5_batches` and `learning_v2_wf5_mature_labels`
+tables, idempotently under a SHA256 batch hash. Existing SEC pilot
+research records and the legacy `learning_v2_outcomes` table stay
+unchanged. Each batch carries `source_pit_verified=0` because
+"WF5 COMPLETE" alone does **not** demonstrate independent PIT
+universe/price/survivorship coverage verification.
+
+`wf5-labels-audit` counts observed 2X/5X/10X outcomes across stored
+snapshot versions but is **not** a statistically valid model win rate,
+market-wide recall, OOS performance or risk-adjusted backtest. A later
+deduplicated walk-forward evaluation and matched controls are required.
+
+**Status now:** source bridge and CI tests can be complete while no real
+WF5 source run is available in GitHub; production labels cannot be
+imported until the user's M10 operational.db is accessible.
+
+## Next five deliverables (scoped roadmap)
+
+1. Mature outcomes bridge and tests (this PR; code ready).
+2. Actual 2013–2024 PIT historical pricing/fundamentals/universe,
+   independent validation, and WF9 `COMPLETE_AND_ACTIVATED` evidence.
+3. Deduplicated walk-forward OOS model comparison, matched negatives,
+   Precision@K / 10X recall and leakage-safe challenger data.
+4. User-authorized M10 runtime orchestration with encrypted Google Drive
+   snapshot/restore tests; background scheduling only after deployment.
+5. Learning V3 experimental ML challenger and controlled `geliştir` pull
+   requests, review, rollback and production UI.

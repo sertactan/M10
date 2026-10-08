@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from core.learning_v2.journal import connect, learn_backtest, record_feedback, audit, backup
 from scripts.import_research_pilot import import_pilot, audit_research
+from core.learning_v2.wf5_outcome_bridge import ingest_wf5, audit_wf5_learning
 
 
 def main():
@@ -30,6 +31,12 @@ def main():
     research=sub.add_parser("research-import", help="Archive source-checked SEC research evidence, not price outcomes")
     research.add_argument("--bundle", type=Path, required=True)
     sub.add_parser("research-audit", help="Read research-only evidence counts")
+    labels=sub.add_parser("wf5-labels-import", help="Import only 252-session mature WF5 labels")
+    labels.add_argument("--operational-db", type=Path, required=True,
+                        help="M10's real operational.db with a completed WF5 run")
+    labels.add_argument("--run-id", required=True)
+    labels.add_argument("--cutoff", required=True, help="Latest allowed evidence date YYYY-MM-DD")
+    sub.add_parser("wf5-labels-audit", help="Aggregate stored mature WF5 evidence; not OOS metrics")
     args=ap.parse_args()
     try:
         if args.command=="init":
@@ -46,6 +53,10 @@ def main():
             result=import_pilot(args.db,args.bundle)
         elif args.command=="research-audit":
             result=audit_research(args.db)
+        elif args.command=="wf5-labels-import":
+            result=ingest_wf5(args.operational_db,args.db,run_id=args.run_id,cutoff=args.cutoff)
+        elif args.command=="wf5-labels-audit":
+            result=audit_wf5_learning(args.db)
         else:
             result=backup(args.db,args.out_dir)
         print(json.dumps(result,indent=2,ensure_ascii=False))
