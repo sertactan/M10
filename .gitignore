@@ -31,3 +31,7 @@ data/runtime/*.sqlite3
 data/runtime/*.sqlite3-*
 data/runtime/learning_backups/
 data/runtime/phase13_export/
+
+# Phase18 private local data/evidence reports (never publish source manifests)
+data/runtime/phase18/
+data/runtime/phase18_*.json
