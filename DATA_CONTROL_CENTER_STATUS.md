@@ -1,0 +1,40 @@
+# Meridyen Data Control Center — Phase 1 (Read Only)
+
+This change adds a DATA CONTROL button to the M10 PySide6 header.
+Panel: PIT listing months (target 144), SEC financial fact row count, US
+CIK matches, source-isolated price series and adjusted-series flags,
+split/dividend source records, pilot versus backtest price selections,
+WF5/WF6 run rows, WF8 activation record rows and local PIT scheduler
+report status. It NEVER certifies WF9 or model accuracy.
+
+## Safe during SEC Companyfacts import
+
+- NO API calls, no downloads, no SQL writes, no migrations, no bootstrap,
+  no model execution. Reads the installed M10 database via SQLite URI mode=ro
+  and PRAGMA query_only=ON. No new empty databases are created.
+- Manual REFRESH only. Worker runs on Qt global thread pool to keep the
+  desktop responsive. On SQLite busy/read error, UI displays a blocked
+  diagnostic and users can retry later. No auto-retry loops.
+- SEC count and PIT availability are approximate point-in-time diagnostics;
+  the importer can still be processing records. Existing facts are not
+  independently verified to match original SEC filing acceptance times.
+- Historical PIT source counts, adjusted-bar metadata and stored split/
+  dividend events are insufficient evidence of survivorship-free WF9,
+  delisting cash payout, full trading-calendar history or 10X predictive
+  accuracy. WF9 is explicitly marked NOT VERIFIED.
+
+## Use on Windows
+
+Keep the SEC importer alive. Do not launch another import into that DB.
+After updating E:\M10 via git pull and restarting a source-based M10 desktop
+process, click DATA CONTROL -> REFRESH (READ ONLY).
+
+An existing installed Windows EXE does not receive the new button via
+git pull: rebuild/publish the installer after these UI changes merge.
+The report is local and does not upload licensed data or secrets to GitHub.
+
+## Remaining work
+
+This is a first, read-only Mission Control panel. Future tasks include
+job orchestration, per-stage progress and history, scheduled backups,
+deeper data quality drilldowns and production WF9/learning readiness.
