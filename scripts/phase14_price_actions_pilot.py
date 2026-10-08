@@ -148,7 +148,7 @@ async def pilot(
 
     # Re-check the installed database and security identity before live writes.
     app = AppContainer(repo_root)
-    if app.sqlite.path.resolve() != db:
+    if app.sqlite.db_path.resolve() != db:
         raise ValueError("Actual operational.db path differs from requested runtime root")
     app.initialize()
     try:
