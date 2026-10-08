@@ -18,11 +18,20 @@ def test_wf9_preflight_ready_only_without_blockers() -> None:
         exact_pit_dates=144,
         any_adjusted_price_dates=144,
         total_universe_observations=1000,
-        total_price_covered=990,
+        total_price_covered=1000,
         blockers=(),
-        warnings=("PARTIAL_ADJUSTED_PRICE_COVERAGE:990/1000",),
+        warnings=(),
     )
     assert ok.ready is True
+    partial=WF9PreflightReport(
+        start_date=ok.start_date,end_date=ok.end_date,
+        requested_snapshot_dates=144,existing_snapshot_dates=144,
+        exact_pit_dates=144,any_adjusted_price_dates=144,
+        total_universe_observations=1000,total_price_covered=990,
+        blockers=("PARTIAL_ADJUSTED_PRICE_COVERAGE:990/1000",),
+        warnings=(),
+    )
+    assert partial.ready is False
     blocked=WF9PreflightReport(
         start_date=ok.start_date,end_date=ok.end_date,
         requested_snapshot_dates=144,existing_snapshot_dates=100,
