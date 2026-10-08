@@ -91,7 +91,16 @@ def _qualified(row, cutoff):
     outcome = row["f_status"]
     if outcome != "READY":
         return None, "CENSORED_FORWARD_LABEL"
-    if int(row["horizon_sessions_available"]) < 252:
+    # Known delisting consideration closes the canonical 252-session
+    # event without inventing post-delisting daily prices or time-to-Kx.
+    # Otherwise all 252 real market sessions must be present.
+    diagnostic = json.loads(row["diagnostics_json"])
+    verified_terminal = (
+        diagnostic.get("terminal_consideration_used") is True
+        and diagnostic.get("terminal_horizon_verified") is True
+        and bool(diagnostic.get("terminal_source_ref"))
+    )
+    if int(row["horizon_sessions_available"]) < 252 and not verified_terminal:
         return None, "CENSORED_SHORT_PRICE_SERIES"
     if row["label_available_at"] is None:
         return None, "CENSORED_MISSING_LABEL_DATE"
@@ -117,8 +126,9 @@ def _qualified(row, cutoff):
     # In M10 the historical FM252 outcome means MAXIMUM observed multiple,
     # NOT last-session close. A verified delisting terminal payout may raise
     # FM252 without a computable time-to-hit trading-session index.
-    diagnostic = json.loads(row["diagnostics_json"])
-    terminal = bool(diagnostic.get("terminal_consideration_used"))
+    terminal = verified_terminal
+    if diagnostic.get("terminal_consideration_used") and not verified_terminal:
+        raise ValueError("Unverified terminal consideration in READY outcome")
     for key,threshold in (("time_to_2x_sessions",2),("time_to_5x_sessions",5),("time_to_10x_sessions",10)):
         t=row[key]
         if t is not None and (not 1 <= int(t) <= 252 or int(t)!=t):
