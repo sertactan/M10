@@ -60,6 +60,9 @@ def _token(payload):
 
 
 def verify_token(value):
+    # Removing the owner password revokes all OAuth access; legacy bearer still works.
+    if not AUTH_ENABLED:
+        return False
     try:
         header, body, mac = value.split(".")
         valid = _b64(hmac.new(SIGN_KEY.encode(), (header + "." + body).encode(),
