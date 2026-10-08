@@ -1,0 +1,23 @@
+name: Meridyen external MCP HTTPS smoke
+on:
+  push:
+    branches: [feature/remote-mcp-health-audit-20261009]
+    paths:
+      - scripts/remote_mcp_health_audit.py
+      - .github/workflows/meridyen-remote-mcp-health.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  three-service-public-https-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check audit syntax
+        run: python -m py_compile scripts/remote_mcp_health_audit.py
+      - name: External Render HTTPS and security regression
+        run: python scripts/remote_mcp_health_audit.py
