@@ -60,7 +60,10 @@ def _forward_payload(row):
         "time_to_5x_sessions", "time_to_7x_sessions",
         "time_to_10x_sessions", "outcome_status",
     )
-    data = {k: row[k] for k in names}
+    data = {k: row[k] for k in names if k not in ("observation_id", "as_of_date_requested", "outcome_status")}
+    data["observation_id"] = row["f_observation_id"]
+    data["as_of_date_requested"] = row["f_as_of"]
+    data["outcome_status"] = row["f_status"]
     data["diagnostics"] = json.loads(row["diagnostics_json"])
     return data
 
