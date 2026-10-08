@@ -116,6 +116,49 @@ def openbb_history(symbol: str = "SPY", start_date: str = "2026-09-01",
     """Actual keyless OpenBB V5 Cboe/Nasdaq daily bars (max 93 days), noncanonical."""
     return _safe_history(provider, symbol, start_date, end_date)
 
+def _sec_filings(symbol: str) -> dict:
+    """List the latest official SEC 10-K / 10-Q links, without importing canonical data."""
+    symbol = symbol.strip().upper()
+    if not PATTERN.fullmatch(symbol):
+        raise ValueError("INVALID_SYMBOL")
+    from openbb import obb
+    end = date.today()
+    start = end - timedelta(days=400)
+    result = obb.sec.company_filings(
+        symbol=symbol,
+        start_date=start.isoformat(),
+        end_date=end.isoformat(),
+        form_type=["10-K", "10-Q"],
+        provider="sec")
+    filings = []
+    for row in (getattr(result, "results", None) or [])[:8]:
+        obj = row.model_dump(mode="json") if hasattr(row, "model_dump") else (
+            row.dict() if hasattr(row, "dict") else {})
+        filings.append({
+            "filing_date": str(obj.get("filing_date") or ""),
+            "report_type": obj.get("report_type"),
+            "report_url": obj.get("report_url"),
+            "accession_number": obj.get("accession_number"),
+        })
+    return {
+        "status": "UPSTREAM_FETCH_VERIFIED" if filings else "OPENBB_FREE_BLOCKED_NO_DATA",
+        "symbol": symbol, "provider": "openbb.sec", "source_command": "obb.sec.company_filings",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "filing_count": len(filings), "filings": filings,
+        "pit_valid": False, "canonical_eligible": False,
+        "note": "A filing list is not a PIT-restated financial statement or S15/S16 score."
+    }
+
+@mcp.tool()
+def openbb_sec_filings(symbol: str = "INOD") -> dict:
+    """Read-only verified SEC 10-K/10-Q filing links for a bounded US ticker."""
+    try:
+        return _sec_filings(symbol)
+    except Exception as exc:
+        return {"status": "OPENBB_FREE_BLOCKED", "symbol": symbol,
+                "provider": "openbb.sec", "error_type": type(exc).__name__,
+                "error": str(exc)[:240], "canonical_eligible": False}
+
 @mcp.tool()
 def openbb_spy_test() -> dict:
     """Execute an actual Cboe historical-bar fetch for SPY without synthetic prices."""
@@ -128,6 +171,18 @@ async def healthz(_request: Request):
     return JSONResponse({"service": NAME, "status": "READY", "mcp_path": "/mcp",
                          "registered_tools": sorted(tool.name for tool in tools),
                          "upstream_spy_probe": dict(PROBE), "mcp_wire_smoke": dict(WIRE_SMOKE)})
+
+SEC_PROBE = {"status": "NOT_RUN"}
+
+async def _probe_sec():
+    value = await asyncio.to_thread(openbb_sec_filings, "INOD")
+    SEC_PROBE.update({
+        "status": value.get("status"), "symbol": "INOD",
+        "filing_count": value.get("filing_count", 0),
+        "error_type": value.get("error_type"), "error": value.get("error"),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    })
+    print("OPENBB_SEC_PROBE:", SEC_PROBE, flush=True)
 
 STOCK_PROBES = {}
 
@@ -170,6 +225,7 @@ async def lifespan(app):
         asyncio.create_task(_probe())
         asyncio.create_task(_mcp_wire_smoke())
         asyncio.create_task(_probe_stocks())
+        asyncio.create_task(_probe_sec())
         yield
 
 base_app = Starlette(routes=[Route("/healthz", healthz), Mount("/", app=mcp_app)],
