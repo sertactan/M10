@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from scripts.mobile_provider_evidence import (
-    SIGNALS, normalize_daily_quote, compare_daily_prices, inventory_s16_evidence,
+    SIGNALS, normalize_daily_quote, compare_daily_prices, inventory_s16_evidence, normalize_social_scan,
 )
 from scripts.s16ea_alert_journal_dryrun import record
 
@@ -59,6 +59,25 @@ class MobileProviderTests(unittest.TestCase):
         self.assertFalse(r["canonical_eligible"])
         self.assertEqual(r["currency"],"USD_UNVERIFIED")
         self.assertEqual(compare_daily_prices(r,r)["status"],"BLOCKED_CURRENCY_UNVERIFIED")
+
+    def test_openbb_daily_bars_latest_date_not_list_order(self):
+        p={"status":"UPSTREAM_FETCH_VERIFIED","symbol":"SPY",
+           "provider":"openbb.cboe","retrieved_at":"2026-10-08T22:00:00Z",
+           "bars":[{"date":"2026-10-07","close":680.0},
+                   {"date":"2026-10-06","close":678.0}]}
+        self.assertEqual(normalize_daily_quote(p,"OPENBB_FREE")["daily_close"],680.0)
+
+    def test_social_scan_is_research_only_not_s16(self):
+        record={"module":"MERIDYEN_SOCIAL_V5_FREE","ticker":"INOD",
+            "source_status":{"bluesky":{"status":"OK","captured":1}},
+            "posts":[{"source_url":"https://bsky.app/profile/example/post/abc",
+              "created_at":"2026-10-08T18:00:00Z",
+              "observed_at":"2026-10-08T18:00:05Z"}]}
+        r=normalize_social_scan(record)
+        self.assertFalse(r["canonical_eligible"])
+        self.assertFalse(r["historical_baseline_verified"])
+        self.assertEqual(r["one_shot_posts"],1)
+        self.assertEqual(r["s16_e"],"NOT_COMPUTED")
 
     def test_cboe_no_pit_and_missing_quotes_rejected(self):
         q={"status":"UPSTREAM_FETCH_VERIFIED","symbol":"SPY",
