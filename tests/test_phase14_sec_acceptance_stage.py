@@ -141,3 +141,17 @@ def test_oversize_sample_prevents_high_db_load(tmp_path):
     db, source = setup(tmp_path)
     with pytest.raises(ValueError, match="max_facts"):
         stage(db, source, max_facts=0)
+
+
+def test_conflicting_duplicate_accession_never_staged(tmp_path):
+    db, source = setup(tmp_path)
+    payload = json.loads(source.read_text())
+    recent = payload["filings"]["recent"]
+    for key in ("accessionNumber", "acceptanceDateTime", "form", "filingDate"):
+        recent[key] = [recent[key][0]] * 3
+    recent["acceptanceDateTime"][1] = "2013-08-09T19:00:00.000Z"
+    source.write_text(json.dumps(payload))
+    r = stage(db, source)
+    assert r["status"] == "NO_SAFE_MATCHES_REQUIRE_REVIEW"
+    assert r["counts"]["conflicting_sec_accession_acceptance"] == 1
+    assert not r["staged"]
