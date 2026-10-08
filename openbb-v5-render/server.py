@@ -129,6 +129,28 @@ async def healthz(_request: Request):
                          "registered_tools": sorted(tool.name for tool in tools),
                          "upstream_spy_probe": dict(PROBE), "mcp_wire_smoke": dict(WIRE_SMOKE)})
 
+STOCK_PROBES = {}
+
+async def _probe_stocks():
+    """Check three real US symbols using the free Nasdaq OpenBB V5 provider."""
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=15)
+    for symbol in ("INOD", "CRMD", "TMDX"):
+        value = await asyncio.to_thread(
+            _safe_history, "nasdaq", symbol, start.isoformat(), end.isoformat())
+        bars = value.get("bars") or []
+        STOCK_PROBES[symbol] = {
+            "status": value.get("status"), "provider": "openbb.nasdaq",
+            "bar_count": value.get("bar_count", 0),
+            "last_bar_date": max((str(x.get("date")) for x in bars), default=None),
+            "error_type": value.get("error_type"),
+            "error": value.get("error"),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "pit_valid": False
+        }
+        print("OPENBB_STOCK_PROBE:", symbol, STOCK_PROBES[symbol], flush=True)
+        await asyncio.sleep(1)
+
 async def _probe():
     end = date.today() - timedelta(days=1)
     start = end - timedelta(days=12)
@@ -147,6 +169,7 @@ async def lifespan(app):
     async with mcp_app.lifespan(app):
         asyncio.create_task(_probe())
         asyncio.create_task(_mcp_wire_smoke())
+        asyncio.create_task(_probe_stocks())
         yield
 
 base_app = Starlette(routes=[Route("/healthz", healthz), Mount("/", app=mcp_app)],
