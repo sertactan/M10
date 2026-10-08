@@ -11,6 +11,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Mount, Route
+from oauth_gate import OAUTH_ROUTES, AUTH_ENABLED, ORIGIN, SCOPE, verify_token
 
 NAME = "Meridyen OpenBB V5 FREE"
 mcp = FastMCP(NAME)
@@ -171,6 +172,7 @@ async def healthz(_request: Request):
     return JSONResponse({"service": NAME, "status": "READY", "mcp_path": "/mcp",
                          "registered_tools": sorted(tool.name for tool in tools),
                          "upstream_spy_probe": dict(PROBE), "mcp_wire_smoke": dict(WIRE_SMOKE),
+                         "owner_oauth_enabled": AUTH_ENABLED,
                          "stock_probes": dict(STOCK_PROBES), "sec_probes": dict(SEC_PROBES)})
 
 SEC_PROBES = {}
@@ -233,7 +235,7 @@ async def lifespan(app):
         asyncio.create_task(_probe_sec())
         yield
 
-base_app = Starlette(routes=[Route("/healthz", healthz), Mount("/", app=mcp_app)],
+base_app = Starlette(routes=OAUTH_ROUTES + [Route("/healthz", healthz), Mount("/", app=mcp_app)],
                      lifespan=lifespan)
 
 class BearerGate:
@@ -246,9 +248,16 @@ class BearerGate:
         if scope["type"] == "http" and scope.get("path", "").startswith("/mcp"):
             authorization = dict(scope.get("headers", [])).get(b"authorization", b"")
             expected = ("Bearer " + self.token).encode()
-            if not hmac.compare_digest(authorization, expected):
+            # Preserve the original private static bearer for local smoke.
+            # Also accept a signed owner OAuth token once configured in Render.
+            legacy_ok = hmac.compare_digest(authorization, expected)
+            oauth_ok = (authorization.startswith(b"Bearer ") and
+                        verify_token(authorization[7:].decode("ascii", errors="ignore")))
+            if not (legacy_ok or oauth_ok):
                 response = PlainTextResponse("Unauthorized", status_code=401,
-                                             headers={"WWW-Authenticate": "Bearer"})
+                    headers={"WWW-Authenticate":
+                        'Bearer resource_metadata="' + ORIGIN +
+                        '/.well-known/oauth-protected-resource", scope="' + SCOPE + '"'})
                 await response(scope, receive, send)
                 return
         await self.application(scope, receive, send)
