@@ -54,7 +54,11 @@ def normalize_daily_quote(data, provider):
         bars = data.get("bars") or []
         if not isinstance(bars, list) or not bars:
             raise ValueError("no OpenBB price bars")
-        last = bars[-1]
+        # OpenBB can return bars in ascending or descending date order.
+        if any(not isinstance(row, dict) or not isinstance(row.get("date"), str)
+               for row in bars):
+            raise ValueError("bar source dates unavailable")
+        last = max(bars, key=lambda row: row["date"][:10])
         price = last.get("close")
         date = last.get("date")
         retrieval = data.get("retrieved_at")
@@ -155,4 +159,36 @@ def inventory_s16_evidence(ticker, as_of, evidence):
         "s16_e": "NOT_COMPUTED", "s16_c": "INCONCLUSIVE_NEEDS_INDEPENDENT_AUDIT",
         "score_calculated": False,
         "note": "Source-provided PIT attestations are not independent validation. Frozen S16 weights/gates never called.",
+    }
+
+
+def normalize_social_scan(data):
+    """Inventory one-shot Social V5 source coverage, NEVER model sentiment/S16."""
+    if not isinstance(data, dict) or data.get("module") != "MERIDYEN_SOCIAL_V5_FREE":
+        raise ValueError("not an authenticated/declared Social V5 response")
+    ticker = data.get("ticker")
+    if not isinstance(ticker, str) or not ticker:
+        raise ValueError("ticker missing")
+    posts = data.get("posts")
+    if not isinstance(posts, list):
+        raise ValueError("posts list missing")
+    for item in posts:
+        if not isinstance(item, dict) or not item.get("source_url"):
+            raise ValueError("social source provenance missing")
+        try:
+            observed = instant(item.get("observed_at"))
+            created = instant(item.get("created_at"))
+            if observed < created:
+                raise ValueError("social post observed before publication")
+        except (ValueError, TypeError) as exc:
+            raise ValueError("social post invalid timestamp") from exc
+    return {
+        "schema": SCHEMA, "ticker": ticker.upper(),
+        "provider": "MERIDYEN_SOCIAL_V5_FREE", "one_shot_posts": len(posts),
+        "source_status": data.get("source_status"),
+        "historical_baseline_verified": False,
+        "cross_platform_market_coverage_verified": False,
+        "pit_valid": False, "canonical_eligible": False,
+        "s16_e": "NOT_COMPUTED", "s16_c": "INCONCLUSIVE_MISSING_PIT",
+        "note": "One-shot public posts never establish full social velocity baseline.",
     }
