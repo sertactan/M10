@@ -40,7 +40,7 @@ class DataControlCenterDialog(QDialog):
         self.service_factory = service_factory
         self._task: _ReadTask | None = None
         self._last_sec_fact_count: int | None = None
-        self.setWindowTitle("Meridyen — Data Control Center Phase 2 (Read Only)")
+        self.setWindowTitle("Meridyen — Data Control Center Phase 3 (Read Only)")
         self.resize(1080, 680)
         self.setMinimumSize(860, 550)
         root = QVBoxLayout(self)
@@ -210,6 +210,39 @@ class DataControlCenterDialog(QDialog):
                  if phase2.daily_pit_requests_used is not None else "UNKNOWN"),
                 "Only recorded requests by scheduled M10 PIT task",
             ))
+        phase3 = getattr(view, "phase3", None)
+        if phase3 is not None:
+            rows.extend([
+                ("SEC checkpoint status", phase3.sec_checkpoint_status,
+                 ("stage: " + (phase3.sec_checkpoint_stage or "—") +
+                  " · last update: " + (phase3.sec_checkpoint_updated_utc or "—"))),
+                ("SEC import lock", "PRESENT" if phase3.sec_lock_present else "NOT PRESENT",
+                 "Legacy importers may not create this lock; NOT permission to restart"),
+                ("SEC ZIP progress", (
+                    f"{phase3.sec_entries_scanned:,}/{phase3.sec_entries_total:,}"
+                    if phase3.sec_entries_scanned is not None
+                    and phase3.sec_entries_total is not None else "NOT INSTRUMENTED"),
+                 "Entries read, not completed issuer count; updates only for future runs"),
+                ("SEC import checkpoint saved", (
+                    f"{phase3.sec_issuers_saved or 0:,} issuers · "
+                    f"{phase3.sec_facts_written_this_run or 0:,} facts"
+                    if phase3.sec_issuers_saved is not None
+                    and phase3.sec_facts_written_this_run is not None
+                    else "NOT INSTRUMENTED"),
+                 "Only this run; no independent import completion certification"),
+                ("SEC quality sample", f"{phase3.sec_quality_rows_sampled:,} latest rows",
+                 "Latest 5,000 rowid window, max 250 facts; biased sample"),
+                ("SEC missing accepted_at", f"{phase3.sec_quality_missing_accepted_at:,}",
+                 "Original SEC acceptance evidence absent"),
+                ("SEC missing accession", f"{phase3.sec_quality_missing_accession:,}",
+                 "Unable to link to SEC original filing"),
+                ("SEC invalid available_at", f"{phase3.sec_quality_invalid_availability:,}",
+                 "Missing, malformed or non-timezone-aware timestamp"),
+                ("SEC time order conflicts", f"{phase3.sec_quality_time_order_conflicts:,}",
+                 "Fact claims availability earlier than its stored acceptance"),
+                ("SEC safe load gate", phase3.readiness_control,
+                 "No launch button; requires manual check and original importer exit"),
+            ])
         self.table.setRowCount(len(rows))
         for i, row in enumerate(rows):
             for j, value in enumerate(row):
