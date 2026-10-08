@@ -4,6 +4,7 @@ Read-only and noncanonical. No trade/broker calls, paid APIs, databases,
 background polling, authentication credentials, or model modifications.
 """
 import datetime as dt
+import json
 import os
 import threading
 import time
@@ -69,6 +70,34 @@ def _guarded_collect(key, collector):
     return result
 
 
+def _bluesky_public_appview_get(url):
+    """Keyless Bluesky search through api.bsky.app when cached public host denies it.
+
+    Strict URL allowlist, HTTPS only, no redirect, no credentials, <=2 MB response.
+    The immutable Social V5 parsing/validation remains core.collect_bluesky.
+    """
+    prefix = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?"
+    if not url.startswith(prefix):
+        raise ValueError("Bluesky endpoint rejected by allowlist")
+    from urllib.request import Request, build_opener
+    target = "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?" + url[len(prefix):]
+    req = Request(target, headers={
+        "User-Agent": "MeridyenSocialV5Free/0.26.0 (+research; no automation)",
+        "Accept": "application/json",
+    })
+    with build_opener(core._NoRedirect()).open(req, timeout=8) as res:
+        if res.status != 200:
+            raise RuntimeError(f"Bluesky API HTTP {res.status}")
+        raw = res.read(core.LIMIT_BYTES + 1)
+        if len(raw) > core.LIMIT_BYTES:
+            raise ValueError("Bluesky response too large")
+        return json.loads(raw.decode("utf-8"))
+
+
+def _collect_bluesky(ticker, limit):
+    return core.collect_bluesky(ticker, limit=limit, fetch=_bluesky_public_appview_get)
+
+
 def _safe_rows(rows):
     # Public information only, bounded; no raw author IDs.
     return [
@@ -101,7 +130,7 @@ def social_bluesky(ticker: str, limit: int = 15) -> dict:
     ticker = core.valid_symbol(ticker)
     limit = max(1, min(int(limit), 15))
     meta, rows = _guarded_collect(("bluesky", ticker, limit),
-        lambda: core.collect_bluesky(ticker, limit=limit))
+        lambda: _collect_bluesky(ticker, limit))
     return {"module": "MERIDYEN_SOCIAL_V5_FREE", "source": "bluesky",
             "ticker": ticker, **meta, "posts": _safe_rows(rows),
             "canonical_status": "UNCHANGED_UNCOMPUTED"}
@@ -126,7 +155,7 @@ def social_scan(ticker: str) -> dict:
     """One-shot keyless multi-source collection plus noncanonical Social V5 analysis."""
     ticker = core.valid_symbol(ticker)
     b, bp = _guarded_collect(("bluesky", ticker, 15),
-        lambda: core.collect_bluesky(ticker, limit=15))
+        lambda: _collect_bluesky(ticker, 15))
     m, mp = _guarded_collect(("mastodon", ticker, "stocks", 15),
         lambda: core.collect_mastodon(ticker, "mastodon.social", "stocks", 15))
     now = core.iso(dt.datetime.now(dt.timezone.utc))
