@@ -1,0 +1,30 @@
+name: OpenBB V5 deployment contract
+on:
+  push:
+    branches: [deploy/openbb-v5-mcp-render-free]
+    paths:
+      - 'openbb-v5-render/**'
+      - '.github/workflows/openbb-v5-regression.yml'
+  workflow_dispatch:
+jobs:
+  safe-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify compilation and canonical firewall
+        run: |
+          python -m py_compile openbb-v5-render/server.py
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+          source=Path('openbb-v5-render/server.py').read_text()
+          tree=ast.parse(source)
+          funcs={node.name for node in ast.walk(tree) if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef))}
+          assert {'openbb_status','openbb_history','openbb_spy_test','openbb_sec_filings','_probe_sec'}.issubset(funcs)
+          assert all(s in source for s in ('INOD', 'CRMD', 'TMDX', '"pit_valid": False', '"canonical_eligible": False'))
+          assert 'MERIDYEN_MCP_BEARER_TOKEN' in source
+          print('OPENBB CONTRACT PASS: read-only SEC probes, PIT firewall, bearer required')
+          PY
