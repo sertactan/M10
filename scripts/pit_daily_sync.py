@@ -20,7 +20,8 @@ from pathlib import Path
 import sqlite3
 from uuid import uuid4
 
-from app.bootstrap import AppContainer
+from core.config.env import load_local_env
+from data.database.sqlite_store import SQLiteStore
 from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
 from data.providers.massive_universe import MassiveUniverseProvider
 from data.repositories.security_repository import SecurityRepository
@@ -31,6 +32,7 @@ DEFAULT_START = date(2013, 1, 1)
 DEFAULT_END = date(2024, 12, 31)
 DEFAULT_LIMIT = 20  # Below free 25/day; 5-request safety margin.
 MAX_DAILY_LIMIT = 20
+PROGRESS_SCHEMA = "MERIDYEN_DAILY_PIT_PROGRESS_V1"
 
 
 def _now():
@@ -90,6 +92,41 @@ def _has_months(conn_path: Path, snapshots: list[date]) -> dict[str, int]:
     return {"present": len(available), "missing": len(snapshots) - len(available)}
 
 
+def _open_existing_store(database: Path) -> SQLiteStore:
+    """Attach to the *existing* SQLite file without full desktop initialization.
+
+    In particular, daily listing sync must not run whole-database quick_check,
+    schema migrations or packaged security seeding on every invocation.
+    A production install runs those separately. The URI mode=rw guarantees
+    that races/deleted files cannot silently create an empty database.
+    """
+    if database.is_symlink() or not database.is_file():
+        raise ValueError("Actual operational.db missing; refusing to create a new database")
+    store = SQLiteStore(database)
+    conn = sqlite3.connect(database.resolve().as_uri() + "?mode=rw",
+                           uri=True, timeout=10)
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=10000")
+        conn.execute("PRAGMA foreign_keys=ON")
+        required = {
+            "security_master": {"security_id", "ticker", "exchange", "market",
+                                "first_seen", "last_seen", "source_priority"},
+            "ticker_aliases": {"alias", "security_id", "valid_from"},
+            "universe_snapshot_membership": {"snapshot_date", "security_id",
+                                              "ticker", "exchange", "source"},
+        }
+        for table, columns in required.items():
+            existing = {str(r["name"]) for r in conn.execute(f"PRAGMA table_info({table})")}
+            if not columns.issubset(existing):
+                raise ValueError("Existing PIT schema is incomplete for " + table)
+        store._conn = conn
+        return store
+    except BaseException:
+        conn.close()
+        raise
+
+
 async def run_daily(
     runtime_root: Path, *, start: date = DEFAULT_START, end: date = DEFAULT_END,
     daily_limit: int = DEFAULT_LIMIT, repo_root: Path | None = None,
@@ -127,21 +164,39 @@ async def run_daily(
         state_path = storage / "utc_request_budget.json"
         state = _read_budget(state_path, utc_day)
 
-        # Load .env without disclosing key in logs or stdout.
-        app = AppContainer(code_root)
-        app.initialize()
+        # This checkpoint is diagnostic only, never a proof of a completed run.
+        progress_path = storage / "latest_progress.json"
+        started_at = _now().isoformat()
+        progress = {"schema": PROGRESS_SCHEMA, "started_at": started_at,
+                    "pid": os.getpid(), "utc_date": utc_day,
+                    "stage": "BOOTSTRAP", "updated_at": started_at,
+                    "snapshots_downloaded_this_run": 0,
+                    "api_requests_reserved_by_this_tool": state["attempts"],
+                    "last_month": None, "failure_class": None}
+        def checkpoint(stage: str, **updates: object) -> None:
+            progress.update({"stage": stage, "updated_at": _now().isoformat(),
+                             **updates})
+            _write_atomic(progress_path, progress)
+
+        # Bypass expensive AppContainer.initialize(), including TWO full
+        # PRAGMA quick_check scans, seed parsing and migrations. Still fail
+        # closed unless actual required schema exists. Load credentials locally.
+        load_local_env(code_root / ".env")
+        store = _open_existing_store(database)
+        checkpoint("EXISTING_DB_CONNECTED")
         try:
             provider = AlphaVantagePitUniverseProvider()
             massive = MassiveUniverseProvider()
             if not provider.configured:
                 raise ValueError("Missing ALPHAVANTAGE_API_KEY in M10 local .env")
-            repository = SecurityRepository(app.sqlite)
+            repository = SecurityRepository(store)
             successful = 0
             skipped = 0
             status = "COMPLETE_LISTINGS_NOT_PIT_CERTIFIED"
             stopped_at = None
             fail_type = None
             for as_of in snapshots:
+                checkpoint("CHECKING_MONTH", last_month=as_of.isoformat())
                 if repository.universe_as_of(as_of):
                     skipped += 1
                     continue
@@ -151,6 +206,8 @@ async def run_daily(
                     stopped_at = as_of.isoformat()
                     break
                 state = new_state
+                checkpoint("API_REQUEST_RESERVED", last_month=as_of.isoformat(),
+                           api_requests_reserved_by_this_tool=state["attempts"])
                 try:
                     records, source = await _load_snapshot(
                         as_of=as_of, mode="ALPHAVANTAGE",
@@ -166,9 +223,12 @@ async def run_daily(
                     fail_type = type(exc).__name__
                     break
                 successful += 1
+                checkpoint("SNAPSHOT_STORED", last_month=as_of.isoformat(),
+                           snapshots_downloaded_this_run=successful)
+            checkpoint("FINAL_COUNTING")
             coverage = _has_months(database, snapshots)
         finally:
-            app.close()
+            store.close()
 
         report = {
             "schema": SCHEMA,
@@ -192,11 +252,19 @@ async def run_daily(
         }
         report_file = storage / "latest_status.json"
         _write_atomic(report_file, report)
+        checkpoint("FINISHED", report_status=status,
+                   snapshots_downloaded_this_run=successful)
         # Append a minimal local audit trail. No URLs or credentials.
         with (storage / "history.jsonl").open("a", encoding="utf-8") as log:
             log.write(json.dumps(report, ensure_ascii=False) + "\n")
         report["report_path"] = str(report_file)
         return report
+    except BaseException as exc:
+        # An abrupt OS kill cannot run this handler: the last atomic
+        # checkpoint remains as evidence of the stage reached.
+        if "progress_path" in locals() and "progress" in locals():
+            checkpoint("FAILED", failure_class=type(exc).__name__)
+        raise
     finally:
         # Only the invocation that won exclusive creation deletes its lock.
         lock.unlink(missing_ok=True)

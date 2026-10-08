@@ -23,13 +23,11 @@ def fixture_runtime(tmp_path, monkeypatch):
     (repo / "config").mkdir(parents=True)
     (repo / "config" / "app.yaml").write_text("fixture-only")
     monkeypatch.setenv("S153_RUNTIME_ROOT", str(root))
-    class FakeApp:
-        def __init__(self, project_root):
-            self.sqlite = SimpleNamespace(connection=sqlite3.connect(db))
-        def initialize(self):
-            pass
+    class FakeStore:
+        def __init__(self):
+            self.connection = sqlite3.connect(db)
         def close(self):
-            self.sqlite.connection.close()
+            self.connection.close()
     class FakeRepository:
         def __init__(self, store):
             self.conn = store.connection
@@ -44,7 +42,7 @@ def fixture_runtime(tmp_path, monkeypatch):
                     (snapshot_date.isoformat(), ticker,ticker,"NASDAQ","ALPHAVANTAGE_PIT"))
             self.conn.commit()
             return len(records)
-    monkeypatch.setattr(daily, "AppContainer", FakeApp)
+    monkeypatch.setattr(daily, "_open_existing_store", lambda _: FakeStore())
     monkeypatch.setattr(daily, "SecurityRepository", FakeRepository)
     monkeypatch.setattr(daily, "AlphaVantagePitUniverseProvider",
                         lambda: SimpleNamespace(configured=True))
@@ -166,3 +164,76 @@ def test_no_pit_canonical_claim_from_synthetic_counts(tmp_path,monkeypatch):
     assert result["monthly_snapshots_present"]==1
     assert result["status"]=="COMPLETE_LISTINGS_NOT_PIT_CERTIFIED"
     assert result["pit_corporate_actions_fundamentals_prices_certified"] is False
+
+
+def test_atomic_progress_records_before_provider_and_preserves_failure_class(
+    tmp_path, monkeypatch,
+):
+    root, db, repo = fixture_runtime(tmp_path, monkeypatch)
+    async def rate_limited(*, as_of, mode, alpha, massive):
+        path = root / "data/runtime/pit_daily_sync/latest_progress.json"
+        event = json.loads(path.read_text(encoding="utf-8"))
+        assert event["stage"] == "API_REQUEST_RESERVED"
+        assert event["api_requests_reserved_by_this_tool"] == 1
+        assert event["last_month"] == "2013-01-31"
+        raise RuntimeError("private provider key must not be logged")
+    monkeypatch.setattr(daily, "_load_snapshot", rate_limited)
+    result = asyncio.run(daily.run_daily(
+        root, repo_root=repo, start=date(2013,1,1), end=date(2013,1,31),
+        daily_limit=1, current_time=at("2026-10-08"),
+    ))
+    assert result["status"] == "PROVIDER_STOPPED_REVIEW_ACCOUNT_OR_QUOTA"
+    progress = json.loads(
+        (root/"data/runtime/pit_daily_sync/latest_progress.json").read_text()
+    )
+    assert progress["stage"] == "FINISHED"
+    assert progress["report_status"] == result["status"]
+    assert progress["api_requests_reserved_by_this_tool"] == 1
+    assert "private provider key" not in json.dumps(progress)
+
+
+def test_lightweight_connection_skips_full_initialize_and_preserves_db(
+    tmp_path, monkeypatch,
+):
+    from data.database.sqlite_store import SQLiteStore
+    db = tmp_path / "existing.db"
+    creator = SQLiteStore(db)
+    creator.initialize()
+    creator.connection.execute(
+        """INSERT INTO security_master
+           (security_id,ticker,name,exchange,market,created_at,updated_at)
+           VALUES ('SEC1','AAA','A','NASDAQ','US','2026-01-01','2026-01-01')"""
+    )
+    creator.connection.commit()
+    creator.close()
+    monkeypatch.setattr(
+        SQLiteStore, "initialize",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("daily PIT must never initialize/migrate the big DB")
+        ),
+    )
+    store = daily._open_existing_store(db)
+    try:
+        assert store.connection.execute(
+            "SELECT COUNT(*) FROM security_master"
+        ).fetchone()[0] == 1
+        assert store.connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    finally:
+        store.close()
+    with sqlite3.connect(db) as con:
+        assert con.execute("SELECT COUNT(*) FROM security_master").fetchone()[0] == 1
+
+
+def test_lightweight_connection_rejects_incomplete_schema_no_creation(tmp_path):
+    db = tmp_path / "missing.db"
+    with pytest.raises(ValueError, match="refusing to create"):
+        daily._open_existing_store(db)
+    assert not db.exists()
+    with sqlite3.connect(db) as con:
+        con.execute("CREATE TABLE dummy (id INTEGER)")
+    with pytest.raises(ValueError, match="schema is incomplete"):
+        daily._open_existing_store(db)
+    with sqlite3.connect(db) as con:
+        assert con.execute(
+            "SELECT count(*) FROM sqlite_master WHERE name='dummy'"
+        ).fetchone()[0] == 1
