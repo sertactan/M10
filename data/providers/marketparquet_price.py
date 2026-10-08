@@ -86,25 +86,50 @@ class MarketParquetPriceProvider:
         high_col = cls._find_col(frame, "high")
         low_col = cls._find_col(frame, "low")
         close_col = cls._find_col(frame, "close")
+        # Phase 14: vendor CSV/Parquet 'close' alone is NOT evidence of an
+        # adjusted close. A raw close must never silently become canonical
+        # BACKTEST_ADJUSTED, even when the file includes delisted tickers.
+        adjusted_col = cls._find_col(
+            frame, "adjusted_close", "adj_close", "adj close", "adj. close",
+            "close_adjusted",
+        )
         volume_col = cls._find_col(frame, "volume")
         if not all([symbol_col, date_col, open_col, high_col, low_col, close_col]):
             raise ValueError(f"Unexpected MarketParquet columns: {list(frame.columns)}")
         symbols = frame[symbol_col].astype(str).str.upper()
         accepted = {ticker.upper(), ticker.upper() + "-DELISTED"}
         subset = frame[symbols.isin(accepted)].copy()
-        subset[date_col] = pd.to_datetime(subset[date_col]).dt.date
+        subset[date_col] = pd.to_datetime(subset[date_col], errors="raise").dt.date
         subset = subset[(subset[date_col] >= start) & (subset[date_col] <= end)]
+        if subset.duplicated([symbol_col, date_col]).any():
+            raise ValueError("MarketParquet has duplicate symbol/date bars")
         out: list[SourcePriceBar] = []
         for _, row in subset.iterrows():
+            import math
+
             close = float(row[close_col])
+            adjusted = float(row[adjusted_col]) if adjusted_col else close
+            op, hi, lo = float(row[open_col]), float(row[high_col]), float(row[low_col])
+            volume = float(row[volume_col]) if volume_col and pd.notna(row[volume_col]) else 0.0
+            if not all(math.isfinite(v) for v in (close, adjusted, op, hi, lo, volume)):
+                raise ValueError("MarketParquet has nonfinite price/volume")
+            if min(close, adjusted, op, hi, lo) <= 0 or volume < 0 or hi < lo:
+                raise ValueError("MarketParquet has invalid price/volume")
             source_symbol = str(row[symbol_col])
             out.append(SourcePriceBar(
                 security_id=security_id, source="MARKETPARQUET", source_symbol=source_symbol,
-                trade_date=parse_date(row[date_col]), open=float(row[open_col]), high=float(row[high_col]),
-                low=float(row[low_col]), raw_close=close, adjusted_close=close,
-                volume=float(row[volume_col]) if volume_col and pd.notna(row[volume_col]) else 0.0,
-                retrieved_at=retrieved_at, quality_status=PriceQualityStatus.SURVIVORSHIP_AWARE,
-                adjustment_status=AdjustmentStatus.ADJUSTED_ONLY,
+                trade_date=parse_date(row[date_col]), open=op, high=hi,
+                low=lo, raw_close=close, adjusted_close=adjusted,
+                volume=volume,
+                retrieved_at=retrieved_at,
+                quality_status=(
+                    PriceQualityStatus.SURVIVORSHIP_AWARE
+                    if adjusted_col else PriceQualityStatus.REQUIRES_ADJUSTMENT
+                ),
+                adjustment_status=(
+                    AdjustmentStatus.DUAL_RAW_ADJUSTED
+                    if adjusted_col else AdjustmentStatus.RAW_ONLY
+                ),
                 raw_payload_hash=sha256_payload(row.to_dict()),
             ))
         return sorted(out, key=lambda b: b.trade_date)
