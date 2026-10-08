@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: meridyen-remote-health-\${{ github.ref }}
+  group: meridyen-remote-health
   cancel-in-progress: false
 jobs:
   three-service-public-https-check:
