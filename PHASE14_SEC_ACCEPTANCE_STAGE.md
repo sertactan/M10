@@ -94,3 +94,6 @@ git pull --ff-only
 - \`--max-issuers\`, \`--max-accessions\` ve \`--max-facts-per-accession\` sınırları sonuçları **kısıtlar**; kapsam tam sayılamaz. \`missing_archival_documents\` varsa tarihsel arşiv kapsaması tamamlanmış değildir. Arşivi eksik bir şirkette son dönem kanıt adayları bulunabilse bile tüm 2013–2024 tarihi doğrulanmış olmaz.
 - Araç dosya hash'ini kaydeder ancak indirmenin gerçekten SEC kaynaklı olduğunu **bağımsız olarak doğrulamaz**. Bir adayı \`evidence_candidates\` listesine koymak, fact kaydına \`accepted_at\` eklemek, mevcut \`available_at\` değerini erkene almak, S15 skorlarını yeniden hesaplamak veya WF9'u açmak değildir.
 - Sonraki ayrı görev: SEC yanıtlarının meşruiyetini ve historical share-class kimliğini doğrulayan kontrollü indirme; uzman gözden geçirme ve ayrı kanıt deposu; mevcut fact tarihlerini ileri alma gereksiniminin ayrı PIT testleri. **Canonical kapalı kalır.**
+
+
+Kaynak dosyaları çoksa aynı toplu işin sonraki sayfasını \`--issuer-offset 5\` (diğer 5 CIK) ya da aynı issuer diliminde \`--accession-offset 1000\` ile çalıştırın. Çıktıda \`next_issuer_offset\` ve \`next_accession_offset\` alanları bulunur. **Her sayfa için farklı --out yolu kullanın**; önceki inceleme raporunun üstüne yazmayın. Parametre limitlerine takılan veriler daha sonra işlenmiş sayılamaz.
