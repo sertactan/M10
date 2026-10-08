@@ -40,7 +40,7 @@ def _sample(tmp_path, *, run_status="COMPLETE"):
 
 
 def _put(conn, ticker, security, stamp, multiple, *, label_date="2025-01-02T23:59:59+00:00",
-         ready=True, hash_valid=True, cohort=True, points=252, override_class=None):
+         ready=True, hash_valid=True, cohort=True, points=252, override_class=None, terminal=False):
     obs=f"wf5-{security}-{stamp}"
     cls=override_class or ("TRUE_10X" if multiple>=10 else "MODERATE_WINNER" if multiple>=2 else "FAILURE")
     conn.execute("INSERT INTO wf5_replay_observations VALUES (?,?,?,?,?,?,?,?)",(
@@ -49,7 +49,7 @@ def _put(conn, ticker, security, stamp, multiple, *, label_date="2025-01-02T23:5
     if not ready:
         return
     forward_id=f"{security}|{stamp}"
-    ti=lambda multiple_: 1 if multiple>=multiple_ else None
+    ti=lambda multiple_: 1 if multiple>=multiple_ and not terminal else None
     payload=dict(
         observation_id=forward_id,security_id=security,as_of_date_requested=stamp,
         anchor_session=stamp,anchor_lag_calendar_days=0,entry_adjusted_close=10.0,
@@ -58,7 +58,9 @@ def _put(conn, ticker, security, stamp, multiple, *, label_date="2025-01-02T23:5
         time_to_2x_sessions=ti(2),time_to_3x_sessions=ti(3),
         time_to_5x_sessions=ti(5),time_to_7x_sessions=ti(7),
         time_to_10x_sessions=ti(10),outcome_status="READY",
-        diagnostics={"source":"SYNTHETIC_FIXTURE","terminal_consideration_used":False})
+        diagnostics={"source":"SYNTHETIC_FIXTURE","terminal_consideration_used":terminal,
+                     "terminal_horizon_verified":terminal,
+                     "terminal_source_ref":"synthetic-primary-source" if terminal else None})
     checksum=hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(",",":"),default=str).encode()).hexdigest()
     if not hash_valid:
         checksum="a"*64
@@ -151,3 +153,17 @@ def test_source_db_same_as_learning_db_refused(tmp_path):
     db=_sample(tmp_path)
     with pytest.raises(ValueError,match="distinct"):
         ingest_wf5(db,db,run_id="run1",cutoff="2026-10-08")
+
+
+
+def test_verified_terminal_consideration_allows_short_horizon_without_invented_hit_time(tmp_path):
+    db=_sample(tmp_path)
+    c=sqlite3.connect(db)
+    _put(c,"DELISTED","SEC-DEL","2024-01-02",11.0,points=63,terminal=True)
+    c.commit();c.close()
+    out=ingest_wf5(db,tmp_path/"learning.sqlite3",run_id="run1",cutoff="2026-10-08")
+    assert out["n_mature"]==1
+    assert out["hits_10x"]==1
+    learned=sqlite3.connect(tmp_path/"learning.sqlite3")
+    assert learned.execute("SELECT time_to_10x_sessions FROM learning_v2_wf5_mature_labels").fetchone()[0] is None
+    learned.close()
