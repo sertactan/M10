@@ -118,13 +118,17 @@ def phase2_diagnostics(
         notes.append("No persisted API health state available; absence is NOT healthy API.")
 
     if conn is not None and "provider_health_events" in tables:
-        for provider, when, rate_limited in conn.execute(
-            """SELECT provider,observed_at,rate_limited
+        # Always inspect only the newest 100 events. Searching for failures
+        # with WHERE success=0 could scan an unbounded healthy event history.
+        for provider, when, rate_limited, success in conn.execute(
+            """SELECT provider,observed_at,rate_limited,success
                FROM provider_health_events
-               WHERE success=0 ORDER BY event_id DESC LIMIT ?""",
-            (MAX_ERROR_EVENTS,),
+               ORDER BY event_id DESC LIMIT 100"""
         ):
-            failures.append((_safe_token(provider), str(when)[:32], bool(rate_limited)))
+            if not success:
+                failures.append((_safe_token(provider), str(when)[:32], bool(rate_limited)))
+                if len(failures) >= MAX_ERROR_EVENTS:
+                    break
     if conn is not None and "background_sync_tasks" in tables:
         for status, n in conn.execute(
             """SELECT status,COUNT(*) FROM background_sync_tasks
