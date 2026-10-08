@@ -66,3 +66,31 @@ veri tamirinin ve kanonik PIT doğrulamasının yapılmadığını belirtir.
    fail-closed kontrolü.
 
 Bu adımlar kanıtlanmadan Görev 4 veya WF9 `COMPLETE` sayılmaz.
+
+
+## Sonraki adım: çok-dosyali SEC arşiv uzlaştırması (2026-10-08)
+
+Yeni \`scripts/phase14_sec_submissions_archive_reconcile.py\` mevcut **tek CIK/son 25 örnek** raporunun yerine geçmeden, şirketin SEC \`filings.recent\` kayıtlarını ve aynı kök dosyadaki \`filings.files\` listesinde belirtilen **eski** \`CIK##########-submissions-001.json\` gibi arşivleri, yerel diskte varsa, birlikte uzlaştırır. SEC'ten otomatik indirme yapmaz; 2013–2024 tarihsel derinlik için bu eski JSON belgelerinin ayrıca SEC'den saklanmış olması gereklidir.
+
+Önce canlı SEC importu bittikten sonra daha önce alınmış, **bütünlük kontrolü yapılmış, ayrı** SQLite yedeğini kullanın. Mevcut PIT otomasyonu ve canlı SQLite üzerinde işlem yapmayın. İndirilmiş SEC orijinal yanıtlarını \`E:\Meridyen_SEC\submissions\` içinde saklayın; CIK ile arşiv dosya adları tam eşleşmelidir.
+
+PowerShell örneği:
+
+\`\`\`powershell
+cd E:\M10
+git pull --ff-only
+
+.\.venv\Scripts\python.exe -m scripts.phase14_sec_submissions_archive_reconcile \`
+  --db "E:\Meridyen_Backups\operational_SEC_20261008_203207.db" \`
+  --submissions-dir "E:\Meridyen_SEC\submissions" \`
+  --max-issuers 5 --max-accessions 1000 --max-facts-per-accession 2000 \`
+  --out "E:\Meridyen_Backups\sec_acceptance_archive_review.json"
+\`\`\`
+
+**Güvenlik ve sınırlar:**
+
+- SQLite bağlantısı \`mode=ro\`, \`PRAGMA query_only=ON\`. Sadece mevcut \`idx_fundamental_accession\` indeksi üzerinden sınırlı eşleştirmeler yapılır; yeni DB, index, ALTER/UPDATE, SEC ağ isteği veya indirme **yoktur**.
+- Accession, kaynak SHA-256, SEC \`acceptanceDateTime\` timezone, form, filingDate, fact period_end, stored accepted_at/available_at kontrol edilir. Ayrı \`security_id\`'lere bağlanan tek CIK, eksik kaynak, çelişkili accession veya lookahead otomatik onaylanmaz.
+- \`--max-issuers\`, \`--max-accessions\` ve \`--max-facts-per-accession\` sınırları sonuçları **kısıtlar**; kapsam tam sayılamaz. \`missing_archival_documents\` varsa tarihsel arşiv kapsaması tamamlanmış değildir. Arşivi eksik bir şirkette son dönem kanıt adayları bulunabilse bile tüm 2013–2024 tarihi doğrulanmış olmaz.
+- Araç dosya hash'ini kaydeder ancak indirmenin gerçekten SEC kaynaklı olduğunu **bağımsız olarak doğrulamaz**. Bir adayı \`evidence_candidates\` listesine koymak, fact kaydına \`accepted_at\` eklemek, mevcut \`available_at\` değerini erkene almak, S15 skorlarını yeniden hesaplamak veya WF9'u açmak değildir.
+- Sonraki ayrı görev: SEC yanıtlarının meşruiyetini ve historical share-class kimliğini doğrulayan kontrollü indirme; uzman gözden geçirme ve ayrı kanıt deposu; mevcut fact tarihlerini ileri alma gereksiniminin ayrı PIT testleri. **Canonical kapalı kalır.**
