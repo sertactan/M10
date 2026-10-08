@@ -90,9 +90,11 @@ def _issuer_index(connection: sqlite3.Connection) -> dict[str, set[str]]:
 
 
 def reconcile(db: Path, folder: Path, *, max_issuers: int = 5,
-              max_accessions: int = 1000, max_facts: int = 2000) -> dict:
+              max_accessions: int = 1000, max_facts: int = 2000,
+              issuer_offset: int = 0, accession_offset: int = 0) -> dict:
     if not (1 <= max_issuers <= 100 and 1 <= max_accessions <= 50_000
-            and 1 <= max_facts <= 20_000):
+            and 1 <= max_facts <= 20_000
+            and issuer_offset >= 0 and accession_offset >= 0):
         raise ValueError("Unbounded SEC reconciliation is not permitted")
     if db.is_symlink() or not db.is_file():
         raise ValueError("Existing SQLite backup required; never create a new DB")
@@ -111,7 +113,11 @@ def reconcile(db: Path, folder: Path, *, max_issuers: int = 5,
         "database": str(db.resolve()),
         "submissions_dir": str(folder.resolve()),
         "status": "REVIEW_REQUIRED",
-        "all_available_issuers_scanned": len(roots) <= max_issuers,
+        "all_available_issuers_scanned": issuer_offset == 0 and len(roots) <= max_issuers,
+        "issuer_offset": issuer_offset,
+        "accession_offset": accession_offset,
+        "next_issuer_offset": (issuer_offset + max_issuers
+                               if issuer_offset + max_issuers < len(roots) else None),
         "archival_coverage_complete": False,
         "independent_sec_download_provenance_verified": False,
         "historical_pit_certified": False,
@@ -143,7 +149,7 @@ def reconcile(db: Path, folder: Path, *, max_issuers: int = 5,
         valid_accessions: dict[tuple[str, str], dict] = {}
         conflicting: set[tuple[str, str]] = set()
 
-        for root in roots[:max_issuers]:
+        for root in roots[issuer_offset:issuer_offset + max_issuers]:
             counts["issuer_root_documents_loaded"] += 1
             cik = ROOT_FILE.fullmatch(root.name).group(1)
             ids = mapped.get(cik, set())
@@ -206,9 +212,15 @@ def reconcile(db: Path, folder: Path, *, max_issuers: int = 5,
         # Global cap bounds indexed DB work. Excess MUST be explicitly flagged.
         ordered = sorted(valid_accessions.values(), key=lambda v: (
             v["filing_date"], v["cik"], v["accession_number"]))
-        if len(ordered) > max_accessions:
-            counts["accessions_deferred_by_run_limit"] = len(ordered) - max_accessions
-        for entry in ordered[:max_accessions]:
+        if accession_offset:
+            counts["accessions_skipped_before_offset"] = min(accession_offset, len(ordered))
+        if len(ordered) > accession_offset + max_accessions:
+            counts["accessions_deferred_by_run_limit"] = len(ordered) - accession_offset - max_accessions
+        report["next_accession_offset"] = (
+            accession_offset + max_accessions if
+            accession_offset + max_accessions < len(ordered) else None
+        )
+        for entry in ordered[accession_offset:accession_offset + max_accessions]:
             rows = con.execute(
                 """SELECT fact_id,accepted_at,available_at,filing_date,
                           period_end,form_type FROM fundamental_facts_source
@@ -281,7 +293,9 @@ def main() -> int:
     parser.add_argument("--out", type=Path, required=True,
                         help="Private JSON review report; must be outside SEC input folder")
     parser.add_argument("--max-issuers", type=int, default=5)
+    parser.add_argument("--issuer-offset", type=int, default=0)
     parser.add_argument("--max-accessions", type=int, default=1000)
+    parser.add_argument("--accession-offset", type=int, default=0)
     parser.add_argument("--max-facts-per-accession", type=int, default=2000)
     args = parser.parse_args()
     try:
@@ -293,7 +307,9 @@ def main() -> int:
         result = reconcile(args.db, args.submissions_dir,
                            max_issuers=args.max_issuers,
                            max_accessions=args.max_accessions,
-                           max_facts=args.max_facts_per_accession)
+                           max_facts=args.max_facts_per_accession,
+                           issuer_offset=args.issuer_offset,
+                           accession_offset=args.accession_offset)
         dest.parent.mkdir(parents=True, exist_ok=True)
         temp = dest.with_suffix(dest.suffix + ".tmp")
         try:
@@ -306,6 +322,8 @@ def main() -> int:
             "status": result["status"],
             "counts": result["counts"],
             "archival_coverage_complete": result["archival_coverage_complete"],
+            "next_issuer_offset": result["next_issuer_offset"],
+            "next_accession_offset": result.get("next_accession_offset"),
             "report": str(dest),
             "database_modified": False,
         }, ensure_ascii=False))
