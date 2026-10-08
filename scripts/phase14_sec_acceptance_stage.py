@@ -117,6 +117,7 @@ def stage(db_path: Path, input_path: Path, *, max_facts: int = 2000) -> dict:
         security_id = security_ids[0]
         counters: Counter[str] = Counter()
         by_accession: dict[str, dict] = {}
+        quarantined_accessions: set[str] = set()
         for row in entries:
             accession = row["accession"]
             if not ACCESSION.fullmatch(accession):
@@ -134,9 +135,12 @@ def stage(db_path: Path, input_path: Path, *, max_facts: int = 2000) -> dict:
             if accepted_at.date() < filing_date:
                 counters["acceptance_date_before_filing_date"] += 1
                 continue
+            if accession in quarantined_accessions:
+                continue
             existing = by_accession.get(accession)
             if existing and existing["accepted_at"] != accepted_at.isoformat():
                 counters["conflicting_sec_accession_acceptance"] += 1
+                quarantined_accessions.add(accession)
                 by_accession.pop(accession)
                 continue
             by_accession[accession] = {
