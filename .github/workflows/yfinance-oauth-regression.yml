@@ -1,0 +1,22 @@
+name: YFinance OAuth regression
+on:
+  push:
+    branches: [deploy/yfinance-mcp-render-free]
+    paths:
+      - 'integrations/yfinance-mcp/**'
+      - '.github/workflows/yfinance-oauth-regression.yml'
+  workflow_dispatch:
+jobs:
+  oauth-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install yfinance MCP requirements
+        run: pip install -r integrations/yfinance-mcp/requirements.txt
+      - name: Run OAuth regression and Python compile
+        run: |
+          python -m compileall -q integrations/yfinance-mcp
+          python -m unittest discover -s integrations/yfinance-mcp/tests -p 'test_*.py' -v
