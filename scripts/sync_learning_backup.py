@@ -103,7 +103,7 @@ def recover_from_cloud_manifest(remote: str, manifest_name: str, destination: Pa
     transport into a private temporary working directory and verified.
     """
     import re
-    if not re.fullmatch(r"meridyen-learning-v2-[A-Za-z0-9_-]+\\.manifest\\.json",manifest_name):
+    if not re.fullmatch(r"meridyen-learning-v2-[A-Za-z0-9_-]+\.manifest\.json",manifest_name):
         raise ValueError("Unsafe cloud manifest name")
     validate_crypt_remote(remote)
     remote_manifest=remote+REMOTE_PREFIX+"/"+manifest_name
