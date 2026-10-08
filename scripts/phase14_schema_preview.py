@@ -9,10 +9,10 @@ against the second copy, comparing ALL pre-existing table row counts before/
 after and checking SQLite integrity. Do not upload the private backups.
 """
 import argparse
+from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import sqlite3
 from uuid import uuid4
@@ -99,13 +99,13 @@ def preview(source_db: Path, backup_dir: Path, *, repo_root: Path | None = None)
         "reason": None,
     }
     try:
-        with _read_only(src) as original:
+        with closing(_read_only(src)) as original:
             if _integrity(original) != "ok":
                 raise ValueError("Original database integrity check failed")
             # SQLite backup API safely includes committed WAL state.
-            with sqlite3.connect(snapshot) as copy:
+            with closing(sqlite3.connect(snapshot)) as copy:
                 original.backup(copy)
-        with _read_only(snapshot) as saved:
+        with closing(_read_only(snapshot)) as saved:
             if _integrity(saved) != "ok":
                 raise ValueError("Online backup SQLite integrity check failed")
             before = _tables_and_counts(saved)
@@ -114,7 +114,7 @@ def preview(source_db: Path, backup_dir: Path, *, repo_root: Path | None = None)
         report["pre_existing_tables"] = len(before)
         # A second SQLite online copy isolates the schema migration.
         with _read_only(snapshot) as saved:
-            with sqlite3.connect(staged) as copy:
+            with closing(sqlite3.connect(staged)) as copy:
                 saved.backup(copy)
         store = SQLiteStore(staged)
         try:
@@ -123,7 +123,7 @@ def preview(source_db: Path, backup_dir: Path, *, repo_root: Path | None = None)
             store.initialize(recover_corrupt=False)
         finally:
             store.close()
-        with _read_only(staged) as check:
+        with closing(_read_only(staged)) as check:
             integrity = _integrity(check)
             after = _tables_and_counts(check)
         report["preview_integrity"] = integrity
