@@ -73,3 +73,5 @@ jobs:
             git commit -m "Record Social V5 MCP and INOD probes (no post text)" || true
             git push origin HEAD:deploy/social-v5-render-free || true
           fi
+
+# Retest after Bluesky public AppView endpoint correction
