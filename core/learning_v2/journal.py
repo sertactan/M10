@@ -11,6 +11,7 @@ import math
 import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 ENGINE = "MERIDYEN_LEARNING_V2"
 SCHEMA_VERSION = 1
@@ -172,9 +173,11 @@ def backup(db_path, out_dir):
         raise ValueError("No local learning database to backup")
     target=Path(out_dir)
     target.mkdir(parents=True,exist_ok=True)
-    stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    dest=target/f"meridyen-learning-v2-{stamp}.sqlite3"
-    src=sqlite3.connect(f"file:{source.resolve()}?mode=ro",uri=True)
+    stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    dest=target/f"meridyen-learning-v2-{stamp}-{uuid4().hex[:12]}.sqlite3"
+    # SQLite online backup uses a consistent snapshot even while other
+    # users access the source DB. Never copy the live .sqlite3 as raw bytes.
+    src=sqlite3.connect(source.resolve().as_uri()+"?mode=ro",uri=True)
     dst=sqlite3.connect(dest)
     try:
         src.backup(dst)
