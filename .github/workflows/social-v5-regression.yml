@@ -1,7 +1,7 @@
 name: Social V5 offline regression
 on:
   push:
-    branches: [deploy/social-v5-render-free]
+    branches: [deploy/social-v5-render-free, feature/social-v5-mcp-sdk-refresh-20261009]
     paths:
       - 'social-v5-render/**'
       - '.github/workflows/social-v5-regression.yml'
@@ -28,3 +28,7 @@ jobs:
           trap 'kill $PID || true' EXIT
           sleep 5
           python tests/smoke_transport.py
+          sleep 1
+          if grep -E 'Error in message router|anyio.ClosedResourceError' /tmp/meridyen-social-mcp.log; then
+            echo 'MCP MESSAGE ROUTER CLOSURE REGRESSION'; exit 1
+          fi
