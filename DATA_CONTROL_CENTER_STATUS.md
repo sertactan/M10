@@ -38,3 +38,37 @@ The report is local and does not upload licensed data or secrets to GitHub.
 This is a first, read-only Mission Control panel. Future tasks include
 job orchestration, per-stage progress and history, scheduled backups,
 deeper data quality drilldowns and production WF9/learning readiness.
+
+## Phase 2 — Data coverage and observed SEC import progress
+
+Faz 2 extends the MANUALLY refreshed and READ-ONLY DATA CONTROL window.
+
+- PIT: annual 2013-2024 month-end coverage (not certified PIT).
+- SEC: companyfacts.zip and .part size and timestamp are ARCHIVE metadata.
+  A complete zip does NOT prove that the importer has finished.
+- SEC facts: row count DELTA between two manual refreshes only. First refresh
+  shows FIRST OBSERVATION. A zero change does not prove a stalled job.
+- Prices: vendor-flagged adjusted source series, overall min/max dates and
+  reported bar totals; no claim of complete historic returns/delistings.
+- API providers: persisted circuit states, consecutive failures, and up
+  to 5 failure observations among latest 100 provider events. Never show
+  original free-form provider messages or sensitive credentials.
+- WF9: local cached Phase13 preflight schema/status/timestamp and blockers;
+  older than 24 hours marked STALE. Even PREFLIGHT_READY does not mean
+  WF9 COMPLETE_AND_ACTIVATED. Missing report means not run/unknown.
+- PIT budget: requests reserved by local PIT sync only, not account-wide.
+- Background sync: grouped persisted status counts, no payload content.
+
+Safety: SQLite mode=ro, PRAGMA query_only=ON, 750ms timeout,
+manual refresh only, no downloads/network, no migrations or SQL writes,
+no database bootstrap, no SEC import restart, no auto-polling or trading.
+File-based report reads max 200 KB with an exact known schema.
+Provider event reads are bounded to last 100 records.
+
+Existing installed Windows EXE is NOT updated just by git pull;
+a separate desktop build is necessary. Do not stop the running SEC import
+to install UI updates. See tests/test_data_control_center.py.
+
+Phase 3 remains: reliable SEC import checkpoint persistence, detailed
+historical evidence diagnostics, exclusive-lock job orchestration,
+and independently confirmed WF9 + original PIT acceptance timestamps.

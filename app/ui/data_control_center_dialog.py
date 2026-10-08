@@ -39,7 +39,8 @@ class DataControlCenterDialog(QDialog):
         super().__init__(parent)
         self.service_factory = service_factory
         self._task: _ReadTask | None = None
-        self.setWindowTitle("Meridyen — Data Control Center (Read Only)")
+        self._last_sec_fact_count: int | None = None
+        self.setWindowTitle("Meridyen — Data Control Center Phase 2 (Read Only)")
         self.resize(1080, 680)
         self.setMinimumSize(860, 550)
         root = QVBoxLayout(self)
@@ -149,6 +150,66 @@ class DataControlCenterDialog(QDialog):
             ("WF9 production verified", "NO",
              "This diagnostic cannot certify or activate WF9"),
         ]
+        # SEC records may be increasing in a different process. Delta
+        # between USER-triggered snapshots is not an importer process check.
+        if view.sec_fact_rows is None:
+            delta = "NOT AVAILABLE"
+        elif self._last_sec_fact_count is None:
+            delta = "FIRST OBSERVATION"
+        else:
+            change = view.sec_fact_rows - self._last_sec_fact_count
+            delta = f"{change:+,} fact rows since previous manual refresh"
+        self._last_sec_fact_count = view.sec_fact_rows
+        rows.append(("SEC import progress (manual delta)", delta,
+                     "Archive and rows cannot prove import completion"))
+
+        phase2 = getattr(view, "phase2", None)
+        if phase2 is not None:
+            rows.append(("SEC bulk archive", phase2.sec_archive_status,
+                         (f"{phase2.sec_archive_size_mb:,.1f} MB · "
+                          f"{phase2.sec_archive_modified_utc or 'mtime unknown'}")
+                         if phase2.sec_archive_size_mb is not None else
+                         "Archive status unknown; no process status inferred"))
+            for year, n in phase2.pit_year_coverage:
+                rows.append((f"Historical PIT {year}", f"{n}/12",
+                             "Calendar month-end snapshot presence only"))
+            if phase2.adjusted_sources:
+                for provider, first, last, series, n_bars in phase2.adjusted_sources:
+                    rows.append((f"Adjusted source {provider}",
+                                 f"{series:,} series · {n_bars:,} reported bars",
+                                 f"Overall min/max: {first} — {last}; gaps not checked"))
+            else:
+                rows.append(("Adjusted source coverage", "NO SOURCE METADATA",
+                             "Not evidence that adjusted price bars are complete"))
+            if phase2.provider_states:
+                for provider, circuit, failures, attempted in phase2.provider_states:
+                    rows.append((f"API health {provider}", f"{circuit} · {failures} failures",
+                                 f"Latest M10 attempt: {attempted}; not an uptime guarantee"))
+            else:
+                rows.append(("API health telemetry", "NO RECORDED STATE",
+                             "Unknown health; not an all-clear"))
+            if phase2.recent_provider_failures:
+                for provider, observed, limited in phase2.recent_provider_failures:
+                    rows.append((f"Recent API failure {provider}", observed,
+                                 "Rate limited" if limited else "Recorded provider failure"))
+            if phase2.queued_tasks:
+                for status, count in phase2.queued_tasks:
+                    rows.append((f"Background tasks {status}", f"{count:,}",
+                                 "Persisted queue status only; executor not verified"))
+            rows.append((
+                "WF9 latest cached preflight", phase2.wf9_report_status,
+                ("STALE · " if phase2.wf9_report_stale else "") +
+                (phase2.wf9_report_generated_at_utc or "NO TIMESTAMP") +
+                (" · blockers: " + ", ".join(phase2.wf9_report_blockers[:3])
+                 if phase2.wf9_report_blockers else
+                 " · does NOT certify execution or activation"),
+            ))
+            rows.append((
+                "PIT API budget (this tool)",
+                (f"{phase2.daily_pit_requests_used}/{phase2.daily_pit_requests_limit}"
+                 if phase2.daily_pit_requests_used is not None else "UNKNOWN"),
+                "Only recorded requests by scheduled M10 PIT task",
+            ))
         self.table.setRowCount(len(rows))
         for i, row in enumerate(rows):
             for j, value in enumerate(row):
