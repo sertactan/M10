@@ -220,7 +220,7 @@ def _write_journal(journal: Path, rows: list[tuple], report: dict) -> tuple[int,
             }, sort_keys=True).encode("utf-8")
         ).hexdigest()
         con.execute(
-            "INSERT OR IGNORE INTO sec_acceptance_staging_runs VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO sec_acceptance_staging_runs VALUES (?,?,?,?,?,?,?,?,?)",
             (run_id, timestamp, report["issuer_offset"], report["accession_offset"],
              len(rows), new_rows, reused_rows,
              report["counts"].get("missing_archival_documents", 0),
