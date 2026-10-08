@@ -10,6 +10,7 @@ on:
       - "scripts/wf9_environment_probe.py"
       - "scripts/sync_free_pit_universe.py"
       - "scripts/bootstrap_wf9_canonical_data.py"
+      - "scripts/phase13_readiness_report.py"
 
 permissions:
   contents: read
@@ -35,7 +36,13 @@ jobs:
       - name: Probe configured production inputs
         run: python scripts/wf9_environment_probe.py
 
+      - name: Phase 13 aggregate PIT readiness (hosted runner only)
+        run: |
+          python scripts/phase13_readiness_report.py --db data/runtime/operational.db --out-dir wf9_probe --report-only
+          cat wf9_probe/PHASE13_READINESS.md
+
       - uses: actions/upload-artifact@v4
         with:
-          name: WF9-Environment-Probe
-          path: wf9_probe/WF9_ENVIRONMENT_PROBE.json
+          name: WF9-Environment-and-Phase13-Readiness
+          path: wf9_probe/
+          if-no-files-found: error

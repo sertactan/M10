@@ -40,3 +40,39 @@ Caveat: installed Windows M10 uses a writable runtime directory that may differ 
 ## Testing
 
 GitHub CI runs `python -m pytest -q` on pull requests. New tests included in `tests/test_phase13_bridge.py`, `tests/test_wf9_execution.py` and `tests/test_learning_v2.py`. No real-market performance metric has been asserted.
+
+## Follow-up — Phase 13 one-command real-data readiness (2026-10-08)
+
+Now includes `scripts/phase13_readiness_report.py` and the guarded
+`scripts/phase13_windows_pipeline.ps1` entry point. The reporter opens
+M10's actual database **read-only** and generates:
+
+- `data/runtime/phase13_readiness/PHASE13_READINESS.json`
+- `data/runtime/phase13_readiness/PHASE13_READINESS.md`
+
+Checks the exact native WF9 PIT coverage on the requested 2013–2024
+window, shows missing monthly dates and coverage counts, and preserves
+`PREFLIGHT_BLOCKED` / `BLOCKED_DB_NOT_FOUND` states honestly.
+
+**On the actual M10 Windows machine**, from source repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/phase13_windows_pipeline.ps1
+# Or, if the application has a custom writable runtime:
+$env:S153_RUNTIME_ROOT = "D:\MeridyenRuntime"
+powershell -ExecutionPolicy Bypass -File scripts/phase13_windows_pipeline.ps1
+# Once the diagnostic says PREFLIGHT_READY_NOT_ACTIVATED:
+powershell -ExecutionPolicy Bypass -File scripts/phase13_windows_pipeline.ps1 -Execute
+```
+
+`-Execute` performs the native WF9 run and **activates** only if the
+preflight passes; it does not bootstrap/download data or bypass gates.
+Check permissions/data licenses before any provider bootstrap.
+
+The updated GitHub-hosted WF9 Environment Probe workflow also produces
+`PHASE13_READINESS.json` and `.md` CI artifacts. Its hosted runner is
+a different machine from the user's Windows M10 runtime. A missing DB there
+is not evidence that the user has no local market data.
+
+No real-market WF9 completion, PIT certification, or continuous Learning V2
+has been claimed from the hosted test alone.
