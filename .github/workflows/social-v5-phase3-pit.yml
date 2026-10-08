@@ -1,0 +1,40 @@
+name: Social V5 Phase 3 PIT verification and first snapshot
+on:
+  push:
+    branches:
+      - feature/social-v5-pit-auth-phase3
+    paths:
+      - .github/workflows/social-v5-phase3-pit.yml
+      - social-v5-render/pit_capture.py
+      - social-v5-render/mcp_auth.py
+      - social-v5-render/server.py
+      - social-v5-render/tests/test_phase3.py
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: meridyen-social-v5-phase3-pit
+  cancel-in-progress: false
+jobs:
+  verify-and-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/social-v5-pit-auth-phase3
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run privacy and authentication regression tests (offline)
+        run: python -m unittest discover -s social-v5-render/tests -p 'test_phase3.py' -v
+      - name: Capture first verified first-seen INOD snapshot (public feeds)
+        run: python social-v5-render/pit_capture.py --ticker INOD --store social-v5-render/pit_data
+      - name: Save sanitized PIT records on isolated feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add social-v5-render/pit_data
+          git commit -m "Record genuine first-observed Social V5 INOD snapshot (hashed)" || true
+          git push origin HEAD:feature/social-v5-pit-auth-phase3
