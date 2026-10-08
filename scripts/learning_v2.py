@@ -8,6 +8,7 @@ import argparse
 import json
 from pathlib import Path
 from core.learning_v2.journal import connect, learn_backtest, record_feedback, audit, backup
+from scripts.import_research_pilot import import_pilot, audit_research
 
 
 def main():
@@ -26,6 +27,9 @@ def main():
     improve.add_argument("--phase13-manifest",type=Path)
     back=sub.add_parser("backup")
     back.add_argument("--out-dir",type=Path,default=Path("data/runtime/learning_backups"))
+    research=sub.add_parser("research-import", help="Archive source-checked SEC research evidence, not price outcomes")
+    research.add_argument("--bundle", type=Path, required=True)
+    sub.add_parser("research-audit", help="Read research-only evidence counts")
     args=ap.parse_args()
     try:
         if args.command=="init":
@@ -38,6 +42,10 @@ def main():
             result=record_feedback(args.db,args.category,args.note,args.evidence_ref)
         elif args.command=="improve":
             result=audit(args.db,args.phase13_manifest)
+        elif args.command=="research-import":
+            result=import_pilot(args.db,args.bundle)
+        elif args.command=="research-audit":
+            result=audit_research(args.db)
         else:
             result=backup(args.db,args.out_dir)
         print(json.dumps(result,indent=2,ensure_ascii=False))

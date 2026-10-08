@@ -50,3 +50,47 @@ The uploader checks local SHA-256 and file existence before transfer, uses immut
 - Repeatable evaluation vs S15/S16 baseline; do not rewrite frozen model definitions.
 - Agent may propose bounded PRs and tests when asked `geliştir`, not edit without evidence or create unapproved trades.
 - Scheduled checks require an actually deployed scheduler/M10 background service; a ChatGPT plugin skill alone is not an always-on worker.
+
+## SEC research pilot integration — 2026-10-08
+
+**Data status: SEC-filing research snapshot only, NOT canonical PIT backtest and NOT trained ML.**
+
+The owner has a dated research pilot of INOD, CRMD and TMDX (3 tickers × 8 research
+modules = 24 checked routes). It is distributed as a private ZIP containing
+`run_manifest.json`, `results/*.json`, and source-tagged inputs. The
+manifest includes SHA-256 hashes for every result file. A summary receipt is
+saved in the owner's Google Drive Learning_Engine/V2 folder:
+
+https://docs.google.com/document/d/1wUb5SMJJ22-z_CgcplHtmWDsenq_lNh71EaJLt8oLKI/edit
+
+### Local Windows import to the persistent Learning V2 database
+
+Download the **private pilot ZIP** from the ChatGPT conversation and use the
+exact path on the Windows machine with the M10 checkout:
+
+```powershell
+python scripts/learning_v2.py --db data/runtime/meridyen_learning.sqlite3 research-import --bundle "C:\\Users\\YOU\\Downloads\\Meridyen_SEC_Research_Pilot_2026-10-08.zip"
+python scripts/learning_v2.py --db data/runtime/meridyen_learning.sqlite3 research-audit
+python scripts/learning_v2.py --db data/runtime/meridyen_learning.sqlite3 backup
+```
+
+For a packaged M10 build, identify its actual writable `S153_RUNTIME_ROOT`
+and pass the **same** private Learning V2 DB in all three commands; checkout
+relative paths need not be the production install's location.
+
+The importer rejects tampered hashes, unsupported modes/statuses, path
+traversal, missing source metadata, duplicate/conflicting records, unexpected
+canonical/PIT/backtest claims, and incomplete bundles. SHA256 de-duplicates
+reimports. Everything is isolated in new `learning_v2_research_*` tables.
+
+**Research ≠ outcomes:** importing these 24 observations DOES NOT populate
+`learning_v2_outcomes`, imply model hit rate, score or retrain S15/S16, or
+establish a market-data feed. 2026 Q2 SEC records are observational evidence;
+training requires historically matured, date-audited price outcomes, controls,
+realistic execution cost and independent test periods.
+
+**Cloud:** the source-linked summary receipt is already in Google Drive;
+the private SQLite database is **NOT** mirrored to Google Drive by this
+import and encrypted rclone backup still needs local user configuration.
+Never commit private research DBs, positions, client information, or paid
+vendor data to public GitHub. No API secrets are required for local ZIP import.
