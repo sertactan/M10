@@ -25,3 +25,9 @@ logs/*.log
 Thumbs.db
 .vscode/
 .idea/
+
+# Phase 13 / Learning V2 private data (never commit)
+data/runtime/*.sqlite3
+data/runtime/*.sqlite3-*
+data/runtime/learning_backups/
+data/runtime/phase13_export/
