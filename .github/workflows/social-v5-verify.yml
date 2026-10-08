@@ -74,4 +74,4 @@ jobs:
             git push origin HEAD:deploy/social-v5-render-free || true
           fi
 
-# Retest after Bluesky public AppView endpoint correction
+# 2026-10-09: Reverify live Social V5 and all four INOD tools; separate MCP and provider status.
