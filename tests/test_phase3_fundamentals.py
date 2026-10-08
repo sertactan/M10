@@ -363,3 +363,46 @@ def test_phase3_schema_contains_required_lineage_columns(tmp_path: Path) -> None
         "fundamental_validation_results","fundamental_sync_runs",
     } <= tables
     store.close()
+
+
+def test_future_dated_sec_period_never_leaks_into_historical_snapshot(tmp_path: Path) -> None:
+    """SEC files can carry future outlier period_end (e.g. 2039).
+
+    A backdated available_at must NOT turn that value into an as-of input;
+    the original archived observation must stay untouched for provenance.
+    """
+    store, repo = _store(tmp_path)
+    repo.save_facts([
+        _fact(value=100, source="SEC_EDGAR", available_at=MAY1,
+              accepted_at=MAY1, period_end=date(2025,3,31)),
+        _fact(value=999999, source="SEC_EDGAR", available_at=MAY1,
+              accepted_at=MAY1, period_end=date(2039,8,31),
+              period_start=date(2039,1,1), accession="FUTURE_PERIOD"),
+    ])
+    rows = repo.source_facts_as_of(
+        "SEC_TEST", datetime(2025,5,15,23,59,tzinfo=timezone.utc))
+    assert [r["value"] for r in rows] == [100]
+    canonical = repo.canonical_facts_as_of(
+        "SEC_TEST", datetime(2025,5,15,23,59,tzinfo=timezone.utc))
+    assert [r["value"] for r in canonical] == [100]
+    assert store.connection.execute(
+        "SELECT COUNT(*) FROM fundamental_facts_source"
+    ).fetchone()[0] == 2
+    later = repo.source_facts_as_of(
+        "SEC_TEST", datetime(2040,1,1,tzinfo=timezone.utc))
+    assert len(later) == 2
+    store.close()
+
+
+def test_fiscal_period_guard_uses_utc_asof_date(tmp_path: Path) -> None:
+    """A positive timezone offset must not allow tomorrow's period at UTC dusk."""
+    from datetime import timedelta
+    store, repo = _store(tmp_path)
+    repo.save_facts([
+        _fact(value=100, source="SEC_EDGAR",
+              available_at=datetime(2025,5,15,tzinfo=timezone.utc),
+              period_start=None, period_end=date(2025,5,16))
+    ])
+    local_asof = datetime(2025,5,16,1,0, tzinfo=timezone(timedelta(hours=9)))
+    assert repo.source_facts_as_of("SEC_TEST", local_asof) == []
+    store.close()
