@@ -21,3 +21,5 @@ jobs:
         run: python -m py_compile scripts/remote_mcp_health_audit.py
       - name: External Render HTTPS and security regression
         run: python scripts/remote_mcp_health_audit.py
+
+# Post-rollout external verification: Social MCP 1.30, Render deploy dep-db42i1ajnfac73ba4h6g
