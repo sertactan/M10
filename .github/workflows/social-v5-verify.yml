@@ -1,0 +1,75 @@
+name: Social V5 FREE remote MCP verification
+on:
+  push:
+    branches: ["deploy/social-v5-render-free"]
+    paths: [".github/workflows/social-v5-verify.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: deploy/social-v5-render-free
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --disable-pip-version-check mcp==1.15.0 pydantic==2.11.9
+      - name: MCP initialize, list tools and INOD public-source calls
+        env:
+          MCP_URL: https://meridyen-social-v5-free.onrender.com/mcp
+        run: |
+          python - <<'PY'
+          import asyncio, json, os, datetime, pathlib
+          from mcp import ClientSession
+          from mcp.client.streamable_http import streamablehttp_client
+
+          result = {"as_of_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "target": os.environ["MCP_URL"], "model_firewall": "UNCHANGED"}
+          async def main():
+              async with streamablehttp_client(os.environ["MCP_URL"], timeout=datetime.timedelta(seconds=90)) as (read, write, _):
+                  async with ClientSession(read, write) as client:
+                      await client.initialize()
+                      names=[t.name for t in (await client.list_tools()).tools]
+                      result["tools_discovered"]=names
+                      assert set(["social_status","social_bluesky","social_mastodon","social_scan"]).issubset(set(names)), names
+                      for name,args in (
+                          ("social_status", {}),
+                          ("social_bluesky", {"ticker":"INOD","limit":8}),
+                          ("social_mastodon", {"ticker":"INOD","limit":8}),
+                          ("social_scan", {"ticker":"INOD"})):
+                          output=await client.call_tool(name,args)
+                          raw=output.structuredContent or {}
+                          if not raw and output.content:
+                              try:raw=json.loads(output.content[0].text)
+                              except Exception:raw={}
+                          result[name]={
+                              "is_error": bool(output.isError),
+                              "status":raw.get("status", "OK" if not output.isError else "ERROR"),
+                              "posts":len(raw.get("posts",[])),
+                              "source_status":raw.get("source_status"),
+                              "module":raw.get("module"),
+                          }
+                          print(name, json.dumps(result[name], ensure_ascii=False)[:800])
+                          assert not output.isError, name
+          try:
+              asyncio.run(main())
+              result["mcp_handshake"]="PASS"
+          except Exception as e:
+              result["mcp_handshake"]="FAIL"
+              result["error"]=repr(e)[:400]
+              print("ERROR", repr(e))
+          pathlib.Path("social-v5-render/verification.json").write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n")
+          PY
+      - name: Store sanitized verification record on isolated branch
+        if: always()
+        run: |
+          if [ -f social-v5-render/verification.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add social-v5-render/verification.json
+            git commit -m "Record Social V5 MCP and INOD probes (no post text)" || true
+            git push origin HEAD:deploy/social-v5-render-free || true
+          fi
