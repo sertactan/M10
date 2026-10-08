@@ -1,0 +1,30 @@
+name: Meridyen Mobile Data / S16 Gate
+on:
+  push:
+    branches: [feature/mobile-meridyen-readiness-v2-20261009]
+    paths:
+      - 'scripts/mobile_provider_evidence.py'
+      - 'scripts/s16ea_alert_journal_dryrun.py'
+      - 'tests/test_mobile_provider_evidence.py'
+      - '.github/workflows/mobile-provider-gates.yml'
+  pull_request:
+    paths:
+      - 'scripts/mobile_provider_evidence.py'
+      - 'scripts/s16ea_alert_journal_dryrun.py'
+      - 'tests/test_mobile_provider_evidence.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile-evidence-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile provider gates
+        run: python -m py_compile scripts/mobile_provider_evidence.py scripts/s16ea_alert_journal_dryrun.py
+      - name: Run fail-closed provenance, leakage and dedup regression
+        run: python -m unittest tests.test_mobile_provider_evidence -v
