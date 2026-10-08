@@ -19,6 +19,7 @@ from starlette.routing import Route
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import social_v5_free as core
+from mcp_auth import BearerGuard
 
 _HOST = os.getenv("RENDER_EXTERNAL_HOSTNAME", "meridyen-social-v5-free.onrender.com")
 _security = TransportSecuritySettings(
@@ -181,3 +182,6 @@ async def _health(request):
 
 app = mcp.streamable_http_app()
 app.router.routes.append(Route("/health", endpoint=_health, methods=["GET"]))
+# Bearer enforcement turns on ONLY when a server secret is configured. Do not
+# enable until every connected private client has an authorized token.
+app = BearerGuard(app)
