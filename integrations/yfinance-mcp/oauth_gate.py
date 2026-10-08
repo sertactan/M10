@@ -185,14 +185,19 @@ async def login(request: Request):
         hits = attempts[peer]
         while hits and hits[0] < now - 900:
             hits.popleft()
+        # Limit failed password attempts, not successful OAuth consent flows.
+        # ChatGPT may issue multiple legitimate authorization requests through
+        # one shared IP. Counting successes previously locked out the owner.
         if len(hits) >= 8:
             return _json({"error": "too_many_attempts"}, 429)
-        hits.append(now)
         item = pending.get(ticket)
         if not item or now - item["created"] > 300:
             return _json({"error": "expired_authorization"}, 400)
         if not hmac.compare_digest(password.encode(), PASSWORD.encode()):
+            hits.append(now)
             return _json({"error": "access_denied"}, 403)
+        # Successful owner authentication clears this peer's failure budget.
+        hits.clear()
         pending.pop(ticket, None)
         code = secrets.token_urlsafe(32)
         codes[hashlib.sha256(code.encode()).hexdigest()] = dict(item, created=now)
