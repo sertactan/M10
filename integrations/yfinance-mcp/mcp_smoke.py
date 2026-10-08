@@ -70,10 +70,11 @@ async def run():
                             structured = {}
                         break
             # Only summary fields. No raw upstream payload or secrets.
-            log.warning("SMOKE INOD quote http=200 result_error=%s provider_status=%s price=%s as_of=%s",
+            log.warning("SMOKE INOD quote http=200 result_error=%s provider_status=%s price=%s bar_date=%s retrieved_at_utc=%s real_time_verified=%s",
                         data.get("isError", False), structured.get("status"),
                         structured.get("price", structured.get("close")),
-                        structured.get("data_as_of", structured.get("date")))
+                        structured.get("bar_date"), structured.get("retrieved_at_utc"),
+                        structured.get("real_time_verified"))
             # Exercise real OAuth PKCE registration, password consent, code exchange,
             # replay rejection, token-gated tool discovery. No secret values logged.
             redirect = "https://chatgpt.com/connector/oauth/meridyen-smoke"
