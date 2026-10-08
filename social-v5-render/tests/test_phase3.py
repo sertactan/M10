@@ -118,7 +118,7 @@ class BaselineReadinessTests(unittest.TestCase):
                 "sources": {"bluesky": {"status": "OK", "matched": 11},
                             "mastodon": {"status": "OK", "matched": 0}},
             }
-            path.write_text(json.dumps(payload) + "\\n", encoding="utf-8")
+            path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
             result = pit_readiness.readiness(path, now)
             self.assertEqual(result["status"], "BASELINE_NOT_READY")
             self.assertEqual(result["source_coverage"]["bluesky"]["baseline_observed_hours"], 0)
@@ -133,7 +133,7 @@ class BaselineReadinessTests(unittest.TestCase):
                 "capture_ended_at": now,
                 "sources": {"bluesky": {"status": "PUBLIC_SOURCE_UNAVAILABLE"}}
             }
-            path.write_text(json.dumps(payload) + "\\n", encoding="utf-8")
+            path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
             result = pit_readiness.readiness(path, now)
             self.assertEqual(result["source_coverage"]["bluesky"]["current_observed_hours"], 0)
 
