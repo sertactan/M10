@@ -30,17 +30,17 @@ def _bounded_history(data, max_bars):
         data["point_in_time_canonical"] = False
     return data
 
-@mcp.tool()
+@mcp.tool(meta={"securitySchemes": [{"type": "oauth2", "scopes": ["yfinance:read"]}]})
 def get_stock_quote(symbol: str) -> dict:
     """Read unofficial most recent DAILY bar. Not verified real-time."""
     return invoke("quote", symbol=symbol)
 
-@mcp.tool()
+@mcp.tool(meta={"securitySchemes": [{"type": "oauth2", "scopes": ["yfinance:read"]}]})
 def get_company_overview(symbol: str) -> dict:
     """Unofficial public company profile and selected financial metrics."""
     return invoke("overview", symbol=symbol)
 
-@mcp.tool()
+@mcp.tool(meta={"securitySchemes": [{"type": "oauth2", "scopes": ["yfinance:read"]}]})
 def get_time_series_daily(symbol: str, outputsize: str = "compact") -> dict:
     """Non-PIT daily OHLCV. compact up to 120, full up to 500 bars."""
     if outputsize not in ("compact", "full"):
@@ -49,17 +49,17 @@ def get_time_series_daily(symbol: str, outputsize: str = "compact") -> dict:
     return _bounded_history(invoke("history", symbol=symbol, period=period),
                             120 if outputsize == "compact" else 500)
 
-@mcp.tool()
+@mcp.tool(meta={"securitySchemes": [{"type": "oauth2", "scopes": ["yfinance:read"]}]})
 def search_symbol(keywords: str) -> dict:
     """Unofficial Yahoo symbol search; not an exchange universe listing."""
     return invoke("search", query=keywords)
 
-@mcp.tool()
+@mcp.tool(meta={"securitySchemes": [{"type": "oauth2", "scopes": ["yfinance:read"]}]})
 def get_recommendations(symbol: str) -> dict:
     """Unofficial analyst recommendations; historical vintage not verified."""
     return invoke("recommendations", symbol=symbol)
 
-@mcp.tool()
+@mcp.tool(meta={"securitySchemes": [{"type": "oauth2", "scopes": ["yfinance:read"]}]})
 def get_insider_transactions(symbol: str) -> dict:
     """Unofficial insider transactions; verify SEC Forms 4 independently."""
     return invoke("insider", symbol=symbol)
