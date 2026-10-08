@@ -170,19 +170,24 @@ async def healthz(_request: Request):
     tools = await mcp.list_tools()
     return JSONResponse({"service": NAME, "status": "READY", "mcp_path": "/mcp",
                          "registered_tools": sorted(tool.name for tool in tools),
-                         "upstream_spy_probe": dict(PROBE), "mcp_wire_smoke": dict(WIRE_SMOKE)})
+                         "upstream_spy_probe": dict(PROBE), "mcp_wire_smoke": dict(WIRE_SMOKE),
+                         "stock_probes": dict(STOCK_PROBES), "sec_probes": dict(SEC_PROBES)})
 
-SEC_PROBE = {"status": "NOT_RUN"}
+SEC_PROBES = {}
 
 async def _probe_sec():
-    value = await asyncio.to_thread(openbb_sec_filings, "INOD")
-    SEC_PROBE.update({
-        "status": value.get("status"), "symbol": "INOD",
-        "filing_count": value.get("filing_count", 0),
-        "error_type": value.get("error_type"), "error": value.get("error"),
-        "checked_at": datetime.now(timezone.utc).isoformat(),
-    })
-    print("OPENBB_SEC_PROBE:", SEC_PROBE, flush=True)
+    """Bounded official 10-K/10-Q filing-list smoke for three tracked issuers."""
+    for symbol in ("INOD", "CRMD", "TMDX"):
+        value = await asyncio.to_thread(openbb_sec_filings, symbol)
+        SEC_PROBES[symbol] = {
+            "status": value.get("status"), "symbol": symbol,
+            "filing_count": value.get("filing_count", 0),
+            "error_type": value.get("error_type"), "error": value.get("error"),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "pit_valid": False,
+        }
+        print("OPENBB_SEC_PROBE:", symbol, SEC_PROBES[symbol], flush=True)
+        await asyncio.sleep(1)
 
 STOCK_PROBES = {}
 
