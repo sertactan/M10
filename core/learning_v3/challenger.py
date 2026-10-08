@@ -16,8 +16,11 @@ import re
 
 SCHEMA = "MERIDYEN_V3_DATED_COHORT_V1"
 ENGINE = "MERIDYEN_LEARNING_V3_EXPERIMENT_V1"
-BAD_FEATURE = re.compile(r"(?:^|_)(?:target|label|hit|outcome|future|forward|fm252|return|time_to)(?:_|$)")
-SAFE_FEATURE = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
+BAD_FEATURE = re.compile(
+    r"(?:^|_)(?:target|label|hit|outcome|future|forward|fm252|return|time_to)(?:_|$)"
+    r"|^(?:H10|HMG5|HMG10|XR|WINNER_SIM|CONTROL_SIM)$", re.IGNORECASE
+)
+SAFE_FEATURE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{1,63}$")
 
 
 def _timestamp(value):
