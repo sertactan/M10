@@ -1,7 +1,7 @@
 name: Meridyen external MCP HTTPS smoke
 on:
   push:
-    branches: [feature/remote-mcp-health-audit-20261009]
+    branches: [feature/remote-mcp-health-audit-20261009, verify/social-v5-mcp-130-20261009]
     paths:
       - scripts/remote_mcp_health_audit.py
       - .github/workflows/meridyen-remote-mcp-health.yml
