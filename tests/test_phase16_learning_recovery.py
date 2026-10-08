@@ -12,7 +12,8 @@ from core.learning_v2.journal import backup,connect
 from core.learning_v2.recovery import read_manifest,restore_snapshot,verify_snapshot
 from scripts.phase16_learning_cycle import cycle
 from scripts.sync_learning_backup import (
-    prepare,validate_crypt_remote,upload_verified,download_verified
+    prepare,validate_crypt_remote,upload_verified,download_verified,
+    recover_from_cloud_manifest
 )
 
 
@@ -150,3 +151,29 @@ def test_cycle_cloud_requires_owner_authorization(tmp_path):
     con.close()
     with pytest.raises(ValueError,match="crypt remote"):
         cycle(db,tmp_path/"backup",execute_cloud=True)
+
+
+def test_disaster_restore_from_cloud_manifest_without_local_files(tmp_path,monkeypatch):
+    db,meta=_backup(tmp_path)
+    _fake_crypt_runner(monkeypatch)
+    manifest=Path(meta["manifest_file"])
+    uploaded=upload_verified(manifest,"meridyen_crypt:")
+    assert uploaded["remote_manifest_verified"] is True
+    # Simulate loss of BOTH the backup and its manifest.
+    Path(meta["file"]).unlink()
+    manifest_name=manifest.name
+    manifest.unlink()
+    dest=tmp_path/"disaster-restored.sqlite3"
+    recovered=recover_from_cloud_manifest("meridyen_crypt:",manifest_name,dest)
+    assert recovered["status"]=="RESTORED_NEW_DB_ONLY"
+    assert dest.exists()
+    conn=sqlite3.connect(dest)
+    assert conn.execute("SELECT COUNT(*) FROM learning_v2_feedback").fetchone()[0]==1
+    conn.close()
+
+
+def test_cloud_disaster_restore_rejects_path_traversal(tmp_path,monkeypatch):
+    _fake_crypt_runner(monkeypatch)
+    with pytest.raises(ValueError,match="Unsafe cloud manifest"):
+        recover_from_cloud_manifest("meridyen_crypt:","../malicious.manifest.json",
+                                    tmp_path/"restored.sqlite3")
