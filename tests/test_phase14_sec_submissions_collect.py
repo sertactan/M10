@@ -220,14 +220,15 @@ def test_httpx_redirect_and_policy_are_fail_closed(monkeypatch):
             )
         import httpx
         real_client = httpx.Client
-        monkeypatch.setattr(
-            collector.httpx, "Client",
-            lambda *args, **kwargs: real_client(
-                transport=httpx.MockTransport(transport_handler),
-                follow_redirects=False,
-            ),
-        )
-        with pytest.raises(collector.CollectorBlocked, match="SEC_"):
-            collector._fetch_sec_document(
-                f"CIK{CIK}.json", "Meridyen Equity owner@valid.org"
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                collector.httpx, "Client",
+                lambda *args, **kwargs: real_client(
+                    transport=httpx.MockTransport(transport_handler),
+                    follow_redirects=False,
+                ),
             )
+            with pytest.raises(collector.CollectorBlocked, match="SEC_"):
+                collector._fetch_sec_document(
+                    f"CIK{CIK}.json", "Meridyen Equity owner@valid.org"
+                )
