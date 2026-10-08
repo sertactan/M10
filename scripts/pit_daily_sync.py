@@ -83,8 +83,8 @@ def _has_months(conn_path: Path, snapshots: list[date]) -> dict[str, int]:
         available = set(row[0] for row in con.execute(
             """SELECT DISTINCT snapshot_date
                FROM universe_snapshot_membership
-               WHERE source='ALPHAVANTAGE_PIT' AND
-               snapshot_date BETWEEN ? AND ?""",
+               WHERE source IN ('ALPHAVANTAGE_PIT','MASSIVE_PIT')
+               AND snapshot_date BETWEEN ? AND ?""",
             (snapshots[0].isoformat(), snapshots[-1].isoformat()),
         ))
     return {"present": len(available), "missing": len(snapshots) - len(available)}
