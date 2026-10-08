@@ -15,6 +15,37 @@ from starlette.routing import Mount, Route
 NAME = "Meridyen OpenBB V5 FREE"
 mcp = FastMCP(NAME)
 PROBE = {"status": "NOT_RUN", "symbol": "SPY", "provider": "cboe"}
+
+WIRE_SMOKE = {"status": "NOT_RUN"}
+
+async def _mcp_wire_smoke():
+    """True streamable-HTTP MCP handshake, tools/list and tools/call via localhost."""
+    await asyncio.sleep(5)
+    try:
+        from fastmcp import Client
+        from fastmcp.client.transports import StreamableHttpTransport
+        port = os.environ.get("PORT", "10000")
+        token = os.environ["MERIDYEN_MCP_BEARER_TOKEN"]
+        transport = StreamableHttpTransport(
+            "http://127.0.0.1:" + port + "/mcp",
+            headers={"Authorization": "Bearer " + token})
+        async with Client(transport) as client:
+            tools = await client.list_tools()
+            names = sorted(tool.name for tool in tools)
+            if not {"openbb_status", "openbb_history", "openbb_spy_test"}.issubset(names):
+                raise RuntimeError("MCP_TOOLS_MISSING")
+            check = await client.call_tool("openbb_status", {})
+            if getattr(check, "is_error", False):
+                raise RuntimeError("MCP_STATUS_TOOL_FAILED")
+            WIRE_SMOKE.update({"status": "MCP_PROTOCOL_VERIFIED_LOCAL",
+                               "tools": names,
+                               "checked_at": datetime.now(timezone.utc).isoformat()})
+    except Exception as exc:
+        WIRE_SMOKE.update({"status": "MCP_PROTOCOL_FAILED_LOCAL",
+                           "error_type": type(exc).__name__,
+                           "error": str(exc)[:240]})
+    print("MCP_WIRE_SMOKE:", WIRE_SMOKE, flush=True)
+
 PATTERN = re.compile(r"^[A-Z][A-Z0-9.-]{0,9}$")
 
 def _get_history(provider, symbol, start_date, end_date):
@@ -96,7 +127,7 @@ async def healthz(_request: Request):
     tools = await mcp.list_tools()
     return JSONResponse({"service": NAME, "status": "READY", "mcp_path": "/mcp",
                          "registered_tools": sorted(tool.name for tool in tools),
-                         "upstream_spy_probe": dict(PROBE)})
+                         "upstream_spy_probe": dict(PROBE), "mcp_wire_smoke": dict(WIRE_SMOKE)})
 
 async def _probe():
     end = date.today() - timedelta(days=1)
@@ -107,6 +138,7 @@ async def _probe():
                   "bar_count": value.get("bar_count", 0),
                   "last_bar_date": (value.get("bars") or [{}])[-1].get("date"),
                   "error_type": value.get("error_type"), "error": value.get("error")})
+    print("OPENBB_SPY_PROBE:", PROBE, flush=True)
 
 mcp_app = mcp.http_app(path="/mcp", stateless_http=True)
 
@@ -114,6 +146,7 @@ mcp_app = mcp.http_app(path="/mcp", stateless_http=True)
 async def lifespan(app):
     async with mcp_app.lifespan(app):
         asyncio.create_task(_probe())
+        asyncio.create_task(_mcp_wire_smoke())
         yield
 
 base_app = Starlette(routes=[Route("/healthz", healthz), Mount("/", app=mcp_app)],
