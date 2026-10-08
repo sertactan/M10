@@ -102,3 +102,32 @@ CLI help/provider permissions before provider access.
 
 **Operational rule:** Never mark WF9 `COMPLETE_AND_ACTIVATED` from
 `PREFLIGHT_INPUT_COVERAGE_ASSERTED_NOT_PIT_CERTIFIED` alone.
+
+
+## SEC future-period anomaly guard (2026-10-08)
+
+Independent of the Windows PIT scheduler and SEC data import, the
+`FundamentalRepository.source_facts_as_of()` query now requires
+`period_end <= date(as_of in UTC)` as well as `available_at <= as_of`.
+This prevents a Companyfacts period ending in **2039** but carrying a
+2026-or-earlier availability timestamp from leaking into the 2013-2024
+historical fundamental snapshots. The source/archive rows are not
+modified and no canonical formula, scoring weight or gate changes.
+Forward estimates and guidance remain in their own separate APIs.
+
+To inspect such outlier facts on the **verified local SEC backup**
+with zero data writes, run:
+
+```powershell
+cd E:\M10
+.\.venv\Scripts\python.exe -m scripts.phase14_sec_temporal_outlier_audit `
+  --db "E:\Meridyen_Backups\operational_SEC_20261008_203207.db" `
+  --as-of 2026-10-08 --limit 1000 `
+  --out "E:\Meridyen_Backups\sec_temporal_outliers_20261008.json"
+```
+
+The audit is bounded by *matching rows*, not a random sample of all facts.
+It does not prove complete SEC coverage or source acceptance timestamps.
+A future-dated fact may require issuer-source review, not deletion.
+The read-only audit must never claim WF9 activation. This can run while
+PIT downloads progress because it accesses the independent backup.

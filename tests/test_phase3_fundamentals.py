@@ -363,3 +363,82 @@ def test_phase3_schema_contains_required_lineage_columns(tmp_path: Path) -> None
         "fundamental_validation_results","fundamental_sync_runs",
     } <= tables
     store.close()
+
+
+def test_future_dated_sec_period_never_leaks_into_historical_snapshot(tmp_path: Path) -> None:
+    """SEC files can carry future outlier period_end (e.g. 2039).
+
+    A backdated available_at must NOT turn that value into an as-of input;
+    the original archived observation must stay untouched for provenance.
+    """
+    store, repo = _store(tmp_path)
+    repo.save_facts([
+        _fact(value=100, source="SEC_EDGAR", available_at=MAY1,
+              accepted_at=MAY1, period_end=date(2025,3,31)),
+        _fact(value=999999, source="SEC_EDGAR", available_at=MAY1,
+              accepted_at=MAY1, period_end=date(2039,8,31),
+              period_start=date(2039,1,1), accession="FUTURE_PERIOD"),
+    ])
+    rows = repo.source_facts_as_of(
+        "SEC_TEST", datetime(2025,5,15,23,59,tzinfo=timezone.utc))
+    assert [r["value"] for r in rows] == [100]
+    canonical = repo.canonical_facts_as_of(
+        "SEC_TEST", datetime(2025,5,15,23,59,tzinfo=timezone.utc))
+    assert [r["value"] for r in canonical] == [100]
+    assert store.connection.execute(
+        "SELECT COUNT(*) FROM fundamental_facts_source"
+    ).fetchone()[0] == 2
+    later = repo.source_facts_as_of(
+        "SEC_TEST", datetime(2040,1,1,tzinfo=timezone.utc))
+    assert len(later) == 2
+    store.close()
+
+
+def test_fiscal_period_guard_uses_utc_asof_date(tmp_path: Path) -> None:
+    """A positive timezone offset must not allow tomorrow's period at UTC dusk."""
+    from datetime import timedelta
+    store, repo = _store(tmp_path)
+    repo.save_facts([
+        _fact(value=100, source="SEC_EDGAR",
+              available_at=datetime(2025,5,15,tzinfo=timezone.utc),
+              period_start=None, period_end=date(2025,5,16))
+    ])
+    local_asof = datetime(2025,5,16,1,0, tzinfo=timezone(timedelta(hours=9)))
+    assert repo.source_facts_as_of("SEC_TEST", local_asof) == []
+    store.close()
+
+
+def test_temporal_outlier_audit_is_read_only_and_reports_2039_row(tmp_path: Path) -> None:
+    from scripts.phase14_sec_temporal_outlier_audit import audit
+    store, repo = _store(tmp_path)
+    repo.save_facts([
+        _fact(value=999, source="SEC_EDGAR",
+              period_start=date(2039,1,1), period_end=date(2039,8,31),
+              available_at=MAY1, accession="2039-ANOMALY"),
+        _fact(value=100, source="SEC_EDGAR",
+              period_start=date(2025,1,1), period_end=date(2025,3,31),
+              available_at=MAY1, accession="NORMAL"),
+    ])
+    store.close()
+    database = tmp_path / "op.db"
+    before = database.read_bytes()
+    report = audit(database, as_of=date(2026,10,8), limit=50)
+    assert report["status"] == "OUTLIERS_FOUND_REVIEW_REQUIRED"
+    assert report["rows_matching_sampled"] == 1
+    assert report["counts_in_bounded_sample"]["PERIOD_END_AFTER_AUDIT_DATE"] == 1
+    assert report["raw_records_modified"] is False
+    assert report["historical_pit_certified"] is False
+    assert database.read_bytes() == before
+
+
+def test_temporal_outlier_audit_no_create_or_pit_certification(tmp_path: Path) -> None:
+    from scripts.phase14_sec_temporal_outlier_audit import audit
+    missing = tmp_path / "missing.db"
+    with pytest.raises(ValueError, match="existing regular"):
+        audit(missing, as_of=date(2026,10,8))
+    assert not missing.exists()
+    store, _ = _store(tmp_path)
+    store.close()
+    report = audit(tmp_path / "op.db", as_of=date(2026,10,8))
+    assert report["status"] == "NO_MATCHES_IN_THIS_QUERY_NOT_FULL_PIT_CERTIFICATION"
+    assert report["wf9_activated"] is False

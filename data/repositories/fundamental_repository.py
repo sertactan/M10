@@ -182,7 +182,12 @@ class FundamentalRepository:
     ) -> list[dict]:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
-        params: list[object] = [security_id, _iso(as_of)]
+        # A companyfacts archive can contain mislabeled future period ends
+        # (e.g. 2039 in a 2026 import). Even if available_at is backdated,
+        # observations for a fiscal period *after* the as-of date must not
+        # enter historical fundamental scores. Forward estimates/guidance
+        # have their own dedicated repository paths and remain unaffected.
+        params: list[object] = [security_id, _iso(as_of), as_of.astimezone(timezone.utc).date().isoformat()]
         metric_sql = ""
         if metric_name:
             metric_sql = " AND metric_name=?"
@@ -190,7 +195,7 @@ class FundamentalRepository:
         rows = self.store.connection.execute(
             f"""
             SELECT * FROM fundamental_facts_source
-            WHERE security_id=? AND available_at<=? {metric_sql}
+            WHERE security_id=? AND available_at<=? AND period_end<=? {metric_sql}
             ORDER BY metric_name,period_end,period_kind,source,available_at
             """,
             params,
