@@ -108,15 +108,21 @@ def _qualified(row, cutoff):
     if row["anchor_session"] is None or _date(row["anchor_session"],"anchor") > signal:
         raise ValueError("Invalid anchor session")
     x = float(row["fm252"])
+    mx = float(row["max_multiple_observed"])
     cx = float(row["control_fm252"])
-    if not math.isfinite(x) or x < 0 or not math.isfinite(cx) or abs(x-cx)>1e-8:
+    if (not math.isfinite(x) or x < 0
+        or not math.isfinite(mx) or mx < x - 1e-8
+        or not math.isfinite(cx) or abs(x-cx)>1e-8):
         raise ValueError("Canonical 252-session outcome does not tie to cohort")
+    # The forward-outcome contract records first intrahorizon 2X/5X/10X
+    # hits from the adjusted-close path. They are NOT terminal FM252 hits:
+    # a stock may hit 10X then close year-end at 3X.
     for key,threshold in (("time_to_2x_sessions",2),("time_to_5x_sessions",5),("time_to_10x_sessions",10)):
         t=row[key]
         if t is not None and (not 1 <= int(t) <= 252 or int(t)!=t):
             raise ValueError(f"Invalid {key} index")
-        if bool(t is not None) != (x >= threshold):
-            raise ValueError(f"{key} incompatible with fm252")
+        if bool(t is not None) != (mx >= threshold):
+            raise ValueError(f"{key} incompatible with maximum observed multiple")
     _assert_outcome_hash(row)
     if row["outcome_class"] != row["control_outcome_class"]:
         raise ValueError("Forward cohort outcome class mismatch")
@@ -129,9 +135,9 @@ def _qualified(row, cutoff):
         "label_available_at": date_of_label.isoformat(),
         "horizon_sessions": 252,
         "fm252": x,
-        "hit_2x": bool(x >= 2.0),
-        "hit_5x": bool(x >= 5.0),
-        "hit_10x": bool(x >= 10.0),
+        "hit_2x": bool(row["time_to_2x_sessions"] is not None),
+        "hit_5x": bool(row["time_to_5x_sessions"] is not None),
+        "hit_10x": bool(row["time_to_10x_sessions"] is not None),
         "time_to_2x_sessions": row["time_to_2x_sessions"],
         "time_to_5x_sessions": row["time_to_5x_sessions"],
         "time_to_10x_sessions": row["time_to_10x_sessions"],
