@@ -80,7 +80,7 @@ def _redirect_ok(uri):
         return (u.scheme == "https" and u.hostname == "chatgpt.com" and
                 u.username is None and u.password is None and
                 u.port in (None, 443) and
-                u.path.startswith("/oauth/") and not u.fragment)
+                (u.path.startswith("/oauth/") or u.path.startswith("/connector/oauth/") or u.path == "/connector_platform_oauth_redirect") and not u.fragment)
     except ValueError:
         return False
 
