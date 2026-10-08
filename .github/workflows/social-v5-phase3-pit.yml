@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/social-v5-phase3-pit.yml
       - social-v5-render/pit_capture.py
+      - social-v5-render/pit_readiness.py
       - social-v5-render/mcp_auth.py
       - social-v5-render/server.py
       - social-v5-render/tests/test_phase3.py
@@ -31,6 +32,8 @@ jobs:
         run: python -m unittest discover -s social-v5-render/tests -p 'test_phase3.py' -v
       - name: Capture first verified first-seen INOD snapshot (public feeds)
         run: python social-v5-render/pit_capture.py --ticker INOD --store social-v5-render/pit_data
+      - name: Calculate transparent research-only baseline readiness
+        run: python social-v5-render/pit_readiness.py --runs social-v5-render/pit_data/capture_runs.jsonl --output social-v5-render/pit_data/readiness.json
       - name: Save sanitized PIT records on isolated feature branch
         run: |
           git config user.name "github-actions[bot]"
