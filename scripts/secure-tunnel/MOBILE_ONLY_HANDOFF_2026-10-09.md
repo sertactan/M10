@@ -58,3 +58,15 @@
 - [Existing private plugin](https://chatgpt.com/plugins)
 
 This is a status snapshot and safety checklist, not a claim that Windows-side services are running.
+
+## Checked source contracts (static review only)
+
+On 2026-10-09, inspected the GitHub branch sources directly (not executed on Windows):
+- YFinance local `stdio` entrypoint: **6/6 named tool functions** and `mcp.run(transport="stdio")` found.
+- OpenBB server: **4/4 tool functions**; local `stdio` entrypoint present.
+- Social server: **4/4 tool functions**; local `stdio` entrypoint present.
+- None of the three local entrypoint files directly starts an HTTP listener.
+
+This **does not** establish successful dependency installation, access to Yahoo/OpenBB/social upstreams, or ChatGPT end-to-end calls.
+
+Track the remaining work in [M10 issue #110](https://github.com/sertactan/M10/issues/110).
