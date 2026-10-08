@@ -114,15 +114,19 @@ def _qualified(row, cutoff):
         or not math.isfinite(mx) or mx < x - 1e-8
         or not math.isfinite(cx) or abs(x-cx)>1e-8):
         raise ValueError("Canonical 252-session outcome does not tie to cohort")
-    # The forward-outcome contract records first intrahorizon 2X/5X/10X
-    # hits from the adjusted-close path. They are NOT terminal FM252 hits:
-    # a stock may hit 10X then close year-end at 3X.
+    # In M10 the historical FM252 outcome means MAXIMUM observed multiple,
+    # NOT last-session close. A verified delisting terminal payout may raise
+    # FM252 without a computable time-to-hit trading-session index.
+    diagnostic = json.loads(row["diagnostics_json"])
+    terminal = bool(diagnostic.get("terminal_consideration_used"))
     for key,threshold in (("time_to_2x_sessions",2),("time_to_5x_sessions",5),("time_to_10x_sessions",10)):
         t=row[key]
         if t is not None and (not 1 <= int(t) <= 252 or int(t)!=t):
             raise ValueError(f"Invalid {key} index")
-        if bool(t is not None) != (mx >= threshold):
-            raise ValueError(f"{key} incompatible with maximum observed multiple")
+        if t is not None and mx < threshold:
+            raise ValueError(f"{key} contradicts maximum observed multiple")
+        if t is None and mx >= threshold and not terminal:
+            raise ValueError(f"{key} missing without verified terminal consideration")
     _assert_outcome_hash(row)
     if row["outcome_class"] != row["control_outcome_class"]:
         raise ValueError("Forward cohort outcome class mismatch")
@@ -135,9 +139,9 @@ def _qualified(row, cutoff):
         "label_available_at": date_of_label.isoformat(),
         "horizon_sessions": 252,
         "fm252": x,
-        "hit_2x": bool(row["time_to_2x_sessions"] is not None),
-        "hit_5x": bool(row["time_to_5x_sessions"] is not None),
-        "hit_10x": bool(row["time_to_10x_sessions"] is not None),
+        "hit_2x": bool(x >= 2.0),
+        "hit_5x": bool(x >= 5.0),
+        "hit_10x": bool(x >= 10.0),
         "time_to_2x_sessions": row["time_to_2x_sessions"],
         "time_to_5x_sessions": row["time_to_5x_sessions"],
         "time_to_10x_sessions": row["time_to_10x_sessions"],
