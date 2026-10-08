@@ -20,3 +20,11 @@ jobs:
         run: |
           python -m compileall -q social-v5-render
           python -m unittest discover -s social-v5-render/tests -p 'test_*.py' -v
+      - name: Verify real local Streamable HTTP MCP tool discovery
+        run: |
+          cd social-v5-render
+          python -m uvicorn server:app --host 127.0.0.1 --port 10000 >/tmp/meridyen-social-mcp.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          sleep 5
+          python tests/smoke_transport.py
