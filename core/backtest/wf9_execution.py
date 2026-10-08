@@ -80,9 +80,30 @@ class WF9FullHistoricalExecution:
             )
         if any_price == 0:
             blockers.append("NO_CANONICAL_ADJUSTED_BACKTEST_PRICE")
+        if any_price < len(requested):
+            blockers.append(
+                f"MISSING_ADJUSTED_PRICE_DATES:{any_price}/{len(requested)}"
+            )
+        if total_universe <= 0:
+            blockers.append("EMPTY_HISTORICAL_UNIVERSE")
         elif total_price < total_universe:
-            warnings.append(
+            blockers.append(
                 f"PARTIAL_ADJUSTED_PRICE_COVERAGE:{total_price}/{total_universe}"
+            )
+        total_fundamentals = sum(row.fundamental_covered for row in rows)
+        total_features = sum(row.feature_covered for row in rows)
+        total_v141_ready = sum(row.v141_upstream_ready for row in rows)
+        if total_universe > 0 and total_fundamentals < total_universe:
+            blockers.append(
+                f"PARTIAL_PIT_FUNDAMENTALS:{total_fundamentals}/{total_universe}"
+            )
+        if total_universe > 0 and total_features < total_universe:
+            blockers.append(
+                f"PARTIAL_PIT_FEATURES:{total_features}/{total_universe}"
+            )
+        if total_universe > 0 and total_v141_ready < total_universe:
+            blockers.append(
+                f"PARTIAL_V141_UPSTREAM:{total_v141_ready}/{total_universe}"
             )
 
         return WF9PreflightReport(
