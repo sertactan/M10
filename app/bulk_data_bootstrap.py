@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 import httpx
 
 from app.bootstrap import AppContainer
+from app.sec_import_progress import SECImportProgress, SECImportBusy
 from core.fundamentals.metrics import XBRL_CANONICAL_ALIASES
 from data.providers.sec_access import resolve_sec_user_agent
 from data.providers.sec_edgar_fundamentals import SECEdgarFundamentalsProvider
@@ -122,10 +123,21 @@ def download_stooq_us_daily_ascii(destination: Path) -> Path:
 
 
 def import_sec_companyfacts_zip(app: AppContainer, zip_path: str | Path) -> tuple[int, int]:
-    path = Path(zip_path)
-    if not path.exists():
-        raise FileNotFoundError(path)
+    """Guard future imports with a single-process ZIP lock and local checkpoints.
 
+    Currently running legacy processes do NOT acquire this new lock.
+    New installs see this feature only after their next process launch.
+    """
+    path = Path(zip_path)
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    with SECImportProgress(path.parent) as progress:
+        return _import_sec_companyfacts_zip_guarded(app, path, progress)
+
+
+def _import_sec_companyfacts_zip_guarded(
+    app: AppContainer, path: Path, progress: SECImportProgress
+) -> tuple[int, int]:
     rows = app.sqlite.connection.execute(
         """
         SELECT security_id,cik
@@ -146,7 +158,15 @@ def import_sec_companyfacts_zip(app: AppContainer, zip_path: str | Path) -> tupl
     facts_saved = 0
 
     with zipfile.ZipFile(path) as archive:
-        for member in archive.namelist():
+        members = archive.namelist()
+        progress.checkpoint(entries_total=len(members), stage="IMPORTING")
+        for scanned, member in enumerate(members, start=1):
+            if (scanned - 1) % progress.checkpoint_every == 0 and scanned > 1:
+                progress.checkpoint(
+                    entries_scanned=scanned - 1,
+                    securities=securities,
+                    facts=facts_saved,
+                )
             name = Path(member).name
             match = re.fullmatch(r"CIK(\d{10})\.json", name, flags=re.I)
             if not match:
@@ -174,6 +194,11 @@ def import_sec_companyfacts_zip(app: AppContainer, zip_path: str | Path) -> tupl
             facts_saved += repository.save_facts(facts)
             securities += 1
 
+    progress.checkpoint(
+        entries_scanned=len(members),
+        securities=securities, facts=facts_saved,
+        stage="FINALIZING",
+    )
     return securities, facts_saved
 
 
@@ -439,6 +464,9 @@ def ensure_sec_companyfacts_bulk(
             timeout_seconds=300.0,
         )
         securities, facts = import_sec_companyfacts_zip(app, zip_path)
+    except SECImportBusy:
+        # Never route a lock collision into a second per-issuer API import.
+        raise
     except Exception as bulk_exc:
         # Some consumer networks receive 403 on the SEC Archives bulk endpoint
         # while data.sec.gov's Company Facts API remains available. Fall back to
