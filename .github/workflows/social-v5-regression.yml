@@ -1,0 +1,22 @@
+name: Social V5 offline regression
+on:
+  push:
+    branches: [deploy/social-v5-render-free]
+    paths:
+      - 'social-v5-render/**'
+      - '.github/workflows/social-v5-regression.yml'
+  workflow_dispatch:
+jobs:
+  research-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install MCP requirements
+        run: pip install -r social-v5-render/requirements.txt
+      - name: Run unchanged original 24 Social V5 tests
+        run: |
+          python -m compileall -q social-v5-render
+          python -m unittest discover -s social-v5-render/tests -p 'test_*.py' -v
