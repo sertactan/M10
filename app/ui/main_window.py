@@ -23,6 +23,7 @@ from app.ui.analysis_worker import AnalysisTask
 from app.ui.compare_page import ComparePage
 from app.ui.context_panels import AnalysisContextPanel, StockHeaderPanel
 from app.ui.data_health_dialog import DataHealthDialog
+from app.ui.data_control_center_dialog import DataControlCenterDialog
 from app.ui.model_page import ModelPage
 from app.ui.scanner_dialog import MarketScannerDialog
 from app.ui.view_models import ComparisonView
@@ -37,12 +38,14 @@ class ResearchTerminalWindow(QMainWindow):
         analysis_service_factory: Callable[[], object] | None = None,
         scanner_service_factory: Callable[[], object] | None = None,
         data_health_service_factory: Callable[[], object] | None = None,
+        control_center_service_factory: Callable[[], object] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.analysis_service_factory = analysis_service_factory
         self.scanner_service_factory = scanner_service_factory
         self.data_health_service_factory = data_health_service_factory
+        self.control_center_service_factory = control_center_service_factory
         self.thread_pool = QThreadPool.globalInstance()
         self.setWindowTitle("S15.3 Research Terminal")
         self.resize(1440, 900)
@@ -120,6 +123,10 @@ class ResearchTerminalWindow(QMainWindow):
         self.data_health_button.clicked.connect(self._open_data_health)
         layout.addWidget(self.data_health_button)
 
+        self.control_center_button = QPushButton("DATA CONTROL")
+        self.control_center_button.clicked.connect(self._open_control_center)
+        layout.addWidget(self.control_center_button)
+
         self.scanner_button = QPushButton("MARKET SCANNER")
         self.scanner_button.clicked.connect(self._open_scanner)
         layout.addWidget(self.scanner_button)
@@ -140,6 +147,18 @@ class ResearchTerminalWindow(QMainWindow):
         dialog.setModal(False)
         dialog.show()
         self._data_health_dialog = dialog
+
+    def _open_control_center(self) -> None:
+        if self.control_center_service_factory is None:
+            self.status.setText("Data Control Center backend is not connected")
+            return
+        dialog = DataControlCenterDialog(
+            service_factory=self.control_center_service_factory,
+            parent=self,
+        )
+        dialog.setModal(False)
+        dialog.show()
+        self._control_center_dialog = dialog
 
     def _open_scanner(self) -> None:
         if self.scanner_service_factory is None:
