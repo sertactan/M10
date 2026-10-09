@@ -37,9 +37,11 @@ def _load_json(path: Path) -> dict:
 def _row(date_value: date, close: float, adjusted: float) -> dict:
     return {
         "source_date": date_value.isoformat(),
-        "raw_close": round(close, 9),
-        "source_adj_close": round(adjusted, 9),
-        "source_close_to_adjusted_factor": round(close/adjusted, 12),
+        # Preserve exact source float values for comparisons with Phase25c.
+        # Display-only rounded values would silently change 5% threshold edges.
+        "raw_close": close,
+        "source_adj_close": adjusted,
+        "source_close_to_adjusted_factor": close/adjusted,
     }
 
 
