@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "provider": "",
+  "model": "",
+  "free_tier_verified": false,
+  "nonbillable_account_verified": false,
+  "verification_expires_epoch": 0,
+  "daily_request_cap": 0,
+  "minute_request_cap": 0,
+  "max_prompt_bytes": 4096,
+  "max_output_tokens": 512
+}

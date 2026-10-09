@@ -1,0 +1,28 @@
+# Example operator-facing Hermes integration checklist, NOT an upstream-native
+# configuration file. Hermes schema evolves; verify pinned upstream release.
+# The real Hermes CLI config must be produced with hermes setup/model.
+hermes:
+  installed: false
+  configured: false
+  single_llm_gateway:
+    endpoint: "http://127.0.0.1:8765/v1"
+    configured_as_only_provider: false
+    provider_model_id: null
+    native_fallbacks_allowed: false
+    maximum_concurrent_requests: 1
+    no_browser_automation_on_micro_vm: true
+  tool_policy:
+    code_execution: false
+    shell: false
+    git_write: false
+    brokerage_orders: false
+    auto_model_promotion: false
+    outbound_web: false
+  permissions:
+    telegram_enabled: false
+    authenticated_plugin_enabled: false
+    cloud_deploy_enabled: false
+  local_files:
+    role_manifest: "config/hermes_team_roles.json"
+    free_policy_template: "config/hermes_team.example.json"
+    external_secrets_only: true
