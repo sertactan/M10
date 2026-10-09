@@ -106,7 +106,14 @@ def assess(db:Path,report24:Path,report25b:Path,report25h:Path,parquet:Path):
             "complete_WF6":"SELECT COUNT(*) FROM wf6_walk_forward_runs WHERE status='COMPLETE'",
         }
         for label,query in key.items():
-            params=(END,START) if label=="canonical_backtest_price" else (START,END) if label not in {"complete_WF5","complete_WF6"} else ()
+            if label=="canonical_backtest_price":
+                params=(END,START)
+            elif label=="corporate_actions":
+                params=(START,END,START,END)
+            elif label in {"complete_WF5","complete_WF6"}:
+                params=()
+            else:
+                params=(START,END)
             out["counts"][label]=_sql(con,query,params)[0]
         source_rows=_sql(con,
             "SELECT source,COUNT(*) FROM universe_snapshot_membership WHERE snapshot_date BETWEEN ? AND ? GROUP BY source",
