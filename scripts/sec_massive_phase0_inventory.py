@@ -86,10 +86,18 @@ def build_report(runtime_root: Path, environ: Mapping[str, str] | None = None) -
             "next_actions": ["Locate the actual writable Windows M10 runtime; do not start an importer."],
         }
     archive = root / "bulk" / "sec"
-    progress = _checkpoint(archive / "companyfacts-progress.json")
-    lock = _artifact(archive / "companyfacts-import.lock")
-    archive_zip = _artifact(archive / "companyfacts.zip")
-    partial_zip = _artifact(archive / "companyfacts.zip.part")
+    sec_parent_safe = not (root / "bulk").is_symlink() and not archive.is_symlink()
+    db_parent_safe = not (root / "data").is_symlink() and not (
+        root / "data" / "runtime"
+    ).is_symlink()
+    if sec_parent_safe:
+        progress = _checkpoint(archive / "companyfacts-progress.json")
+        lock = _artifact(archive / "companyfacts-import.lock")
+        archive_zip = _artifact(archive / "companyfacts.zip")
+        partial_zip = _artifact(archive / "companyfacts.zip.part")
+    else:
+        progress = {"state": "UNSAFE_PARENT_SYMLINK", "import_completed": False}
+        lock = archive_zip = partial_zip = "UNSAFE_PARENT_SYMLINK"
     credentials = {
         "massive_process_environment_configured": bool((env.get("MASSIVE_API_KEY") or "").strip()),
         "alphavantage_process_environment_configured": bool((env.get("ALPHAVANTAGE_API_KEY") or "").strip()),
@@ -117,8 +125,10 @@ def build_report(runtime_root: Path, environ: Mapping[str, str] | None = None) -
             "splits_dividends_delisting_verified": False,
         },
         "storage": {
-            "operational_db": _artifact(root / "data" / "runtime" / "operational.db"),
-            "parquet_root": ("UNSAFE_SYMLINK" if (root / "data" / "runtime" / "parquet").is_symlink()
+            "operational_db": (_artifact(root / "data" / "runtime" / "operational.db")
+                               if db_parent_safe else "UNSAFE_PARENT_SYMLINK"),
+            "parquet_root": ("UNSAFE_PARENT_SYMLINK" if not db_parent_safe
+                             else "UNSAFE_SYMLINK" if (root / "data" / "runtime" / "parquet").is_symlink()
                              else "DIRECTORY_PRESENT" if (root / "data" / "runtime" / "parquet").is_dir()
                              else "NOT_FOUND"),
             "sqlite_opened": False,
