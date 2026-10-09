@@ -73,14 +73,48 @@ class Phase19OfflineListingAuditTests(unittest.TestCase):
             self.assertTrue(r["findings"])
             self.assertFalse(r["production_database_modified"])
 
-    def test_duplicate_listing_key_is_not_silently_counted(self):
+    def test_duplicate_listing_key_is_preserved_as_identity_warning(self):
         with TemporaryDirectory() as d:
             root = Path(d)
             save(root, "2024-01-31", [
                 ("AAA", "Alpha", "NASDAQ"), ("AAA", "Alpha duplicate", "NASDAQ")])
             r = audit(root, start=date(2024, 1, 1), end=date(2024, 1, 31))
-            self.assertEqual(r["status"], "BLOCKED_SOURCE_ARCHIVE_INCOMPLETE_OR_INVALID")
+            self.assertEqual(r["status"],
+                             "SOURCE_ARCHIVE_VERIFIED_WITH_IDENTITY_WARNINGS_NOT_PIT_CERTIFIED")
+            self.assertEqual(r["verified_months"], 1)
+            self.assertEqual(r["monthly_source_records"][0]["qualified_stock_rows"], 2)
+            self.assertEqual(r["distinct_ticker_exchange_listing_keys"], 1)
+            self.assertEqual(r["duplicate_listing_key_groups_across_months"], 1)
+            self.assertEqual(r["extra_raw_rows_with_repeated_listing_keys_across_months"], 1)
+            self.assertEqual(r["sample_duplicate_listing_keys"][0]["ticker"], "AAA")
+            self.assertFalse(r["original_pit_identity_certified"])
+            self.assertFalse(r["model_training_performed"])
+
+    def test_metadata_mismatch_reports_safe_reason_code(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            save(root, "2024-01-31", [("AAA", "Alpha", "NASDAQ")])
+            path = root / "2024-01-31.manifest.json"
+            metadata = json.loads(path.read_text())
+            metadata["bytes"] = 1
+            path.write_text(json.dumps(metadata))
+            r = audit(root, start=date(2024, 1, 1), end=date(2024, 1, 31))
             self.assertEqual(r["verified_months"], 0)
+            self.assertIn("INVALID_SOURCE_2024-01-31_SOURCE_HASH_OR_METADATA_MISMATCH",
+                          r["findings"])
+
+    def test_row_counts_mismatch_not_tolerated(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            save(root, "2024-01-31", [("AAA", "Alpha", "NASDAQ")])
+            path = root / "2024-01-31.manifest.json"
+            metadata = json.loads(path.read_text())
+            metadata["qualified_stock_rows"] += 1
+            path.write_text(json.dumps(metadata))
+            r = audit(root, start=date(2024, 1, 1), end=date(2024, 1, 31))
+            self.assertEqual(r["verified_months"], 0)
+            self.assertIn("INVALID_SOURCE_2024-01-31_SOURCE_ROW_COUNT_MISMATCH",
+                          r["findings"])
 
     def test_optional_installed_db_has_read_only_candidate_matching(self):
         with TemporaryDirectory() as d:
