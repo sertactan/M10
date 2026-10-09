@@ -88,7 +88,7 @@ def evaluate(path:Path):
         or g.get("network_requests")!=0
         or g.get("paid_API_requests")!=0
         or g.get("training_performed") is not False
-    )):
+    ):
         raise ValueError("PHASE25G_RESEARCH_PROVENANCE_FAILURE")
     originals=g.get("source_math")
     if not isinstance(originals,list) or len(originals)!=len(REFERENCES):
