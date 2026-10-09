@@ -32,7 +32,7 @@ def fixture(root):
             "source_first_adj_close":adj2 if name=="HUYA" else adj1,
             "source_last_raw_close":raw1 if name=="HUYA" else raw2,
             "source_last_adj_close":adj1 if name=="HUYA" else adj2,
-            "factor_range_pct_or_change_pct":33.333,
+            "factor_range_pct_or_change_pct_or_adjusted_move_pct":33.333,
         })
         by_ticker[name]={
             "source_events":1, "first_source_date":first,
