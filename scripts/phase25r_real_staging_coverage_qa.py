@@ -6,6 +6,9 @@ invented, and zero source rows become canonical or trigger WF9/Learning V3.
 """
 from __future__ import annotations
 import argparse
+from datetime import date
+import hashlib
+from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
 from collections import Counter,defaultdict
 from contextlib import closing
 import json,os
@@ -32,7 +35,7 @@ def _load(path):
         raise ValueError("REPORT_NOT_OBJECT")
     return o
 
-def analyze(phase25q_manifest:Path,phase25b:Path,backup_check=True):
+def analyze(phase25q_manifest:Path,phase25b:Path,pit_dir:Path,backup_check=True):
     m=_load(phase25q_manifest)
     b=_load(phase25b)
     if (
@@ -60,10 +63,13 @@ def analyze(phase25q_manifest:Path,phase25b:Path,backup_check=True):
     month_rows=Counter()
     counts=Counter()
     matched_rows=defaultdict(int)
+    original_snapshot_sha={}
     with closing(sqlite3.connect(db.resolve().as_uri()+"?mode=ro",uri=True,timeout=10)) as con:
         con.execute("PRAGMA query_only=ON")
         if con.execute("PRAGMA quick_check").fetchone()[0]!="ok":
             raise ValueError("STAGING_DB_QUICK_CHECK_FAILED")
+        for source_key,sha in con.execute("SELECT source_key,source_sha256 FROM source_artifacts WHERE kind=\'ALPHAVANTAGE_HISTORIC_MONTH_END_RETRIEVED_RETROSPECTIVELY\'"):
+            original_snapshot_sha[source_key]=sha
         for (month,ticker,exchange) in con.execute(
             "SELECT month_end,ticker,exchange FROM monthly_research_membership"):
             monthsets[month[:7]].add((ticker,exchange))
@@ -114,6 +120,48 @@ def analyze(phase25q_manifest:Path,phase25b:Path,backup_check=True):
         or counts["historical_identity_approved_rows"]!=0
         or counts["canonical_price_approved_rows"]!=0):
         raise ValueError("STAGING_ROW_COUNT_OR_CANONICAL_GATE_FAILURE")
+    # The source provider sometimes supplies two distinct issuer names for the
+    # SAME month/exchange/ticker. Never resolve these by accepting first row.
+    identity_conflicts=[]
+    duplicate_identical=0
+    conflict_tickers=set()
+    source_rows=0
+    for key in PER_MONTH_KEYS:
+        month_end=next((x for x in original_snapshot_sha if x.startswith(key)),None)
+        if not month_end:
+            raise ValueError("MONTH_SOURCE_PROVENANCE_MISSING")
+        csvfile=pit_dir/(month_end+".csv")
+        if csvfile.is_symlink() or not csvfile.is_file():
+            raise ValueError("MONTH_SOURCE_CSV_MISSING")
+        raw=csvfile.read_bytes()
+        if hashlib.sha256(raw).hexdigest()!=original_snapshot_sha[month_end]:
+            raise ValueError("SOURCE_MONTH_SHA256_NOT_EQUAL_TO_STAGING")
+        records_source=AlphaVantagePitUniverseProvider.parse_csv(
+            raw.decode("utf-8-sig"),as_of=date.fromisoformat(month_end))
+        seen={}
+        for x in records_source:
+            source_rows+=1
+            ident=(x.ticker,x.exchange.value)
+            candidate=(x.name,x.ipo_date.isoformat() if x.ipo_date else None)
+            if ident in seen:
+                if seen[ident]==candidate:
+                    duplicate_identical+=1
+                else:
+                    conflict_tickers.add(x.ticker)
+                    identity_conflicts.append({
+                        "month_end":month_end,"ticker":x.ticker,"exchange":x.exchange.value,
+                        "first_issuer_name":seen[ident][0],
+                        "second_issuer_name":candidate[0],
+                        "first_IPO":seen[ident][1],"second_IPO":candidate[1],
+                        "conflicting_company_identity_quarantined":True})
+            else:
+                seen[ident]=candidate
+    if (source_rows!=m["source_counts"]["month_snapshot_source_records"]
+        or len(identity_conflicts)+duplicate_identical!=
+          source_rows-m["monthly_membership_rows"]):
+        raise ValueError("SOURCE_MONTH_DUPLICATES_NOT_RECONCILED")
+    strong_tickers={str(x["ticker"]) for x in records}
+    affected_strong=sorted(strong_tickers.intersection(conflict_tickers))
     churn=[]
     for i,mon in enumerate(PER_MONTH_KEYS):
         present=monthsets.get(mon,set())
@@ -139,6 +187,12 @@ def analyze(phase25q_manifest:Path,phase25b:Path,backup_check=True):
       "reconciled_strong_candidate_source_valid_rows":total,
       "original_monthly_source_records":stats.get("month_snapshot_source_records"),
       "distinct_monthly_ticker_exchange_keys":m["monthly_membership_rows"],
+      "conflicting_month_ticker_exchange_identity_rows":len(identity_conflicts),
+      "duplicate_identical_month_ticker_exchange_rows":duplicate_identical,
+      "conflicting_distinct_ticker_strings":len(conflict_tickers),
+      "conflicting_strong_cohort_tickers":affected_strong,
+      "conflicting_strong_cohort_tickers_count":len(affected_strong),
+      "membership_identity_conflict_quarantine":identity_conflicts,
       "source_duplicate_month_ticker_exchange_records_potential_identity_risk":
           stats.get("month_snapshot_source_records",0)-m["monthly_membership_rows"],
       "monthly_membership_churn_research_only":churn,
@@ -160,6 +214,8 @@ def main():
     root=Path(os.environ.get("LOCALAPPDATA") or str(Path.home()))/"S153ResearchTerminal/runtime"
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--manifest",type=Path,required=True)
+    p.add_argument("--pit-dir",type=Path,
+                   default=root/"phase19/pit_staging")
     p.add_argument("--phase25b",type=Path,
                    default=root/"phase25b/simfin_distinct_daily_depth_research.json")
     p.add_argument("--out",type=Path,
@@ -168,7 +224,7 @@ def main():
     try:
         if a.out.resolve() in {a.manifest.resolve(),a.phase25b.resolve()} or a.out.is_symlink():
             raise ValueError("UNSAFE_OUTPUT")
-        rep=analyze(a.manifest,a.phase25b)
+        rep=analyze(a.manifest,a.phase25b,a.pit_dir)
         a.out.parent.mkdir(parents=True,exist_ok=True)
         temp=a.out.with_name(a.out.name+".tmp")
         if temp.is_symlink():raise ValueError("SYMLINK_TEMP")
@@ -182,6 +238,8 @@ def main():
        "price_rows":rep["price_and_membership_counts"]["source_price_rows"],
        "reconciled_3557_source_rows":rep["reconciled_strong_candidate_source_valid_rows"],
        "member_rows":rep["distinct_monthly_ticker_exchange_keys"],
+       "conflicting_identity_month_rows":rep["conflicting_month_ticker_exchange_identity_rows"],
+       "strong_cohort_tickers_quarantined":rep["conflicting_strong_cohort_tickers"],
        "duplicates_potential_identity_risk":
          rep["source_duplicate_month_ticker_exchange_records_potential_identity_risk"],
        "canonical_accepted":0,
