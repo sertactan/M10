@@ -32,7 +32,7 @@ def _name_key(value: str) -> str:
     return re.sub(r"[^A-Z0-9]+", " ", value.upper()).strip()
 
 
-def _read_db(db: Path) -> tuple[dict, dict, dict, bool]:
+def _read_db(db: Path) -> tuple[dict, dict, dict, bool, dict]:
     if db.is_symlink() or not db.is_file():
         raise ValueError("INSTALLED_DB_NOT_FOUND_OR_SYMLINK")
     connection = sqlite3.connect(db.resolve().as_uri() + "?mode=ro",
