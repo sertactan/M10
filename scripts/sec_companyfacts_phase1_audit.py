@@ -8,6 +8,7 @@ confirmation that *legacy and modern* importers are stopped, this only reads
 the Phase0 metadata inventory (no ZIP or SQLite contents).
 """
 import argparse
+from contextlib import closing
 from datetime import datetime, timezone
 import json
 import os
@@ -76,6 +77,27 @@ def _archive_inventory(path: Path, *, verify_crc: bool = False) -> dict:
     return result
 
 
+
+def _checkpoint_import_counts(path: Path) -> dict:
+    """Read bounded, non-secret importer totals only after verified path checks."""
+    result = {"facts_written_this_run": None, "matched_issuers_saved": None}
+    if path.is_symlink() or not path.is_file():
+        return result
+    try:
+        if path.stat().st_size > 200_000:
+            return result
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(record, dict) or record.get("schema") != "MERIDYEN_SEC_BULK_PROGRESS_V1":
+            return result
+        for key in result:
+            value = record.get(key)
+            if type(value) is int and 0 <= value <= 1_000_000_000:
+                result[key] = value
+    except (OSError, UnicodeError, ValueError):
+        pass
+    return result
+
+
 def _backup_inventory(backup: Path | None, live: Path) -> dict:
     result = {
         "state": "NOT_CHECKED", "sec_fact_count": None,
@@ -106,7 +128,7 @@ def _backup_inventory(backup: Path | None, live: Path) -> dict:
         # Backups must be made with SQLite's online backup API, not a file
         # copy of a live WAL database. This cannot be attested programmatically.
         uri = backup.resolve().as_uri() + "?mode=ro"
-        with sqlite3.connect(uri, uri=True, timeout=2.0) as connection:
+        with closing(sqlite3.connect(uri, uri=True, timeout=2.0)) as connection:
             connection.execute("PRAGMA query_only=ON")
             check = connection.execute("PRAGMA quick_check(1)").fetchone()
             result["sqlite_quick_check"] = str(check[0]) if check else "NO_RESULT"
@@ -214,15 +236,25 @@ def audit(
     if backup["state"] != "BACKUP_SEC_COUNTS_READ_ONLY":
         report["blockers"].append("SQLITE_ONLINE_BACKUP_MISSING_OR_INVALID")
     elif progress["state"] == "INSTRUMENTED_IMPORT_FINISHED_UNVERIFIED":
-        inserted = progress.get("facts_written_this_run")
-        saved_issuers = progress.get("matched_issuers_saved")
-        # The Phase0 checkpoint exposes no counters for these optional
-        # fields. Require a separate checkpoint parse for a quantitative
-        # lower-bound check; unknown counts are never promoted.
-        if type(inserted) is int and backup["sec_fact_count"] < inserted:
-            report["blockers"].append("BACKUP_SEC_FACT_COUNT_BELOW_IMPORT_CHECKPOINT")
-        if type(saved_issuers) is int and backup["sec_security_count"] < saved_issuers:
-            report["blockers"].append("BACKUP_SEC_ISSUERS_BELOW_IMPORT_CHECKPOINT")
+        saved = _checkpoint_import_counts(
+            root / "bulk" / "sec" / "companyfacts-progress.json"
+        )
+        report["imported_counts_from_checkpoint"] = saved
+        inserted = saved["facts_written_this_run"]
+        saved_issuers = saved["matched_issuers_saved"]
+        if inserted is None or saved_issuers is None:
+            report["blockers"].append("SEC_CHECKPOINT_SAVE_COUNTS_MISSING")
+        elif inserted == 0 or saved_issuers == 0:
+            report["blockers"].append("SEC_CHECKPOINT_ZERO_IMPORTED_RECORDS")
+        else:
+            if backup["sec_fact_count"] < inserted:
+                report["blockers"].append("BACKUP_SEC_FACT_COUNT_BELOW_IMPORT_CHECKPOINT")
+            if backup["sec_security_count"] < saved_issuers:
+                report["blockers"].append("BACKUP_SEC_ISSUERS_BELOW_IMPORT_CHECKPOINT")
+    if backup["state"] == "BACKUP_SEC_COUNTS_READ_ONLY" and (
+        backup["sec_fact_count"] <= 0 or backup["sec_security_count"] <= 0
+    ):
+        report["blockers"].append("SEC_BACKUP_HAS_NO_FACTS_OR_ISSUERS")
     if report["blockers"]:
         report["status"] = "BLOCKED_PARTIAL_OR_UNVERIFIED_SEC_EVIDENCE"
     else:
