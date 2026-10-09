@@ -1,4 +1,5 @@
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -9,7 +10,7 @@ from scripts.phase25i_real_market_gate_matrix import assess
 
 def fixtures(root):
     db=root/"operational.db"
-    with sqlite3.connect(db) as con:
+    with closing(sqlite3.connect(db)) as con:
         con.execute("CREATE TABLE universe_snapshot_membership(snapshot_date TEXT, security_id TEXT, source TEXT)")
         con.execute("CREATE TABLE canonical_price_selection(purpose TEXT, security_id TEXT,start_date TEXT,end_date TEXT)")
         con.execute("CREATE TABLE corporate_actions(ex_date TEXT,effective_date TEXT)")
