@@ -8,6 +8,7 @@ backtest grading, model promotion, or Learning V3.
 """
 from __future__ import annotations
 import argparse
+from contextlib import closing
 import csv
 from datetime import date,datetime,timezone
 import hashlib
@@ -61,7 +62,12 @@ def _verify_inputs(pit_dir,source,phase24,phase25k):
         manifest=_load(m)
         raw=f.read_bytes()
         actual=hashlib.sha256(raw).hexdigest()
-        records=AlphaVantagePitUniverseProvider.parse_csv(raw.decode("utf-8-sig"),as_of=day)
+        if actual!=manifest.get("sha256"):
+            raise ValueError("HISTORICAL_MONTH_SHA256_MISMATCH_"+key)
+        try:
+            records=AlphaVantagePitUniverseProvider.parse_csv(raw.decode("utf-8-sig"),as_of=day)
+        except (RuntimeError,UnicodeError) as exc:
+            raise ValueError("HISTORICAL_MONTH_CSV_INVALID_"+key) from exc
         if (manifest.get("source")!="ALPHAVANTAGE_LISTING_STATUS_RESEARCH_ONLY"
             or manifest.get("as_of")!=key or actual!=manifest.get("sha256")
             or len(records)!=manifest.get("qualified_stock_rows")
@@ -277,9 +283,9 @@ def build(*,pit_dir:Path,source:Path,phase24:Path,phase25k:Path,
             raise ValueError("STAGING_SQLITE_INTEGRITY_FAILED")
         con.close()
         backup=temp/"research_pit.backup.sqlite"
-        with sqlite3.connect(db) as source_con, sqlite3.connect(backup) as target_con:
+        with closing(sqlite3.connect(db)) as source_con, closing(sqlite3.connect(backup)) as target_con:
             source_con.backup(target_con,pages=2500)
-        with sqlite3.connect(backup) as check_con:
+        with closing(sqlite3.connect(backup)) as check_con:
             if check_con.execute("PRAGMA quick_check").fetchone()[0]!="ok":
                 raise ValueError("STAGING_BACKUP_SQLITE_INTEGRITY_FAILED")
         report_path=temp/"manifest.json"
@@ -290,9 +296,8 @@ def build(*,pit_dir:Path,source:Path,phase24:Path,phase25k:Path,
         temp.replace(final)
         return status
     finally:
-        if con.in_transaction or con.total_changes>=0:
-            try: con.close()
-            except sqlite3.Error:pass
+        try: con.close()
+        except sqlite3.Error:pass
 
 
 def main():
