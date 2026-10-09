@@ -161,6 +161,34 @@ subject to quota and not an entitlement to bypass 50/day basic cap.
 The service is disabled without billing safeguards. An empty private
 `.env` is not a real provider configuration.
 
+## Verified 2026-10-10 local Hermes and Phase25Q continuation
+
+- Windows HTTP 10054 root-cause reproduction and bounded fix documented in
+  `docs/HERMES_V2_PHASE_2_12_ACCEPTANCE.md`.
+- `python -m scripts.hermes_pit_stage_audit --stage-dir
+  <the-existing-private-versioned-research-stage>` runs read-only SQLite
+  `PRAGMA quick_check`, validates 21 snapshot dates, source row counts,
+  133 candidate gate records, and the zero-canonical manifest. The optional
+  private stage is discovered conservatively by A1/A2/A3/A5/A6 and its
+  verification results are included without reading/writing production DB.
+  If more than one version is present, automatic version selection is
+  blocked pending operator review.
+- Hermes native gateway was **actually started** with an M10-only
+  `HERMES_HOME` and without API/messaging credentials, the cron ticker
+  heartbeat was observed, and the paused offline job was temporarily
+  enabled and explicitly run once. Hermes reported success and a recorded
+  execution. The job was paused and the gateway was stopped afterward.
+- No paid Gemini/OpenRouter fallback, Cloud Run/VM, broker order, or model
+  promotion was enabled. No model scores were synthesized.
+
+- Both estimated S16-E and canonical S16-C now require distinct internal
+  trusted formula-derived authorization; external payload fields alone cannot
+  inject a score. A verified live price still needs separate actual
+  source evidence and timestamp; no real-time price is claimed here.
+- OpenRouter free-only local cap ceiling is 50/day, 20/minute, with no
+  paid/free auto-routing. The operator must prove live account eligibility
+  before enabling the LLM gateway.
+
 ## Cloud blocking decision (2026-10-10)
 One e2-micro in eligible US region + qualifying standard 30 GB-month disk
 are Always Free candidates. Outbound transfer free threshold is narrow;

@@ -44,6 +44,10 @@ class Policy:
             raise Blocked("VERIFICATION_EXPIRED")
         if not (0 < self.daily_request_cap <= 1000 and 0 < self.minute_request_cap <= 100):
             raise Blocked("INVALID_REQUEST_CAP")
+        if self.provider == "openrouter" and (
+            self.daily_request_cap > 50 or self.minute_request_cap > 20
+        ):
+            raise Blocked("OPENROUTER_FREE_PLAN_QUOTA_CEILING")
         if not (0 < self.max_prompt_bytes <= 65536 and 0 < self.max_output_tokens <= 8192):
             raise Blocked("INVALID_TOKEN_POLICY")
 

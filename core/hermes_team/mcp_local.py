@@ -42,6 +42,13 @@ TOOLS = [
 ]
 
 
+class LoopbackMCPServer(ThreadingHTTPServer):
+    """Private local test/control service; never bind an external interface."""
+
+    daemon_threads = True
+    request_queue_size = 64
+
+
 def call_tool(queue: LocalTasks, name: str, args: dict) -> dict:
     if not isinstance(args, dict):
         raise ValueError("INVALID_ARGUMENTS")
@@ -99,9 +106,11 @@ def handler_factory(queue: LocalTasks, secret: str):
 
         def _send(self, code: int, payload: dict):
             raw = json.dumps(payload).encode("utf-8")
+            self.close_connection = True
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
             self.send_header("Content-Length", str(len(raw)))
             self.end_headers()
             self.wfile.write(raw)
@@ -110,6 +119,16 @@ def handler_factory(queue: LocalTasks, secret: str):
             if self.path != "/mcp":
                 return self._send(404, {"error": "NOT_FOUND"})
             if not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + secret):
+                # On Windows, closing a TCP socket while its POST body remains
+                # unread may send RST and swallow the 401 already written.
+                # Drain only the declared bounded body, *without* processing
+                # or logging it. Never read unbounded unauthorized payloads.
+                try:
+                    size = int(self.headers.get("Content-Length", "0"))
+                    if 0 < size <= 16_384:
+                        self.rfile.read(size)
+                except (ValueError, TypeError, TimeoutError, OSError):
+                    pass
                 return self._send(401, {"error": "UNAUTHORIZED"})
             try:
                 n = int(self.headers.get("Content-Length", "0"))
@@ -133,6 +152,6 @@ def serve(ledger: Path) -> None:
     token = os.environ.get("MERIDYEN_LOCAL_MCP_TOKEN", "")
     if len(token) < 32:
         raise RuntimeError("MCP_TOKEN_REQUIRED_IN_PRIVATE_ENV")
-    server = ThreadingHTTPServer(("127.0.0.1", 8876),
-                                 handler_factory(LocalTasks(ledger), token))
+    server = LoopbackMCPServer(("127.0.0.1", 8876),
+                               handler_factory(LocalTasks(ledger), token))
     server.serve_forever()

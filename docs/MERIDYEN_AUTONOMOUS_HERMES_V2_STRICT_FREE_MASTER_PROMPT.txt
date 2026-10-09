@@ -255,3 +255,37 @@ Continue source-only evidence triage and independent test work where
 possible. Do not fabricate resolved corporate actions, historical
 membership, delisting proceeds, trained challenger performance, live
 price, S16-C or alerts.
+
+### 2026-10-10 latest verified continuation
+
+Apply Phase25k and Phase25Q **source-only** additions from `origin/main`
+without touching production data. Phase25k creates the 133-row fail-closed
+candidate ledger; Phase25Q's existing private 21-month research stage was
+read-only validated: **128,088 monthly research membership rows and
+2,110,622 vendor source price rows**, **133 candidate gate rows**, and
+**zero** canonical accepted identities/prices. Historical snapshot files
+were acquired retrospectively (in 2026), so all original Phase25i
+canonical PIT/WF9/Learning V3 blockers remain.
+
+The Windows MCP 10054 TCP reset was traced through server-side
+instrumentation to unauthorized HTTP 401 responses closing without
+draining an already-transmitted POST body. Drain bounded body bytes
+(16 KiB maximum), never parse or log untrusted unauthorized content,
+and retain 401 responses and loopback-only binding. Real HTTP stress and
+authenticated JSON-RPC integration must be repeatable without SEC archives.
+
+The actual native Hermes gateway was launched in the isolated profile,
+cron ticker heartbeat observed, its `--no-agent` local job run
+successfully once, **then paused** and gateway stopped. This is real
+deterministic scheduling, not genuine LLM-driven specialist messaging.
+Do not auto-enable model API fallback or user-profile gateway service
+while model and billing verification remain missing.
+
+Add a fail-closed **score provenance** rule: neither the external
+`s16_e` nor `s16_c` JSON field is itself a formula computation.
+Both must be authorized by a trusted Python M10 formula-caller path;
+otherwise return a null score and its `INCONCLUSIVE` status.
+Never turn synthetic test fixture prices into "current prices".
+For the OpenRouter Free plan, local caps must not exceed 50 requests/day
+and 20/minute without independent nonbillable tier proof; do not infer
+that public pricing is enough to enable a connected user account.

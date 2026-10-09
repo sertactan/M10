@@ -83,7 +83,8 @@ def run() -> None:
                      "retrieved_at": "2026-10-09", "available_at": "2026-10-09"}],
         "s16_e": 61, "s16_c": 83, "canonical_evidence_verified": True,
     })
-    assert valid["s16_e"] == 61 and valid["s16_c"] is None
+    assert valid["s16_e"] is None and valid["s16_c"] is None
+    assert valid["s16_e_status"] == "INCONCLUSIVE"
     assert "S16-C: INCONCLUSIVE" in telegram_message(valid)
     assert plugin_response(valid)["transport_connected"] is False
     print("PASS financial and adapter contracts (synthetic fixture only)")

@@ -34,7 +34,7 @@ jobs:
           python -m pip install pytest pytest-asyncio pandas pydantic PyYAML httpx pyarrow duckdb PySide6
 
       - name: Compile
-        run: python -m compileall -q app core data scripts/hermes_team_tasks.py scripts/hermes_team_mcp.py scripts/hermes_team_no_agent_tick.py main.py
+        run: python -m compileall -q app core data scripts/hermes_team_tasks.py scripts/hermes_team_mcp.py scripts/hermes_team_no_agent_tick.py scripts/hermes_pit_stage_audit.py main.py
 
       - name: Hermes strict-free controls and API contracts
         env:

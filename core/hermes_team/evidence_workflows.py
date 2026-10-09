@@ -6,9 +6,11 @@ Outputs are bounded to source counts and their documented fail-closed blockers.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+from core.hermes_team.pit_stage import audit_stage
 
 AUDITS = {
     "strategy": "scripts.phase25i_real_market_gate_matrix",
@@ -18,6 +20,21 @@ AUDITS = {
     "fundamental": "scripts.phase25j_p1_sec_issuer_and_p2p3_source_triage",
 }
 M10_SOURCE_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _research_stage_status() -> dict:
+    # Optional and strictly research-only. No user file is copied or changed.
+    base = (Path(os.environ.get("LOCALAPPDATA") or str(Path.home()))
+            / "S153ResearchTerminal" / "runtime" / "phase25q" / "staged_datasets")
+    if not base.is_dir() or base.is_symlink():
+        return {"status": "INCONCLUSIVE", "reason": "NO_PRIVATE_PHASE25Q_STAGE"}
+    folders = [path for path in base.glob("research_pit_*")
+               if path.is_dir() and not path.is_symlink()
+               and not path.name.endswith(".building")]
+    # Do not silently select the wrong research dataset after a new build.
+    if len(folders) != 1:
+        return {"status": "INCONCLUSIVE", "reason": "MISSING_OR_AMBIGUOUS_STAGE_VERSION"}
+    return audit_stage(folders[0])
 
 
 def perform_local_evidence_task(task: str) -> dict:
@@ -47,6 +64,7 @@ def perform_local_evidence_task(task: str) -> dict:
                 "source": "M10_PHASE25I_LOCAL_READONLY",
                 "process_exit_code": proc.returncode,
                 "llm_called": False,
+                "research_stage": _research_stage_status(),
             }
         return {
             "status": result["status"],
@@ -58,6 +76,7 @@ def perform_local_evidence_task(task: str) -> dict:
             "process_exit_code": proc.returncode,
             "llm_called": False,
             "canonical_backtest_allowed": False,
+            "research_stage": _research_stage_status(),
         }
     except (OSError, ValueError, TypeError, subprocess.TimeoutExpired):
         return {"status": "INCONCLUSIVE", "reason": "EXISTING_M10_AUDIT_UNAVAILABLE",

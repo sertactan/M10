@@ -20,6 +20,76 @@ BLOCKED means external evidence/security prevents safe completion.
 | 11 — ChatGPT Private Plugin | localhost authenticated MCP JSON-RPC tools/list/call tested; public TLS/tunnel + ChatGPT actual connection absent | PARTIAL |
 | 12 — CI/acceptance | focused pytest and offline real source audit run; full historical and cloud live acceptance not certified | PARTIAL |
 
+## 2026-10-10 continuation — independently confirmed changes
+
+The feature branch integrated `origin/main` Phase25k and Phase25Q without
+altering the frozen formulas, private production database, or user untracked
+files. Real local Phase25k produced a **133-candidate canonical acceptance
+ledger with zero canonical acceptances**.
+
+The **pre-existing** Phase25Q immutable versioned staging repository was
+verified *read-only* using its manifest and SQLite `PRAGMA quick_check`
+and row-level counts:
+
+| Phase25Q metric | Actual |
+|---|---:|
+| Historical month-end snapshot dates | 21 |
+| Monthly source membership rows | 128,088 |
+| Source vendor daily price rows | 2,110,622 |
+| Candidate acceptance-gate rows | 133 |
+| Canonical PIT identities accepted | 0 |
+| Independently verified adjusted-price selections | 0 |
+| True WF9 runs | 0 |
+| True Learning V3 trainings | 0 |
+
+The source snapshots were retrieved retrospectively in 2026 and SimFin vendor
+adjusted prices may embed future corporate action knowledge. These new,
+real research-source counts do **not** remove the Phase25i nine acceptance
+blockers or establish survivorship-free performance.
+
+### Windows TCP reset resolved and tested
+
+The original HTTP test intermittently reported WinError 10054 while
+receiving unauthenticated POST replies. Instrumentation showed that the
+server had accepted the socket, entered `do_POST`, and emitted its
+`401 Unauthorized` response **without a Python handler exception**.
+The handler previously returned before consuming the small POST body;
+on Windows closing a socket with pending received bytes can send TCP RST
+and obscure the HTTP 401 reply. The fix consumes *at most 16,384 declared
+bytes* for unauthorized requests before closing; no unauthenticated data
+is parsed, persisted or logged. Real localhost HTTP tests now cover 60
+alternating authorized/unauthorized POSTs, `initialize`, `tools/list`,
+`tools/call`, persistent tasks and negative authorization, using temporary
+SQLite only and no source-archive dependency. This is still a local JSON-RPC
+adapter, NOT evidence of live ChatGPT Plugin remote connectivity.
+
+### Native Hermes gateway and paused no-agent cron
+
+Isolated `HERMES_HOME` was used with LLM and Telegram keys disabled.
+The installed Hermes v0.21.5+5295.g234badf gateway was started in
+foreground; native `gateway status` reported a live PID and `cron status`
+reported an active ticker heartbeat. Listener inspection found loopback
+`127.0.0.1`. The private `6e92e18ee724` no-agent job was
+temporarily resumed, explicitly triggered, **reported "Ran now: succeeded"**
+and was recorded in cron run history. It was then **paused again**, and
+the foreground gateway was stopped. This proves an actual Hermes
+deterministic scheduler execution; it does NOT prove LLM agent delegation,
+24/7 service, or bot delivery. Native source launcher update still
+emits a warning; no in-place global upgrade was attempted.
+
+### Score and free-usage hardening
+
+External JSON flags cannot create S16-E or S16-C values. Both numeric
+scores now require separate trusted local deterministic formula call-site
+approval, finite values in [0,100] and validated source/provenance fields.
+Until M10 local scoring adapters produce real proof, the response has
+`s16_e_status=INCONCLUSIVE`, `s16_c_status=INCONCLUSIVE` and empty
+score fields. Sample inputs in unit tests are not live prices.
+OpenRouter Free Plan local policies are additionally capped at no more
+than 50 requests/day and 20 requests/minute, even if an operator writes
+an accidentally larger number. These guards do NOT guarantee provider
+billing status, so live inference remains disabled.
+
 ## Live vs simulated
 
 **Real-local:** official Hermes executable version check; six Hermes skill registrations

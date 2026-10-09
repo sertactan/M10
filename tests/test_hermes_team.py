@@ -88,7 +88,15 @@ def test_financial_evidence_gate_and_separate_scores():
                      "available_at": "2026-10-09"}],
         "s16_e": 61, "s16_c": 83, "canonical_evidence_verified": True
     })
-    assert trusted["s16_e"] == 61 and trusted["s16_c"] is None
+    assert trusted["s16_e"] is None and trusted["s16_c"] is None
+    assert trusted["s16_e_status"] == "INCONCLUSIVE"
+    assert "S16-E: N/A" in telegram_message(trusted)
+    assert financial_result({
+        "symbol": "INOD", "price": 8.5, "price_timestamp": "2026-10-09T16:00:00Z",
+        "sources": [{"source": "SEC", "source_ref": "filing",
+                     "retrieved_at": "2026-10-09", "available_at": "2026-10-09"}],
+        "s16_e": 61,
+    }, estimated_trusted=True)["s16_e_status"] == "ESTIMATED"
     assert "S16-C: INCONCLUSIVE" in telegram_message(trusted)
     assert plugin_response(trusted)["transport_connected"] is False
 
@@ -99,3 +107,22 @@ def test_bridge_denies_llm_invented_s16():
         "feature_origin": "LLM"
     })
     assert report["s16_c"] is None and report["s16_c_status"] == "INCONCLUSIVE"
+
+
+def test_scores_refuse_nonfinite_or_untrusted_values():
+    raw = {"symbol": "INOD", "price": 8.5, "price_timestamp": "2026-10-09T16:00:00Z",
+           "sources": [{"source": "SEC", "source_ref": "filing",
+                        "retrieved_at": "2026-10-09", "available_at": "2026-10-09"}],
+           "s16_e": float("nan"), "s16_c": float("nan"),
+           "canonical_evidence_verified": True}
+    report = financial_result(raw, estimated_trusted=True, canonical_trusted=True)
+    assert report["s16_e"] is None and report["s16_c"] is None
+    assert financial_result({**raw, "price": float("inf")})["price"] is None
+
+
+def test_openrouter_free_caps_are_hard_ceiling():
+    from dataclasses import replace
+    p = policy()
+    for changed in ({"daily_request_cap": 51}, {"minute_request_cap": 21}):
+        with pytest.raises(Blocked, match="OPENROUTER_FREE_PLAN_QUOTA_CEILING"):
+            replace(p, **changed).validate(2000000000)
