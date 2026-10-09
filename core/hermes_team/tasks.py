@@ -2,6 +2,8 @@
 from __future__ import annotations
 import json
 import sqlite3
+import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -66,8 +68,27 @@ class LocalTasks:
         job = self.claim()
         if job is None:
             return None
-        # No operational price/SEC data assumed, no LLM calls, no trade side effects.
-        result = {"status": "INCONCLUSIVE", "reason": "SOURCE_EVIDENCE_REQUIRED",
-                  "role": job["role"], "task": job["task"], "llm_called": False}
-        self.finish(job["id"], result)
+        # Reuse real read-only M10 audit, never launch a fake walk-forward.
+        if job["task"] == "learning":
+            try:
+                process = subprocess.run(
+                    [sys.executable, "-m", "scripts.phase25i_real_market_gate_matrix"],
+                    text=True, capture_output=True, timeout=45, check=False,
+                )
+                data = json.loads(process.stdout)
+                result = {
+                    "status": data.get("status", "INCONCLUSIVE"),
+                    "blockers": data.get("blockers", []),
+                    "walk_forward_executed": False,
+                    "Learning_V3_executed": False,
+                    "exit_code": process.returncode,
+                    "role": job["role"], "task": job["task"], "llm_called": False,
+                }
+            except (OSError, ValueError, subprocess.TimeoutExpired):
+                result = {"status": "INCONCLUSIVE", "reason": "READ_ONLY_PIT_AUDIT_FAILED",
+                          "role": job["role"], "task": job["task"], "llm_called": False}
+        else:
+            result = {"status": "INCONCLUSIVE", "reason": "SOURCE_EVIDENCE_REQUIRED",
+                      "role": job["role"], "task": job["task"], "llm_called": False}
+        self.finish(job["id"], result, failed=result["status"] not in ("DONE", "INCONCLUSIVE"))
         return {"job_id": job["id"], **result}

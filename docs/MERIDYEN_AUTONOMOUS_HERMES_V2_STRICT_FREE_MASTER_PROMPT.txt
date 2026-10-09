@@ -197,3 +197,14 @@ devam et. Canlı üretim kodunu veya broker işlevlerini değiştirme.**
 - Provider account quotas, Google Cloud total no-charge assurances, live
   chat/plugin/Telegram wiring and full historical PIT/OOS results remain
   BLOCKED pending independent evidence.
+
+### Continuation evidence / Phase 10 read-only reality check
+
+The A6 local persistent task now calls M10 Phase25i, which returned
+`FULL_CHAIN_REAL_DATA_BLOCKED_NOT_TRAINED` on Windows, with 9 missing
+real-data acceptance conditions including PIT membership, canonical
+adjusted bars, corporate actions, historical CIK/share class identity,
+delisted terminal outcomes, WF5/6 and mature labels. Neither walk-forward
+nor Learning V3 ran. This does not certify backtest accuracy.
+Native Hermes profile bootstrap started in isolated `HERMES_HOME`;
+no successful CLI role execution or paid model call is claimed.

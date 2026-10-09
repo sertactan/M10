@@ -77,6 +77,25 @@ nonbillable account guard, live Telegram/plugin transport, complete
 IPv6-only GCP may avoid IPv4 address charge but does not establish
 zero total spend or provider connectivity; cloud remains blocked.
 
+## 2026-10-10 continuation acceptance evidence
+
+- Feature branch reconciled with upstream main through Phase25i; main and
+  local untracked user files remain untouched.
+- Installed Hermes v0.21.5 verified. A separate private
+  `HERMES_HOME=data/runtime/hermes_v2/hermes_profile` was selected;
+  initial dependency preparation started but complete native role/CLI
+  invocation has **not** been demonstrated as successful.
+- The A6 `learning` queue task now invokes the actual existing
+  `scripts.phase25i_real_market_gate_matrix` read-only M10 audit. Tested
+  on local Windows: `FULL_CHAIN_REAL_DATA_BLOCKED_NOT_TRAINED`,
+  nine reported blockers, `walk_forward_executed=false` and
+  `Learning_V3_executed=false`. This is NOT model training.
+- Offline safety smoke, compilation and actual SQLite task round-trip
+  passed. Full pytest regression, real gateway provider calls, actual
+  Telegram delivery and authenticated MCP handshake are still pending.
+- The isolated Hermes profile must complete installation and pass
+  `hermes doctor` before marking native Hermes integration accepted.
+
 ## Cloud blocking decision (2026-10-10)
 One e2-micro in eligible US region + qualifying standard 30 GB-month disk
 are Always Free candidates. Outbound transfer free threshold is narrow;
