@@ -1,4 +1,5 @@
 import hashlib,json,sqlite3
+from contextlib import closing
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -65,7 +66,7 @@ class TestPhase25Q(unittest.TestCase):
             b=build(pit_dir=pit,source=price,phase24=old,phase25k=k,
                     prod_db=root/"nonexistent_prod.db",out_root=stage)
             self.assertEqual(b["staging_version"],a["staging_version"])
-            with sqlite3.connect(a["staging_db"]) as con:
+            with closing(sqlite3.connect(a["staging_db"])) as con:
                 self.assertEqual(con.execute("SELECT COUNT(*) FROM candidate_gate").fetchone()[0],133)
                 self.assertEqual(con.execute("SELECT COUNT(*) FROM source_daily_price WHERE listed_in_same_month_end_archive=1").fetchone()[0],2)
             self.assertTrue(Path(a["backup_db"]).is_file())
