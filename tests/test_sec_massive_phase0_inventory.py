@@ -112,3 +112,23 @@ def test_no_configured_key_is_not_entitlement_verdict(tmp_path: Path) -> None:
     assert report["massive"]["historical_price_data_loaded"] == "NOT_VERIFIED"
     assert report["pit_snapshots"]["actual"] is None
     assert report["pit_snapshots"]["required"] == 144
+
+def test_symlinked_sec_directory_blocked(tmp_path: Path) -> None:
+    root = _runtime(tmp_path)
+    (root / "bulk").mkdir()
+    other = tmp_path / "outside"
+    other.mkdir()
+    (root / "bulk" / "sec").symlink_to(other, target_is_directory=True)
+    report = build_report(root, {})
+    assert report["sec"]["instrumented_progress"]["state"] == "UNSAFE_PARENT_SYMLINK"
+    assert report["sec"]["companyfacts_zip"] == "UNSAFE_PARENT_SYMLINK"
+
+
+def test_symlinked_db_directory_blocked(tmp_path: Path) -> None:
+    root = _runtime(tmp_path)
+    other = tmp_path / "outside"
+    other.mkdir()
+    (root / "data").symlink_to(other, target_is_directory=True)
+    report = build_report(root, {})
+    assert report["storage"]["operational_db"] == "UNSAFE_PARENT_SYMLINK"
+    assert report["storage"]["parquet_root"] == "UNSAFE_PARENT_SYMLINK"
