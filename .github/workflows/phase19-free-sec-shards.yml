@@ -1,0 +1,114 @@
+name: Meridyen Phase19 Free SEC Shards
+
+on:
+  pull_request:
+    paths:
+      - "scripts/phase19_free_sec_shard.py"
+      - "tests/test_phase19_free_sec_shard.py"
+      - ".github/workflows/phase19-free-sec-shards.yml"
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: "Explicitly download SEC public companyfacts? (default is offline preview)"
+        type: boolean
+        default: false
+        required: true
+      shard_index:
+        description: "Zero-based shard number (0, 1, 2, ...)"
+        type: string
+        default: "0"
+        required: true
+      shard_size:
+        description: "Up to 100 current SEC-listed issuers per shard (10 recommended)"
+        type: choice
+        options: ["1", "5", "10", "25", "50", "100"]
+        default: "10"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: phase19-sec-${{ github.workflow }}-${{ inputs.shard_index || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fail-closed SEC collector regressions (no network)
+        run: python -m unittest discover -s tests -p 'test_phase19_free_sec_shard.py' -v
+
+  sec-shard:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: offline-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      GH_TOKEN: ${{ github.token }}
+      ARTIFACT_NAME: meridyen-sec-2024-2025-shard-${{ inputs.shard_index }}-size-${{ inputs.shard_size }}
+      EXECUTE: ${{ inputs.execute }}
+      SHARD_INDEX: ${{ inputs.shard_index }}
+      SHARD_SIZE: ${{ inputs.shard_size }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Restore latest same-shard artifact, when available
+        if: ${{ inputs.execute }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase19_sec_shard
+          last_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ARTIFACT_NAME&per_page=100" --jq '[.artifacts[] | select(.expired == false and .workflow_run != null)] | sort_by(.created_at) | reverse | .[0].workflow_run.id // empty')"
+          if [[ -n "$last_run" ]]; then
+            gh run download "$last_run" --name "$ARTIFACT_NAME" --dir phase19_sec_shard
+            echo "Restored temporary, source-hashed prior shard."
+          else
+            echo "No unexpired shard artifact exists. Starting from an empty shard."
+          fi
+      - name: Bounded SEC intake, never M10 production DB
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--start 2024-01-01 --end 2025-09-30 --out-dir phase19_sec_shard
+                --shard-index "$SHARD_INDEX" --shard-size "$SHARD_SIZE"
+                --pause 1.0 --max-source-mib 20 --max-total-mib 80)
+          if [[ "$EXECUTE" == "true" ]]; then
+            args+=(--execute)
+          fi
+          python scripts/phase19_free_sec_shard.py "${args[@]}" || echo "Collector stopped safely; check status artifact before resuming."
+      - name: Upload resumable SEC-public-data shard, NOT private M10 database
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: phase19_sec_shard/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Final status (incomplete download is NOT success)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib, sys
+          p = pathlib.Path("phase19_sec_shard/status.json")
+          if not p.exists():
+              sys.exit("BLOCKED: status report missing")
+          r = json.loads(p.read_text(encoding="utf-8"))
+          print("SEC shard:", r["status"], "downloaded:", r["downloaded"],
+                "reused:", r["reused"], "failed:", len(r["failed"]))
+          expected = ("SEC_SOURCE_SHARD_COMPLETE_NOT_PIT_CERTIFIED"
+                      if os.environ["EXECUTE"] == "true"
+                      else "PREVIEW_ONLY_NO_NETWORK")
+          if r["status"] != expected:
+              sys.exit("INCOMPLETE: inspect artifact; do not promote into canonical models")
+          PY
