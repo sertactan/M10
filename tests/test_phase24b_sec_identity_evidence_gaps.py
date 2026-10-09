@@ -27,6 +27,8 @@ def fixtures(root: Path):
         con.execute(
             "CREATE TABLE filing_records_source (security_id TEXT, source TEXT,"
             "cik TEXT, filing_date TEXT, accepted_at TEXT, accession_number TEXT)")
+        con.execute("CREATE INDEX idx_filing_records_pit ON "
+                    "filing_records_source(security_id,source,accepted_at,filing_date)")
         con.executemany("INSERT INTO filing_records_source VALUES (?,?,?,?,?,?)", [
             ("s1","SEC_EDGAR","0000000123","2024-03-01","2024-03-01T12:20:00+00:00","abc"),
             ("s2","SEC_EDGAR","0000000456","2024-03-02",None,"def"),
