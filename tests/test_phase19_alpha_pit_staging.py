@@ -90,5 +90,73 @@ class PITStagingTests(unittest.TestCase):
             self.assertFalse(folder.joinpath("2024-01-31.csv").exists())
 
 
+    def test_redirect_follows_only_approved_alpha_vantage_host(self):
+        import httpx
+        from unittest.mock import patch
+        from scripts.phase19_alpha_pit_staging import _raw_response
+        from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
+
+        seen_hosts = []
+        def handler(request):
+            seen_hosts.append(request.url.host)
+            if request.url.host == "www.alphavantage.co":
+                return httpx.Response(302, headers={
+                    "Location": str(request.url).replace(
+                        "www.alphavantage.co", "alphavantage.co", 1
+                    )
+                })
+            return httpx.Response(200, content=CSV)
+        original_client = httpx.Client
+        transport = httpx.MockTransport(handler)
+        with patch("httpx.Client", side_effect=lambda **kw: original_client(
+            transport=transport, **kw
+        )):
+            response = _raw_response(
+                AlphaVantagePitUniverseProvider(api_key="unit-test-key"),
+                date(2024, 1, 31),
+            )
+        self.assertEqual(response, CSV)
+        self.assertEqual(seen_hosts, ["www.alphavantage.co", "alphavantage.co"])
+
+    def test_redirect_to_untrusted_domain_refuses_to_send_api_key(self):
+        import httpx
+        from unittest.mock import patch
+        from scripts.phase19_alpha_pit_staging import _raw_response
+        from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
+
+        seen_hosts = []
+        def handler(request):
+            seen_hosts.append(request.url.host)
+            return httpx.Response(302, headers={
+                "Location": "https://example.invalid/query?apikey=stolen"
+            })
+        original_client = httpx.Client
+        transport = httpx.MockTransport(handler)
+        with patch("httpx.Client", side_effect=lambda **kw: original_client(
+            transport=transport, **kw
+        )):
+            with self.assertRaisesRegex(PITStageBlocked, "PROVIDER_REDIRECT_HOST_NOT_ALLOWED"):
+                _raw_response(
+                    AlphaVantagePitUniverseProvider(api_key="unit-test-key"),
+                    date(2024, 1, 31),
+                )
+        self.assertEqual(seen_hosts, ["www.alphavantage.co"])
+
+    def test_failure_reports_safe_http_status_and_counts_attempt(self):
+        with TemporaryDirectory() as d:
+            from unittest.mock import patch
+            def denied(*args):
+                raise PITStageBlocked("PROVIDER_HTTP_STATUS_429")
+            with patch("scripts.phase19_alpha_pit_staging.AlphaVantagePitUniverseProvider.configured",
+                       new_callable=lambda: property(lambda self: True)):
+                report = stage(start=date(2024, 1, 1), end=date(2024, 1, 31),
+                               root=Path(d), execute=True, fetch=denied)
+            self.assertEqual(report["error"], "PITStageBlocked")
+            self.assertEqual(report["error_code"], "PROVIDER_HTTP_STATUS_429")
+            self.assertEqual(report["api_requests"], 1)
+            self.assertEqual(report["saved"], 0)
+            self.assertFalse(report["production_database_modified"])
+
+
 if __name__ == "__main__":
     unittest.main()

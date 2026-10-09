@@ -57,18 +57,33 @@ def _raw_response(provider: AlphaVantagePitUniverseProvider, as_of: date) -> byt
     """One request. Intentionally do not expose query URL (contains API key)."""
     import httpx
 
+    # Alpha Vantage's established M10 adapter follows HTTP redirects. Preserve
+    # that behavior, but never send the query (which includes the key) to an
+    # unapproved redirect host. A redirect is still one logical provider call.
     with httpx.Client(timeout=90.0, follow_redirects=False) as client:
-        response = client.get(
-            "https://www.alphavantage.co/query",
+        request = client.build_request(
+            "GET", "https://www.alphavantage.co/query",
             params={"function": "LISTING_STATUS", "date": as_of.isoformat(),
                     "state": "active", "apikey": provider.api_key},
             headers={"User-Agent": "S15.3 Research Terminal", "Accept": "text/csv"},
         )
-        if response.status_code != 200:
-            raise PITStageBlocked("PROVIDER_HTTP_STATUS_" + str(response.status_code))
-        if len(response.content) > 10 * 1024 * 1024:
-            raise PITStageBlocked("CSV_SOURCE_OVER_10MIB")
-        return response.content
+        for _ in range(4):
+            response = client.send(request, follow_redirects=False)
+            if response.status_code in (301, 302, 303, 307, 308):
+                next_request = response.next_request
+                if next_request is None:
+                    raise PITStageBlocked("PROVIDER_REDIRECT_MISSING_LOCATION")
+                if (next_request.url.scheme != "https" or
+                    next_request.url.host not in {"www.alphavantage.co", "alphavantage.co"}):
+                    raise PITStageBlocked("PROVIDER_REDIRECT_HOST_NOT_ALLOWED")
+                request = next_request
+                continue
+            if response.status_code != 200:
+                raise PITStageBlocked("PROVIDER_HTTP_STATUS_" + str(response.status_code))
+            if len(response.content) > 10 * 1024 * 1024:
+                raise PITStageBlocked("CSV_SOURCE_OVER_10MIB")
+            return response.content
+        raise PITStageBlocked("PROVIDER_REDIRECT_LIMIT_EXCEEDED")
 
 
 def stage(*, start: date, end: date, root: Path, execute: bool,
@@ -86,7 +101,7 @@ def stage(*, start: date, end: date, root: Path, execute: bool,
         "start": start.isoformat(), "end": end.isoformat(),
         "requested_month_ends": len(dates),
         "api_requests": 0, "saved": 0, "reused": 0,
-        "remaining": [], "snapshots": [], "error": None,
+        "remaining": [], "snapshots": [], "error": None, "error_code": None,
         "production_database_modified": False,
         "historical_pit_identity_certified": False,
         "canonical_adjusted_price_certified": False,
@@ -121,6 +136,8 @@ def stage(*, start: date, end: date, root: Path, execute: bool,
             continue
         else:
             try:
+                # Count attempted provider calls even when a response fails.
+                status["api_requests"] += 1
                 payload = get_source(provider, as_of)
                 records = AlphaVantagePitUniverseProvider.parse_csv(
                     payload.decode("utf-8-sig"), as_of=as_of
@@ -128,6 +145,13 @@ def stage(*, start: date, end: date, root: Path, execute: bool,
             except Exception as exc:
                 # Never print provider exception text or request URL (may contain API key).
                 status["error"] = type(exc).__name__
+                if isinstance(exc, PITStageBlocked):
+                    code = str(exc)
+                    status["error_code"] = (code if code.isascii() and
+                        code.replace("_", "").isalnum() and len(code) <= 80
+                        else "PROVIDER_REQUEST_BLOCKED")
+                else:
+                    status["error_code"] = "PROVIDER_TRANSPORT_OR_RESPONSE_ERROR"
                 status["remaining"].append(name)
                 status["remaining"].extend(d.isoformat() for d in dates if d > as_of)
                 break
@@ -150,7 +174,6 @@ def stage(*, start: date, end: date, root: Path, execute: bool,
             atomic_bytes(path, payload)
             atomic_json(manifest_path, manifest)
             status["saved"] += 1
-            status["api_requests"] += 1
         status["snapshots"].append({
             "as_of": name, "qualified_stocks": len(records),
             "exchange_counts": manifest.get("exchange_counts", {
