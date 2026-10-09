@@ -42,24 +42,38 @@ def _groups(values, n=BATCH_SIZE):
         yield values[idx:idx+n]
 
 
-def _read_index(con, ids, table, fields, limit_per_id):
-    """Bounded indexed lookups; the limit is a real evidence caveat."""
+def _read_filing_index(con, ids):
+    """Bounded per-issuer lookups using the existing security_id index."""
     result = {}
-    if not ids:
-        return result
     for sid in ids:
-        if table == "filing_records_source":
-            sql = ("""SELECT cik,filing_date,accepted_at,accession_number
-                        FROM filing_records_source
-                        WHERE security_id=? AND source='SEC_EDGAR'
-                        AND filing_date BETWEEN '2024-01-01' AND '2025-09-30'
-                        LIMIT ?""")
+        rows = con.execute(
+            """SELECT cik,filing_date,accepted_at,accession_number
+               FROM filing_records_source
+               WHERE security_id=? AND source='SEC_EDGAR'
+                 AND filing_date BETWEEN '2024-01-01' AND '2025-09-30'
+               LIMIT ?""", (sid, MAX_FILINGS_PER_ID + 1)
+        ).fetchall()
+        result[sid] = {"rows": rows[:MAX_FILINGS_PER_ID],
+                       "truncated": len(rows) > MAX_FILINGS_PER_ID}
+    return result
+
+
+def _read_alias_index(con, ids):
+    """One alias-table scan; don't do thousands of unindexed lookups."""
+    target = set(ids)
+    result = {sid: {"rows": [], "truncated": False} for sid in target}
+    for sid, alias, start, end, source, availability in con.execute(
+        "SELECT security_id,alias,valid_from,valid_to,source,availability_date "
+        "FROM ticker_aliases"
+    ):
+        sid = str(sid)
+        if sid not in target:
+            continue
+        entry = result[sid]
+        if len(entry["rows"]) >= MAX_ALIASES_PER_ID:
+            entry["truncated"] = True
         else:
-            sql = ("""SELECT alias,valid_from,valid_to,source,availability_date
-                        FROM ticker_aliases WHERE security_id=? LIMIT ?""")
-        rows = con.execute(sql, (sid, limit_per_id + 1)).fetchall()
-        result[sid] = {"rows": rows[:limit_per_id],
-                       "truncated": len(rows) > limit_per_id}
+            entry["rows"].append((alias,start,end,source,availability))
     return result
 
 
@@ -131,10 +145,24 @@ def analyze(report_file: Path, db_file: Path, *, max_security_ids: int = 10000) 
                 "PRAGMA table_info(ticker_aliases)")}
             aliases_available = {"security_id","alias","valid_from","valid_to",
                                  "source","availability_date"}.issubset(ac)
-        filings = (_read_index(con, ids, "filing_records_source", None,
-                               MAX_FILINGS_PER_ID) if filings_available else {})
-        aliases = (_read_index(con, ids, "ticker_aliases", None,
-                               MAX_ALIASES_PER_ID) if aliases_available else {})
+        if filings_available:
+            # Without a leading security_id index thousands of live-db
+            # lookups could become a costly full-table scan.
+            index_rows = con.execute(
+                "PRAGMA index_list(filing_records_source)"
+            ).fetchall()
+            indexed = False
+            for index in index_rows:
+                index_name = str(index[1]).replace('"', '""')
+                first_col = con.execute(
+                    'PRAGMA index_info("' + index_name + '")'
+                ).fetchone()
+                if first_col and first_col[2] == "security_id":
+                    indexed = True
+                    break
+            filings_available = indexed
+        filings = _read_filing_index(con, ids) if filings_available else {}
+        aliases = _read_alias_index(con, ids) if aliases_available else {}
     finally:
         con.close()
 
