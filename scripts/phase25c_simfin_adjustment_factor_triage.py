@@ -157,7 +157,15 @@ def analyze(source:Path,pit_dir:Path,phase25b:Path):
             rows[sid]+=1
             stats["qualified_rows"]+=1
 
-    measurements=Counter()
+    measurements=Counter({
+        "candidate_ids_with_factor_5pct_intra_month":0,
+        "candidate_ids_with_factor_5pct_month_boundary":0,
+        "candidate_ids_with_extreme_adj_month_boundary_return":0,
+        "candidate_ids_with_no_detected_5pct_factor_change":0,
+        "intra_month_factor_5pct_months":0,
+        "factor_5pct_boundary_events":0,
+        "extreme_adjusted_month_boundary_moves":0,
+    })
     review_samples=[]
     results=[]
     for sid, rec in sorted(selected.items()):
