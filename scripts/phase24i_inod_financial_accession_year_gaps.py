@@ -48,6 +48,7 @@ def _source_accessions(folder: Path):
     good = {}
     barred = set()
     anomalies = []
+    anomaly_forms = Counter()
     conflicts = Counter()
     for name, sha, entries in _source_rows(folder, roots[0], "0000903651", counts):
         for e in entries:
@@ -70,6 +71,7 @@ def _source_accessions(folder: Path):
                 continue
             if accepted.date() < filed:
                 conflicts["accepted_UTC_before_filing_date"] += 1
+                anomaly_forms[e["form"]] += 1
                 if len(anomalies) < 30:
                     anomalies.append({
                         "accession": accession, "form": e["form"],
@@ -95,7 +97,7 @@ def _source_accessions(folder: Path):
                 del good[accession]
             elif prior is None:
                 good[accession] = current
-    return good, conflicts, anomalies
+    return good, conflicts, anomalies, anomaly_forms
 
 
 def analyze(db: Path, submissions: Path, phase24h: Path,
@@ -104,7 +106,7 @@ def analyze(db: Path, submissions: Path, phase24h: Path,
         submissions.is_symlink() or not submissions.is_dir()):
         raise ValueError("OFFLINE_BACKUP_OR_SEC_SOURCE_MISSING")
     r = _prior(phase24h)
-    good, conflicts, anomalies = _source_accessions(submissions)
+    good, conflicts, anomalies, anomaly_forms = _source_accessions(submissions)
     if (len(good) != r["valid_accessions_total"]
         or conflicts["accepted_UTC_before_filing_date"] !=
            r["source_before_filing_date_count_not_double_counted"]):
@@ -187,8 +189,7 @@ def analyze(db: Path, submissions: Path, phase24h: Path,
         "target_window_no_fact_candidates_NOT_verified":target_missing,
         "accepted_UTC_before_filing_date_source_count":
             conflicts["accepted_UTC_before_filing_date"],
-        "date_conflict_form_counts":dict(sorted(Counter(
-            v["form"] for v in anomalies).items())),
+        "date_conflict_form_counts":dict(sorted(anomaly_forms.items())),
         "date_conflict_examples_bounded":anomalies,
         "date_conflicts_automatically_fixed":False,
         "additional_SEC_source_needed_proven":False,
@@ -214,6 +215,9 @@ def main():
     p.add_argument("--out",type=Path,default=root/"phase24i/inod_financial_accession_gaps.json")
     a=p.parse_args()
     try:
+        destination=a.out.expanduser().resolve()
+        if destination in {a.db.resolve(),a.phase24h.resolve()} or a.submissions_dir.resolve() in destination.parents:
+            raise ValueError("REPORT_DESTINATION_OVERWRITES_SOURCE")
         report=analyze(a.db,a.submissions_dir,a.phase24h)
         a.out.parent.mkdir(parents=True,exist_ok=True)
         stage=a.out.with_suffix(".json.tmp")
