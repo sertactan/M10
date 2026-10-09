@@ -65,7 +65,10 @@ def _raw_response(provider: AlphaVantagePitUniverseProvider, as_of: date) -> byt
             "GET", "https://www.alphavantage.co/query",
             params={"function": "LISTING_STATUS", "date": as_of.isoformat(),
                     "state": "active", "apikey": provider.api_key},
-            headers={"User-Agent": "S15.3 Research Terminal", "Accept": "text/csv"},
+            # Match the proven AlphaVantagePitUniverseProvider request headers.
+            # Forcing Accept: text/csv triggered HTTP 406 on the Windows host;
+            # let httpx send its ordinary default Accept header instead.
+            headers={"User-Agent": "S15.3 Research Terminal"},
         )
         for _ in range(4):
             response = client.send(request, follow_redirects=False)

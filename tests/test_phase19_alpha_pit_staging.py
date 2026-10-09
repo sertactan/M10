@@ -158,5 +158,51 @@ class PITStagingTests(unittest.TestCase):
             self.assertFalse(report["production_database_modified"])
 
 
+    def test_request_accept_header_matches_working_adapter(self):
+        import httpx
+        from unittest.mock import patch
+        from scripts.phase19_alpha_pit_staging import _raw_response
+        from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
+
+        seen = {}
+        def handler(request):
+            seen["accept"] = request.headers.get("Accept")
+            seen["user_agent"] = request.headers.get("User-Agent")
+            return httpx.Response(200, content=CSV)
+        original_client = httpx.Client
+        transport = httpx.MockTransport(handler)
+        with patch("httpx.Client", side_effect=lambda **kw: original_client(
+            transport=transport, **kw
+        )):
+            result = _raw_response(
+                AlphaVantagePitUniverseProvider(api_key="offline-unit-key"),
+                date(2024, 1, 31),
+            )
+        self.assertEqual(result, CSV)
+        self.assertEqual(seen["user_agent"], "S15.3 Research Terminal")
+        self.assertEqual(seen["accept"], "*/*")
+        self.assertNotEqual(seen["accept"], "text/csv")
+
+    def test_provider_406_is_fail_closed_and_api_key_not_in_status(self):
+        import httpx
+        from unittest.mock import patch
+        from scripts.phase19_alpha_pit_staging import _raw_response
+        from data.providers.alpha_vantage_pit_universe import AlphaVantagePitUniverseProvider
+
+        original_client = httpx.Client
+        transport = httpx.MockTransport(lambda _req:
+                                        httpx.Response(406, content=b"Not acceptable"))
+        with patch("httpx.Client", side_effect=lambda **kw: original_client(
+            transport=transport, **kw
+        )):
+            with self.assertRaisesRegex(PITStageBlocked,
+                                        "PROVIDER_HTTP_STATUS_406") as context:
+                _raw_response(
+                    AlphaVantagePitUniverseProvider(api_key="offline-unit-key"),
+                    date(2024, 1, 31),
+                )
+        self.assertNotIn("offline-unit-key", str(context.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
