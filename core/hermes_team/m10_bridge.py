@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import fields
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from core.hermes_team.contracts import financial_result
 from core.models.s16 import S16V1Model
@@ -13,13 +13,19 @@ _METADATA = {"security_id", "ticker", "as_of", "route"}
 REQUIRED_FEATURES = tuple(f.name for f in fields(S16Input) if f.name not in _METADATA)
 
 
-def canonical_s16_from_verified_features(payload: dict[str, Any]) -> dict[str, Any]:
+def canonical_s16_from_verified_features(
+    payload: dict[str, Any], *,
+    verifier: Callable[[dict[str, Any]], bool] | None = None,
+) -> dict[str, Any]:
     """Only trust deterministic, externally verified PIT feature bundles.
 
     The caller must independently verify evidence references and PIT lineage.
     No LLM-originated feature value is admissible as canonical evidence.
     """
     if payload.get("feature_origin") != "M10_VERIFIED_PIT_PIPELINE":
+        return financial_result(payload)
+    # A JSON flag is NOT proof. Trust only a separate native PIT verifier.
+    if verifier is None or verifier(payload) is not True:
         return financial_result(payload)
     if payload.get("canonical_evidence_verified") is not True:
         return financial_result(payload)
@@ -39,4 +45,4 @@ def canonical_s16_from_verified_features(payload: dict[str, Any]) -> dict[str, A
         return financial_result({**payload, "canonical_evidence_verified": False})
     # This is the frozen genuine M10 formula, not an LLM estimate.
     return financial_result({**payload, "s16_c": result.explosive_score,
-                             "canonical_evidence_verified": True})
+                             "canonical_evidence_verified": True}, canonical_trusted=True)

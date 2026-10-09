@@ -88,8 +88,8 @@ def test_financial_evidence_gate_and_separate_scores():
                      "available_at": "2026-10-09"}],
         "s16_e": 61, "s16_c": 83, "canonical_evidence_verified": True
     })
-    assert trusted["s16_e"] == 61 and trusted["s16_c"] == 83
-    assert "S16-C: 83" in telegram_message(trusted)
+    assert trusted["s16_e"] == 61 and trusted["s16_c"] is None
+    assert "S16-C: INCONCLUSIVE" in telegram_message(trusted)
     assert plugin_response(trusted)["transport_connected"] is False
 
 

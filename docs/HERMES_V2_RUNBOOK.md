@@ -1,7 +1,10 @@
 # Hermes V2 — Safe local integration runbook
 
 ## Current status
-Hermes binary installed: **NO**. Cloud deployed: **NO**.
+Hermes binary installed: **YES** — Windows v0.21.5+5295.g234badf,
+git SHA 234badf4012af380d23c91eae55d045a69c69ffb, not upgraded.
+Official v0.21.6 released 2026-10-08 (818c13be1dc4fd28987e1e881a9408224afd4535).
+Cloud deployed: **NO**.
 Private Plugin connected: **NO**. Telegram connected: **NO**.
 True PIT 10–15 year walk-forward validated: **NO**.
 No provider credentials, pricing claims or user billing settings were invented.
@@ -44,13 +47,35 @@ Never execute an unreviewed remote install script in the running M10 checkout.
 
 ## Network and security limitations
 Loopback only does not protect against other untrusted local processes.
-SQLite quota is single-machine only. 90s lease and 30s outgoing timeout
-must be validated under killed processes and concurrent requests. The gateway
+SQLite quota is single-machine only. Active unfinished leases are NOT
+automatically released on timeout; inspect crashes manually. The gateway
 has no production-grade auth identity, OpenTelemetry cost feed,
 independent official proof of model account billing settings or enforced
 remote non-billable request proof.
 The `canonical_evidence_verified` flag is not a cryptographic proof.
 Only an explicitly trusted local M10 provenance checker may set it.
+The S16 bridge requires an independent verifier callback; none is yet
+wired to the actual production PIT source. JSON flags alone cannot attest
+canonical results.
+
+## Hermes native roles and recoverable queue
+
+Six skills are defined as project-scoped `.agents/skills/meridyen-*/SKILL.md`
+instructions. Native Hermes CLI supports `skills trust [path]`, but no
+global trust or unattended execution was enabled. Persistent local-only
+SQLite queue: `python -m scripts.hermes_team_tasks --db
+data/runtime/hermes_v2/tasks.sqlite3 enqueue scan`, then change final
+argument to `tick` to execute one no-network/no-LLM fail-closed status
+assessment, or `status JOB_ID` to inspect. Interrupted RUNNING tasks
+require review; no auto-repeat. This queue is not yet the full M10 scanner.
+Native Hermes `cron create --no-agent --script` and `cron runs` can be
+used once manually approved; no job was scheduled in the user's profile.
+
+Official Hermes release pinning, actual user-owned LLM quota and
+nonbillable account guard, live Telegram/plugin transport, complete
+144-month PIT, WF9, and real Learning V3 performance remain unverified.
+IPv6-only GCP may avoid IPv4 address charge but does not establish
+zero total spend or provider connectivity; cloud remains blocked.
 
 ## Cloud blocking decision (2026-10-10)
 One e2-micro in eligible US region + qualifying standard 30 GB-month disk

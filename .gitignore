@@ -35,3 +35,6 @@ data/runtime/phase13_export/
 # Phase18 private local data/evidence reports (never publish source manifests)
 data/runtime/phase18/
 data/runtime/phase18_*.json
+
+# Local Hermes V2 isolated profile, quota ledger and tasks (private)
+data/runtime/hermes_v2/

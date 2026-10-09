@@ -177,3 +177,23 @@ blokaj ve bir sonraki güvenli görev.
 **Şimdi aynı iş sırasında bağımlılıksız fazları tamamla; doğrulanmış
 bir bariyere geldiğinde onu açıkça yazıp diğer yerel kod/test işlerine
 devam et. Canlı üretim kodunu veya broker işlevlerini değiştirme.**
+
+## 2026-10-10 continuation addendum
+
+- Existing local Hermes executable v0.21.5+5295.g234badf at upstream
+  234badf4012af380d23c91eae55d045a69c69ffb confirmed. New stable
+  v0.21.6 exists, but in-place upgrade would touch the user's global
+  Hermes installation and was not performed.
+- Six Hermes project skills placed in `.agents/skills`; no global trust
+  action was performed. Hermes supports `cron --no-agent --script` and
+  persistent cron history, but no live cron was registered.
+- New SQLite queue offers persistent tasks, deterministic single-item
+  claims, statuses, and no automatic retry of interrupted RUNNING jobs.
+  Current task execution reports SOURCE_EVIDENCE_REQUIRED/INCONCLUSIVE.
+- Atomic local free LLM quota guard now blocks all outstanding in-flight
+  leases even after their nominal expiry, pending manual reconciliation.
+- Canonical S16 requires native trusted evidence verification; a boolean
+  included in LLM / remote JSON is insufficient.
+- Provider account quotas, Google Cloud total no-charge assurances, live
+  chat/plugin/Telegram wiring and full historical PIT/OOS results remain
+  BLOCKED pending independent evidence.

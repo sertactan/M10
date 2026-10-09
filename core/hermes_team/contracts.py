@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 
-def financial_result(payload: dict[str, Any]) -> dict[str, Any]:
+def financial_result(payload: dict[str, Any], *, canonical_trusted: bool = False) -> dict[str, Any]:
     """Never claim canonical S16 when source evidence or formula result is absent."""
     ticker = str(payload.get("symbol") or "").upper().strip()
     price = payload.get("price")
@@ -26,7 +26,7 @@ def financial_result(payload: dict[str, Any]) -> dict[str, Any]:
         and s.get("available_at") and s.get("source_ref") for s in sources
     ) and bool(sources)
     ready = bool(ticker and price_ok and timestamp_ok and provenance_ok)
-    canonical_ready = ready and approved_evidence and isinstance(
+    canonical_ready = ready and canonical_trusted and approved_evidence and isinstance(
         canonical, (int, float)
     ) and not isinstance(canonical, bool) and 0 <= canonical <= 100
     return {

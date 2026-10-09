@@ -83,8 +83,8 @@ def run() -> None:
                      "retrieved_at": "2026-10-09", "available_at": "2026-10-09"}],
         "s16_e": 61, "s16_c": 83, "canonical_evidence_verified": True,
     })
-    assert valid["s16_e"] == 61 and valid["s16_c"] == 83
-    assert "S16-C: 83" in telegram_message(valid)
+    assert valid["s16_e"] == 61 and valid["s16_c"] is None
+    assert "S16-C: INCONCLUSIVE" in telegram_message(valid)
     assert plugin_response(valid)["transport_connected"] is False
     print("PASS financial and adapter contracts (synthetic fixture only)")
     print("ALL_HERMES_V2_SMOKE_TESTS_PASSED")

@@ -77,9 +77,9 @@ class QuotaGuard:
         db = self._connect()
         try:
             db.execute("BEGIN IMMEDIATE")
-            # No second LLM may start while an existing lease is active.
-            if db.execute("SELECT 1 FROM calls WHERE in_flight=1 AND lease_until>? LIMIT 1",
-                          (current,)).fetchone():
+            # Expired lease is NEVER proof that an outbound request stopped.
+            # Require operator-reviewed recovery after a crash, even past 90 s.
+            if db.execute("SELECT 1 FROM calls WHERE in_flight=1 LIMIT 1").fetchone():
                 raise Blocked("ONE_LLM_AT_A_TIME")
             count_day = db.execute("SELECT count(*) FROM calls WHERE at_epoch>=? AND provider=?",
                                    (day, policy.provider)).fetchone()[0]
