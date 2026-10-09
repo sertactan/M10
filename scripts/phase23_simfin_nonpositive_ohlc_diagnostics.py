@@ -164,12 +164,13 @@ def analyze(source: Path, phase22_report: Path) -> dict:
         "monthly_nonpositive_row_counts":
             [{"month": month, **dict(counts)}
              for month, counts in sorted(by_month.items())],
-        "top_tickers_nonpositive_rows_not_security_identity":
-            [{"ticker": ticker, "rows": count}
-             for ticker, count in by_ticker.items()
-             for count in [count["nonpositive_rows"]]
-             if count > 0
-             ][:0],  # replaced below with explicit deterministic sort
+        "top_tickers_nonpositive_rows_not_security_identity": [
+            {"ticker": ticker, "rows": counts["nonpositive_rows"]}
+            for ticker, counts in sorted(
+                by_ticker.items(),
+                key=lambda item: (-item[1]["nonpositive_rows"], item[0])
+            )[:25]
+        ],
         "sample_rows_small_private_audit_only": examples,
         "provider_zero_field_semantics_verified": False,
         "adjusted_close_corporate_actions_certified": False,
