@@ -208,3 +208,50 @@ delisted terminal outcomes, WF5/6 and mature labels. Neither walk-forward
 nor Learning V3 ran. This does not certify backtest accuracy.
 Native Hermes profile bootstrap started in isolated `HERMES_HOME`;
 no successful CLI role execution or paid model call is claimed.
+
+## Local deployment progress — 2026-10-10 02:37 JST and later checks
+
+**Do not reinterpret a research-only local execution as a successful
+financial model backtest or live LLM deployment.**
+
+1. Real installed Hermes v0.21.5 git SHA `234badf4012af380d23c91eae55d045a69c69ffb`.
+   Runtime packages were staged in a separate M10 `HERMES_HOME`.
+   Native `hermes skills list` confirmed all six Meridyen skills enabled.
+   Hermes source launcher publication reports an intermittent upgrade
+   completion error; global Hermes program was not upgraded.
+2. The real Hermes `cron create --no-agent` mechanism registered a
+   paused, local-only two-hour job `6e92e18ee724`. Its Python shim
+   executes at most one pre-enqueued local audit and uses no LLM.
+   The gateway scheduler is not running, therefore this is registered
+   scheduling, **not active unattended processing**.
+3. Persistent A1→A2/A3/A4/A5/A6 task transfer and crash review are
+   implemented in local SQLite. The actual M10 Phase25j 6 P1 issuer
+   references and remaining 127 research candidates, 167 non-P1
+   source-only observations, were evaluated. **Zero candidates received
+   a certified canonical adjusted-price/CIK evidence chain.**
+4. Actual Phase25i was run and blocked the full 21-month PIT,
+   true WF9 and Learning V3 by nine missing source-evidence gates.
+   This is a verified blocker report, not a completed training cycle.
+5. `core/hermes_team/mcp_local.py` serves an authenticated, loopback
+   MCP JSON-RPC API (status, submit, tick, job and scenario-only paper).
+   Local HTTP protocol tests pass. The connected Meridyen demo tunnel
+   may be unavailable; never claim a real Private Plugin remote binding
+   until actual `tools/list` and end-to-end remote checks pass.
+6. `core/hermes_team/telegram_control.py` handles allowlisted local
+   commands, and opt-in outbound Telegram messages are disabled by
+   default; mocked outbound transport alone is not live delivery.
+7. `core/hermes_team/paper.py` models bounded maximum share
+   quantity and spread/slippage/fees for test assumptions only. Its
+   output explicitly says SYNTHETIC_SCENARIO_ONLY and does not
+   connect to a broker or prove a strategy.
+8. Cloud cost and credential guards remain strictly disabled
+   without independent billing-account and quota proof. Official
+   Google Cloud Always Free does NOT constitute a hard USD 0
+   infrastructure cap.
+
+**Full acceptance matrix:** `docs/HERMES_V2_PHASE_2_12_ACCEPTANCE.md`.
+**Current command guidance:** `docs/HERMES_V2_RUNBOOK.md`.
+Continue source-only evidence triage and independent test work where
+possible. Do not fabricate resolved corporate actions, historical
+membership, delisting proceeds, trained challenger performance, live
+price, S16-C or alerts.

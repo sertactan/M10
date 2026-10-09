@@ -34,7 +34,16 @@ jobs:
           python -m pip install pytest pytest-asyncio pandas pydantic PyYAML httpx pyarrow duckdb PySide6
 
       - name: Compile
-        run: python -m compileall -q app core data main.py
+        run: python -m compileall -q app core data scripts/hermes_team_tasks.py scripts/hermes_team_mcp.py scripts/hermes_team_no_agent_tick.py main.py
+
+      - name: Hermes strict-free controls and API contracts
+        env:
+          OPENAI_PAID_API_ENABLED: "false"
+          PAID_LLM_FALLBACK_ENABLED: "false"
+          LIVE_TRADING_ENABLED: "false"
+          MERIDYEN_TELEGRAM_SEND_ENABLED: "false"
+        run: |
+          python -m pytest -q +            tests/test_hermes_team.py +            tests/test_hermes_tasks.py +            tests/test_hermes_handoffs.py +            tests/test_hermes_mcp_local.py +            tests/test_hermes_telegram.py +            tests/test_hermes_cron.py +            tests/test_hermes_paper.py
 
       - name: Test
         run: python -m pytest -q

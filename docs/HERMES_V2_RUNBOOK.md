@@ -96,6 +96,71 @@ zero total spend or provider connectivity; cloud remains blocked.
 - The isolated Hermes profile must complete installation and pass
   `hermes doctor` before marking native Hermes integration accepted.
 
+## End-to-end deterministic six-role execution and adapters
+
+The updated `core/hermes_team/evidence_workflows.py` orchestrates existing
+M10 Phase25i and Phase25j scripts using a bounded subprocess and returns
+their own source statuses without inventing S15/S16 scores. SQLite queue
+supports single active worker, idempotent A1 specialist handoff, operator
+review of interrupted jobs, audit history, secret-containing payload
+rejection and explicit blocked results.
+
+Authenticated local MCP (Streamable HTTP JSON mode) is available by manually
+running `python -m scripts.hermes_team_mcp --db
+data/runtime/hermes_v2/mcp_tasks.sqlite3`, only with a separately stored
+32-character-plus `MERIDYEN_LOCAL_MCP_TOKEN`. Binds `127.0.0.1:8876`,
+never exposed to public internet. Tools include status, submit, tick, job
+inspection and **synthetic-only paper scenario preview**. A real ChatGPT
+remote plugin handshake has not been performed. Do not confuse tests of
+localhost MCP protocol with the Private Plugin connecting to ChatGPT.
+
+Telegram commands are pure allowlisted `interpret_update` routines.
+Outbound delivery is blocked unless SEND_ENABLED=true plus bot token and
+exact chat ID are independently configured and opted in. No real send or
+webhook was run; transport is mock-tested without any retries.
+
+Hermes native `cron create --no-agent` registered the private profile
+`6e92e18ee724` job pointing to the bounded offline Python shim,
+every two hours, paused. Gateway scheduler absent; it is not active.
+See `docs/HERMES_V2_PHASE_2_12_ACCEPTANCE.md` for actual acceptance status.
+
+## A1-to-specialist execution trace (real local inputs, no LLM)
+
+```powershell
+$db = "data/runtime/hermes_v2/tasks.sqlite3"
+python -m scripts.hermes_team_tasks --db $db enqueue strategy
+python -m scripts.hermes_team_tasks --db $db tick
+# Only after A1 finished, replace JOB_ID with the new A1 id:
+python -m scripts.hermes_team_tasks --db $db handoff JOB_ID scan
+python -m scripts.hermes_team_tasks --db $db handoff JOB_ID fundamental
+python -m scripts.hermes_team_tasks --db $db handoff JOB_ID catalyst
+python -m scripts.hermes_team_tasks --db $db handoff JOB_ID risk
+python -m scripts.hermes_team_tasks --db $db handoff JOB_ID learning
+# Invoke tick once for each queued job. An interrupted RUNNING job blocks
+# further dispatch until explicit operator review; do NOT auto-retry.
+python -m scripts.hermes_team_tasks --db $db review-interrupted STUCK_JOB_ID
+```
+
+Source research scripts Phase25j (A2/A3) and Phase25i (A1/A5/A6)
+were actually executed. A4 returned INCONCLUSIVE without a current,
+timestamp-verified catalyst. An A1-to-A6 chain was persisted locally
+with one attempt per specialist, and no network LLM provider or broker
+was invoked. A3's official SEC issuer references are not proof of an
+entire historical daily share-class identity.
+
+The local MCP endpoint supports authenticated JSON-RPC 2.0 with
+`initialize`, `tools/list`, `tools/call`, and `ping`. This is a
+**loopback development adapter**. It cannot be added as a production
+ChatGPT remotely hosted connector without an authenticated TLS
+transport, network routing, plugin authorization and real handshake.
+
+The Free Tier models listed on official Gemini pricing pages are
+**candidates only** until the exact AI Studio project has verified model
+access and its RPM/TPM/RPD; OpenRouter's `:free` endpoints are account
+subject to quota and not an entitlement to bypass 50/day basic cap.
+The service is disabled without billing safeguards. An empty private
+`.env` is not a real provider configuration.
+
 ## Cloud blocking decision (2026-10-10)
 One e2-micro in eligible US region + qualifying standard 30 GB-month disk
 are Always Free candidates. Outbound transfer free threshold is narrow;

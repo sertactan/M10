@@ -1,6 +1,9 @@
 from core.hermes_team.tasks import LocalTasks
 
-def test_jobs_persist_fail_closed(tmp_path):
+def test_jobs_persist_fail_closed(tmp_path, monkeypatch):
+    from core.hermes_team import tasks
+    monkeypatch.setattr(tasks, "perform_local_evidence_task",
+                        lambda task: {"status": "INCONCLUSIVE", "llm_called": False})
     db = tmp_path / "tasks.sqlite3"
     q = LocalTasks(db)
     job = q.submit("scan")
