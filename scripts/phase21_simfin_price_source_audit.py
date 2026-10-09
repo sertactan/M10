@@ -69,10 +69,7 @@ def _reader(text: TextIO) -> csv.DictReader:
         raise PriceInputBlocked("EMPTY_PRICE_SOURCE")
     # Official SimFin examples use ';'; manually exported CSV may use ','.
     delimiter = ";" if header.count(";") >= header.count(",") else ","
-    return csv.DictReader(
-        [header] + list(text) if False else _stream_with_header(header, text),
-        delimiter=delimiter,
-    )
+    return csv.DictReader(_stream_with_header(header, text), delimiter=delimiter)
 
 
 def _stream_with_header(header: str, source: TextIO):
