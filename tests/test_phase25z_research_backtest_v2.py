@@ -21,6 +21,7 @@ class Phase25ZV2Tests(unittest.TestCase):
         baseline = equal_weight_path(series)
         result = diagnostics(series, dates, baseline)
         self.assertEqual(result["source_adj_index_final"], 1.04)
+        self.assertEqual(result["monthly_diagnostics"][-1]["source_close_index"], 1.0)
         self.assertAlmostEqual(result["contribution_sum"], 0.04)
         self.assertEqual(result["leave_one_out"]["T00"]["index_without"], 1.0)
         self.assertEqual(result["most_influential_leave_one_out"][0], "T00")

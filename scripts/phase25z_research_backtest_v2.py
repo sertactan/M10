@@ -67,7 +67,7 @@ def diagnostics(series: dict[str, dict], all_dates: dict[str, set[str]], baselin
     for k in ("source_adj_index_final", "source_close_index_final"):
         if abs(observed[k] - baseline[k]) > 1e-9:
             raise ValueError("Phase25Y-A baseline does not reproduce")
-    nav, winsor_nav, median_nav = 1.0, 1.0, 1.0
+    nav, close_nav, winsor_nav, median_nav = 1.0, 1.0, 1.0, 1.0
     contributions = {t: 0.0 for t in names}
     close_contributions = {t: 0.0 for t in names}
     returns_by_month = []
@@ -83,15 +83,19 @@ def diagnostics(series: dict[str, dict], all_dates: dict[str, set[str]], baselin
         lo, hi = percentile(vals, 0.05), percentile(vals, 0.95)
         capped = [max(lo, min(hi, v)) for v in vals]
         nav *= 1 + sum(vals) / 25
+        close_nav *= 1 + sum(close.values()) / 25
         winsor_nav *= 1 + sum(capped) / 25
         median_nav *= 1 + median(vals)
         gap = sum(adjusted[t] - close[t] for t in names) / 25
         returns_by_month.append({"from": prior, "to": current,
                                  "adj_minus_close_mean_return": round(gap, 10),
                                  "source_adj_index": round(nav, 10),
+                                 "source_close_index": round(close_nav, 10),
                                  "winsor_5_95_index": round(winsor_nav, 10),
                                  "median_index": round(median_nav, 10),
                                  "upper_winsor_cut": round(hi, 10), "lower_winsor_cut": round(lo, 10)})
+    if abs(close_nav - baseline["source_close_index_final"]) > 1e-9:
+        raise ValueError("Final close path does not tie to baseline")
     if abs(nav - baseline["source_adj_index_final"]) > 1e-9:
         raise ValueError("Final attribution does not tie to baseline")
     if abs(sum(contributions.values()) - (nav - 1)) > 1e-9:

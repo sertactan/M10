@@ -39,4 +39,4 @@ $root = "$env:LOCALAPPDATA\S153ResearchTerminal\runtime"
 & "E:\M10\.venv\Scripts\python.exe" -W error::ResourceWarning -m unittest tests.test_phase25z_research_backtest_v2 -v
 ```
 
-Final actual Windows report: `%LOCALAPPDATA%\S153ResearchTerminal\runtime\phase25z\research_backtest_v2_final.json`, SHA-256 `d7e7215188d035cd842518850cd30642a77a2a981d81cb581af52c883b94aced`. It remains private; the source SHA-256 and input-report hashes are recorded inside it. Sources and operational database were not changed.
+Final actual Windows report for the desktop chart: `%LOCALAPPDATA%\S153ResearchTerminal\runtime\phase25z\research_backtest_v2_desktop.json`, SHA-256 `cab8f4f9e6523b73594a44e0bb8beb373740e0a7cf2179329e484ea2a1486322`. It remains private; the source SHA-256 and input-report hashes are recorded inside it. Sources and operational database were not changed.
