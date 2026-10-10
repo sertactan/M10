@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 from typing import Callable
 
 from PySide6.QtCore import QDate, QThreadPool, Signal
@@ -26,6 +27,7 @@ from app.ui.data_health_dialog import DataHealthDialog
 from app.ui.historical_pit_evidence_dialog import HistoricalPitEvidenceDialog
 from app.ui.data_control_center_dialog import DataControlCenterDialog
 from app.ui.model_page import ModelPage
+from app.ui.research_backtest_page import ResearchBacktestPage
 from app.ui.scanner_dialog import MarketScannerDialog
 from app.ui.view_models import ComparisonView
 
@@ -40,6 +42,7 @@ class ResearchTerminalWindow(QMainWindow):
         scanner_service_factory: Callable[[], object] | None = None,
         data_health_service_factory: Callable[[], object] | None = None,
         control_center_service_factory: Callable[[], object] | None = None,
+        research_backtest_report_path: Path | None = None,
         historical_pit_service_factory: Callable[[], object] | None = None,
         parent=None,
     ) -> None:
@@ -69,11 +72,14 @@ class ResearchTerminalWindow(QMainWindow):
         self.s16_page = ModelPage("S16 V1.0 Canonical")
         self.s16_ea_page = ModelPage("S16-EA V1.3 Canonical Hybrid FastPath")
         self.compare_page = ComparePage()
+        self.research_backtest_page = ResearchBacktestPage(report_path=research_backtest_report_path)
         self.tabs.addTab(self.v12_page, "V1.2")
         self.tabs.addTab(self.v14_page, "V1.4.1")
         self.tabs.addTab(self.s16_page, "S16")
         self.tabs.addTab(self.s16_ea_page, "S16-EA")
         self.tabs.addTab(self.compare_page, "COMPARE")
+        self.tabs.addTab(self.research_backtest_page, "RESEARCH BACKTEST")
+        self.tabs.currentChanged.connect(self._refresh_research_tab)
         root.addWidget(self.tabs, 1)
 
         footer = QHBoxLayout()
@@ -87,6 +93,13 @@ class ResearchTerminalWindow(QMainWindow):
         self.progress.hide()
         footer.addWidget(self.progress)
         root.addLayout(footer)
+
+    def _refresh_research_tab(self, index: int) -> None:
+        research = self.tabs.widget(index) is self.research_backtest_page
+        self.stock_header.setVisible(not research)
+        self.context_panel.setVisible(not research)
+        if research:
+            self.research_backtest_page.refresh()
 
     def _build_header(self) -> QFrame:
         frame = QFrame()
