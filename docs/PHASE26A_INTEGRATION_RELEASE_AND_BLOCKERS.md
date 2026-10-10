@@ -47,6 +47,10 @@ Python 3.11.9, PyInstaller 6.22.3, mevcut spec ve sürüm 1.0.6 kullanıldı. İ
 
 Inno Setup 6.7.3 kullanıcı kapsamındaki kurulumda bulundu. Mevcut .iss içeriğinin yalnızca kaynak/çıktı yolu özel test dizinine uyarlanmış kopyasıyla 72.609.907 baytlık imzasız installer üretildi; SHA-256: 02327da5cff3402a6dd12b5c641c7de170227b51f929a2c26cd6fe5a9608ccc2. Yalıtılmış kullanıcı dizinine sessiz kurulum exit 0 verdi. Kurulu EXE yeni runtime ile doctor exit 0 verdi; gerçek Qt ana penceresi açıldı ve WM_CLOSE sonrası exit 0 kapandı. MSI üretilmez; mevcut dağıtım yapılandırması Inno EXE üretir. İmzalama sertifikası ve yayın onayı yoktur. Test paketleri ve özel seedler GitHub'a eklenmeyecek.
 
+## Nihai PR ve CI kaydı
+
+Staging PR #170: https://github.com/sertactan/M10/pull/170; taban #169 dalı, başlık `codex/phase26a-integration`. Yerel tam Windows testi 734/734 geçti. GitHub `Python CI` kontrolünün kesin sonucu PR kontrol ekranından doğrulanır; GitHub Windows paketleme iş akışı bu PR dalında otomatik çalışmaz. `scripts/check_release_version.py --root .` Python 3.11 ile geçti; uygulama, build spec ve installer sürümü 1.0.6 olarak hizalıdır.
+
 ## Birleştirme ve release kararı
 
 Kullanıcı onayından sonra gözden geçirilebilir sıra: #163, #164, ardından #165→#167→#169 Research hattı; #166→#168 BKE hattı #164 üstünden; #162 bağımsız. Staging PR, #169 tabanlı olarak bağımsız #162/#166/#168 değişikliklerini ve Faz 26A kapılarını gösterir. Her adımda tabanı güncelleme, CI ve hash kontrolü gerekir. Bu bir plan; otomatik merge yok.
