@@ -71,8 +71,8 @@ Restrict terminal and file capabilities before trusting remote source content.
 ## 3. One shared, pinned free model before six logical roles
 
 No model is currently active for the six roles. Candidate *published* free
-model IDs (not proof of account entitlement): `gemini-2.5-flash`,
-`gemini-2.5-flash-lite`. Google currently restricts access to some legacy
+model IDs (not proof of account entitlement): `gemini-3.8-flash`,
+`gemini-2.5-flash`, and `gemini-2.5-flash-lite`. Google currently restricts access to some legacy
 2.5 models for new projects; enumerate the actual model list on the
 **specific** AI Studio project and verify Free Tier, RPM/TPM/RPD and
 billing disabled/hard blocked. OpenRouter `:free` IDs are candidates,
