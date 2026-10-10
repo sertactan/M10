@@ -10,3 +10,14 @@ Do not treat simulated labels or code test passing as verified predictive
 performance. Report precision@K, recall@K, drawdown and test costs only
 when supported by complete cohorts. No automatic formula update or
 champion/challenger promotion; publish review proposals only.
+
+## Phase25Q/R/M/S acceptance gate
+
+An existing verified Phase25Q stage contains 21 retrospective source
+months, 128,088 membership rows and 2,110,622 vendor price rows.
+Phase25R found 464 historical identity conflicts; Phase25M/S
+explain some issuer corporate actions but not approved adjusted-price
+or delisted terminal value. The canonical 133-candidate gate remains
+zero accepted. Report these as research evidence only.
+Do not run/claim WF9 or Learning V3 trained outcomes until independent
+historical identity, corporate-action and `available_at` gates pass.
