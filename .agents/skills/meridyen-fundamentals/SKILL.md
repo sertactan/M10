@@ -22,3 +22,15 @@ CURB spinoff, but does not certify fully adjusted total-return bars,
 SEC public `available_at`, or full-window SimFinId↔CIK identity.
 Use the existing `phase25m`, `phase25r`, `phase25s` read-only reports
 and source links. Do not infer missing history from present-day CIK.
+
+## Phase25L B/FUN official identity transitions
+
+SEC/issuer evidence now documents Barnes NYSE:B cash merger delisting
+on 2025-01-27 ($47.50 for eligible common shares); Barrick GOLD→B
+ticker effective 2025-05-09; and former Cedar Fair LP FUN /
+Six Flags SIX conversion into new FUN common shares from 2024-07-02.
+Treat these as *dated issuer action facts*, not a vendor
+SimFinId↔CIK full-window crosswalk or a verified backtest payoff.
+Read the existing local Phase25L report through the read-only
+`phase25_source_evidence` adapter; keep the 464 historical
+source identity conflicts quarantined.
