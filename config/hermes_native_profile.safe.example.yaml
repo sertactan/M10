@@ -1,0 +1,46 @@
+# Native Hermes Agent config.yaml TEMPLATE for the isolated M10 profile.
+# This is NOT an operational deployment or a complete no-charge guarantee.
+# It must NOT be copied into an existing personal ~/.hermes directory.
+# Use only HERMES_HOME=E:\M10\data\runtime\hermes_v2\hermes_profile.
+# Review against the installed official Hermes v0.21.5 runtime before use.
+#
+# IMPORTANT: No model/provider is configured. Do not activate LLM work until
+# the actual account's model access, quotas and nonbillable status are verified.
+# A prompt or delegation concurrency setting does not stop native model
+# fallbacks, other provider clients or billable traffic.
+terminal:
+  backend: local
+  cwd: 'E:\M10'
+  home_mode: profile
+  timeout: 180
+  env_passthrough: []
+
+delegation:
+  max_concurrent_children: 1
+  max_spawn_depth: 1
+  orchestrator_enabled: false
+
+skills:
+  write_approval: true
+
+memory:
+  write_approval: true
+
+gateway:
+  allow_all_users: false
+
+# Native Hermes toolsets, not a parallel or custom agent framework.
+# CAUTION: terminal and execute_code run with the Hermes process permissions.
+# Do not enable live model inference until the working-tree and tools are
+# restricted to an approved read-only or feature-branch workspace.
+toolsets:
+  - skills
+  - terminal
+  - delegation
+  - cronjob
+  - session_search
+  - code_execution
+
+# Disable any auto-execution via the existing private paused cron job until
+# the pinned no-charge model and independent quota/billing gate pass.
+# DO NOT use a default model inherited from the personal Hermes config.
