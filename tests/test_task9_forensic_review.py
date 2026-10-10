@@ -131,9 +131,16 @@ class Task9ForensicTests(TestCase):
 
     def test_output_is_private_and_create_only(self):
         from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
         import os
-        with self.assertRaisesRegex(ValueError,"PRIVATE_TASK9"):
-            _output_path(Path(os.environ.get("TEMP","C:/Temp"))/"task9_fake.json")
+        # Windows has LOCALAPPDATA; Linux GitHub CI does not. Supply a
+        # synthetic private root so both platforms exercise the identical
+        # security predicate rather than fail on unrelated env discovery.
+        with TemporaryDirectory() as private_home:
+            with patch.dict(os.environ,{"LOCALAPPDATA":private_home}):
+                with self.assertRaisesRegex(ValueError,"PRIVATE_TASK9"):
+                    _output_path(Path(private_home)/"task9_fake.json")
 
 
 if __name__=="__main__":
