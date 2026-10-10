@@ -100,6 +100,10 @@ jobs:
           if (!(Test-Path "dist/S153ResearchTerminal/S153ResearchTerminal.exe")) {
             throw "PyInstaller executable was not produced"
           }
+          $exe = (Get-Item "dist/S153ResearchTerminal/S153ResearchTerminal.exe").VersionInfo
+          if ($exe.FileVersion -ne "1.0.6.0" -or $exe.ProductVersion -ne "1.0.6.0") {
+            throw "Windows PE metadata version mismatch: $($exe.FileVersion) / $($exe.ProductVersion)"
+          }
 
       - name: Prepare Authenticode signing
         shell: pwsh

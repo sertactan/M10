@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import date, timedelta
 import json
 from pathlib import Path
 import tempfile
@@ -35,9 +36,13 @@ class Phase26BSeedGateTests(unittest.TestCase):
 
     def _write(self, name: str, field: str, value: str) -> None:
         with (self.seed / name).open("w", newline="", encoding="utf-8") as stream:
-            writer = csv.DictWriter(stream, fieldnames=[field, "ticker"])
+            fields = [field, "ticker"] + (["snapshot_date"] if field == "transport" else [])
+            writer = csv.DictWriter(stream, fieldnames=fields)
             writer.writeheader()
-            writer.writerow({field: value, "ticker": "TEST"})
+            row = {field: value, "ticker": "TEST"}
+            if field == "transport":
+                row["snapshot_date"] = date.today().isoformat()
+            writer.writerow(row)
 
     def test_clean_seed_is_private_test_only_without_external_approval(self) -> None:
         gate.prepare_test_manifest(self.seed, self.notices)
@@ -60,6 +65,38 @@ class Phase26BSeedGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match"):
             gate.verify(self.seed, self.notices, private_test=False, approval=approval)
         self.assertEqual(manifest["status"], "PRIVATE_TEST_ONLY")
+
+    def test_mirror_allowed_only_for_private_test(self) -> None:
+        self._write("sec_us_current.csv", "transport", "SEC_MIRROR_EDGARTOOLS")
+        with patch.dict(gate.EXPECTED, {
+            "sec_us_current.csv": ("transport", {"SEC_DIRECT", "SEC_MIRROR_EDGARTOOLS"}, 1),
+            "jp_tr_hk_current.csv": ("source", {"FINANCEDATABASE_MIT_REFERENCE"}, 1),
+        }, clear=True):
+            gate.prepare_test_manifest(self.seed, self.notices)
+            gate.verify(self.seed, self.notices, private_test=True)
+            with self.assertRaisesRegex(ValueError, "directly fetched SEC"):
+                gate.verify(self.seed, self.notices, private_test=False)
+
+    def test_old_and_future_us_seed_rejected_for_release(self) -> None:
+        path = self.seed / "sec_us_current.csv"
+        for stamp in ((date.today() - timedelta(days=31)).isoformat(),
+                      (date.today() + timedelta(days=1)).isoformat()):
+            with path.open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=["transport", "ticker", "snapshot_date"])
+                writer.writeheader()
+                writer.writerow({"transport": "SEC_DIRECT", "ticker": "TEST", "snapshot_date": stamp})
+            manifest = gate.prepare_test_manifest(self.seed, self.notices)
+            with self.assertRaisesRegex(ValueError, "future-dated or older than 30 days"):
+                gate.verify(self.seed, self.notices, private_test=False)
+            (self.seed / "manifest.json").unlink()
+
+    def test_mixed_us_seed_snapshot_dates_rejected(self) -> None:
+        path = self.seed / "sec_us_current.csv"
+        with path.open("a", newline="", encoding="utf-8") as stream:
+            writer = csv.writer(stream)
+            writer.writerow(["SEC_DIRECT", "ANOTHER", "2025-01-01"])
+        with self.assertRaisesRegex(ValueError, "mixed snapshot dates"):
+            gate.prepare_test_manifest(self.seed, self.notices)
 
 
 class Phase26BBackupScopeTests(unittest.TestCase):

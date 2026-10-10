@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import argparse
 import csv
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
 
 SCHEMA = "M10_PHASE26B_RELEASE_SEEDS_V1"
+MAX_RELEASE_US_SEED_AGE = timedelta(days=30)
 EXPECTED = {
     "sec_us_current.csv": ("transport", {"SEC_DIRECT", "SEC_MIRROR_EDGARTOOLS"}, 1000),
     "jp_tr_hk_current.csv": ("source", {"FINANCEDATABASE_MIT_REFERENCE"}, 4000),
@@ -31,15 +32,32 @@ def inspect_csv(path: Path, field: str, allowed: set[str], minimum: int) -> dict
         reader = csv.DictReader(stream)
         if reader.fieldnames is None or field not in reader.fieldnames:
             raise ValueError(f"Seed provenance column missing: {path.name}")
+        if field == "transport" and "snapshot_date" not in reader.fieldnames:
+            raise ValueError("US seed snapshot_date column missing")
         values = set()
+        dates: set[str] = set()
         count = 0
         for row in reader:
             values.add(row.get(field, ""))
+            if field == "transport":
+                dates.add(row.get("snapshot_date", ""))
             count += 1
     if count < minimum or not values or not values <= allowed:
         raise ValueError(f"Unapproved or incomplete seed source: {path.name}")
-    return {"file": path.name, "sha256": sha256(path), "rows": count,
-            "provenance_values": sorted(values)}
+    entry = {"file": path.name, "sha256": sha256(path), "rows": count,
+             "provenance_values": sorted(values)}
+    if field == "transport":
+        if len(dates) != 1:
+            raise ValueError("US seed contains mixed snapshot dates")
+        stamp = next(iter(dates))
+        try:
+            parsed = date.fromisoformat(stamp)
+        except ValueError as exc:
+            raise ValueError("US seed snapshot date is invalid") from exc
+        if parsed.isoformat() != stamp:
+            raise ValueError("US seed snapshot date must be ISO YYYY-MM-DD")
+        entry["snapshot_date"] = stamp
+    return entry
 
 
 def prepare_test_manifest(directory: Path, notices: Path) -> dict:
@@ -58,7 +76,7 @@ def prepare_test_manifest(directory: Path, notices: Path) -> dict:
 
 
 def verify(directory: Path, notices: Path, *, private_test: bool,
-           approval: Path | None = None) -> dict:
+           approval: Path | None = None, today: date | None = None) -> dict:
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     if (manifest.get("schema") != SCHEMA or manifest.get("status") != "PRIVATE_TEST_ONLY"
             or manifest.get("contains_operational_or_user_data") is not False
@@ -69,6 +87,12 @@ def verify(directory: Path, notices: Path, *, private_test: bool,
     if manifest.get("entries") != expected:
         raise ValueError("Seed SHA-256, row count, or provenance changed")
     if not private_test:
+        us = next(row for row in expected if row["file"] == "sec_us_current.csv")
+        if us["provenance_values"] != ["SEC_DIRECT"]:
+            raise ValueError("Release requires directly fetched SEC US seed")
+        age = (today or datetime.now(timezone.utc).date()) - date.fromisoformat(us["snapshot_date"])
+        if age < timedelta(0) or age > MAX_RELEASE_US_SEED_AGE:
+            raise ValueError("Release US seed snapshot is future-dated or older than 30 days")
         if approval is None or not approval.is_file():
             raise ValueError("External distribution approval is required")
         decision = json.loads(approval.read_text(encoding="utf-8"))

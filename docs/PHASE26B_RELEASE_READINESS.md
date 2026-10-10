@@ -28,6 +28,12 @@ Canonical **0 hisse / 0 tarih**; WF9 **BLOCKED**; Learning V3 **NOT_TRAINED**. T
 
 ## Faz 26B kapanış — gerçek durum (10 Ekim 2026, Japonya)
 
+### Faz 26B devam — yayın kapılarının güçlendirilmesi
+
+US seed release doğrulaması artık `SEC_DIRECT` kökenini, tüm satırlarda tek geçerli ISO `snapshot_date` değerini ve UTC takvimine göre en fazla 30 günlük yaşı şart koşar; gelecekteki tarihler engellenir. Eski tarihli `SEC_MIRROR_EDGARTOOLS` yalnız `PRIVATE_TEST_ONLY` olarak paketlenebilir. Kaynak/snapshot bilgisi dosya SHA'sına ve seed manifestine bağlıdır; lisans değerlendirmesi ve dosya hash'lerine özel dağıtım onayı ayrıca gereklidir. 2026-06-01 tarihli önceki özel test seed'i **yayın için geçersizdir**. SEC direct 403 kaldırıldığı iddia edilmez.
+
+PyInstaller Windows sürüm kaynağı `config/RELEASE_VERSION.txt`, `pyproject.toml` ve Inno Setup sürüm eşitliğinden türetilir. Yeni EXE oluşturulduğunda Windows PE `FileVersion` / `ProductVersion` değerinin `1.0.6.0` olması beklenir; Windows build iş akışına bu kontrol eklendi. Önceki yerel EXE/installer **halen imzasız ve metadata'sı boş eski test çıktılarıdır**; yeniden üretilmediler, düzeltme ancak sonraki yeni paket üzerinde doğrulanabilir. İmzalama sertifikası ve resmî güncel seed kaynak kararı eksik; yayın **BLOCKED** kalır.
+
 **Karar: PARTIAL.** Faz 26B'nin temiz özel paketleme ve uygulama-durumu yedekleme işleri başarıyla tamamlandı; nihai yayın ve tam sistem kurtarma kabulü **BLOCKED**. İşler yeniden çalıştırılmadı: mevcut bitmiş işlem ve disk manifesti okundu. Kaynak operasyonel SQLite, S15/S16, Hermes ve özel fiyat girdileri değiştirilmedi. PR'lar birleştirilmedi.
 
 ### Yedek / restore denetimi

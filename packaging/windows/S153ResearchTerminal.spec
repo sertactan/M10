@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
+import tempfile
 
 project_root = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 
@@ -8,6 +9,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, project_root)
 from scripts.phase26b_seed_gate import verify
+from scripts.windows_version_resource import render as render_windows_version
 
 seed_dir_text = os.environ.get("M10_RELEASE_SEED_DIR")
 if not seed_dir_text:
@@ -18,6 +20,9 @@ private_test = os.environ.get("M10_PRIVATE_TEST_PACKAGE") == "1"
 approval_text = os.environ.get("M10_RELEASE_SEED_APPROVAL")
 verify(seed_dir, notices, private_test=private_test,
        approval=Path(approval_text) if approval_text else None)
+version_resource_dir = Path(tempfile.mkdtemp(prefix="m10-pe-version-"))
+version_resource_file = version_resource_dir / "version.txt"
+version_resource_file.write_text(render_windows_version(Path(project_root)), encoding="utf-8")
 
 a = Analysis(
     [os.path.join(project_root, "main.py")],
@@ -79,6 +84,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    version=str(version_resource_file),
 )
 
 coll = COLLECT(
