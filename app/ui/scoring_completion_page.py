@@ -15,9 +15,9 @@ class ScoringCompletionPage(QWidget):
         self.warning.setWordWrap(True);root.addWidget(self.warning)
         self.status=QLabel('No verified report loaded');self.status.setWordWrap(True);root.addWidget(self.status)
         button=QPushButton('Load verified offline results');button.clicked.connect(self.refresh);root.addWidget(button)
-        self.comparison=QTableWidget(0,11)
+        self.comparison=QTableWidget(0,13)
         self.comparison.setHorizontalHeaderLabels(('Stock','Cached price','Price time','S7','S12',
-            'S14','S14 legs','S16-E','S16-C','Features','Full formula scores'))
+            'S14','S14 legs','B_Q inputs','S6 inputs','S16-E','S16-C','Features','Full formula scores'))
         self.comparison.setEditTriggers(QTableWidget.NoEditTriggers)
         self.comparison.itemSelectionChanged.connect(self.select_stock)
         self.comparison.setMinimumHeight(210)
@@ -40,9 +40,13 @@ class ScoringCompletionPage(QWidget):
                 s14=next((m['score'] for m in s['models'] if m['model']=='S14'),None)
                 present=sum(s['quality'][k]['score'] is not None
                             for k in ('B_Q','S6','S7','S11','S12','S13'))
+                v3=s.get('sec_quality_v3') or {}
                 values=(s['ticker'],f"{s['price']:.2f} {s['currency']}",s['price_time'],
                         s['quality']['S7']['score'],s['quality']['S12']['score'],s14,
-                        f"{present}/6",None,None,len(s['features']),s['full_model_count'])
+                        f"{present}/6",
+                        f"{v3['B_Q_risk_count']}/7" if v3 else 'N/A',
+                        f"{v3['S6_partial_count']}/7" if v3 else 'N/A',
+                        None,None,len(s['features']),s['full_model_count'])
                 for j,v in enumerate(values):
                     self.comparison.setItem(i,j,QTableWidgetItem('N/A' if v is None else f'{v:.2f}' if isinstance(v,float) else str(v)))
             self.status.setText(f"Offline snapshot {self.report['generated_at']} · {self.report['full_model_count']} full research formula scores · prices retain original timestamps; not live")
@@ -64,6 +68,14 @@ class ScoringCompletionPage(QWidget):
         evidence={k:stock[k] for k in ('quality','control_chain','s16_features','daily','features')}
         if stock.get('sec_companyfacts_partial'):
             evidence['sec_companyfacts_partial']=stock['sec_companyfacts_partial']
+        if stock.get('sec_quality_v3'):
+            evidence['sec_quality_v3']=stock['sec_quality_v3']
+        if stock.get('sec_forensic_v3'):
+            evidence['sec_forensic_v3']=stock['sec_forensic_v3']
+        if stock.get('sec_event_candidates_v3'):
+            evidence['sec_event_candidates_v3']=stock['sec_event_candidates_v3']
+        if stock.get('sec_jones_v3'):
+            evidence['sec_jones_v3']=stock['sec_jones_v3']
         self.details.setPlainText(json.dumps(evidence,ensure_ascii=False,indent=2))
     def select_model(self):
         i,j=self.comparison.currentRow(),self.models.currentRow()

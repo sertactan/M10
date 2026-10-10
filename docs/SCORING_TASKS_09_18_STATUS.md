@@ -110,3 +110,20 @@ Bu bölüm PR #174'ün üzerindeki **yeni izole** `codex/scoring-completion-v2` 
 **Yeni XBRL kanıtı:** FY2025/FY2024 aynı SEC 10-K accession `0001104659-26-020655`, Companyfacts ham SHA-256 `6ccc9dcc93b9c303cee51c166f345350fb16258408c884e2ed5d1231f2741b38`. Gerçek **DSRI 1.1245852440**, **AQI 0.5989734840**, **SGAI 0.9446728769**, **SGI 1.4763670282**, **TATA -0.08642707586**; bunlar eksiksiz yedi risk puanı değil. Ayrı COGS, yalnız depreciation, toplam interest-bearing debt, inventory standard tag kanıtı eksik. Özellikle `DepreciationDepletionAndAmortization` saf amortisman dışı *Depreciation* olarak sessizce kullanılmadı; `LongTermDebt` toplam faizli borç olarak kullanılmadı. S13 için yedi filing-body incelemesi ve bağımsız flag review yok. Kesin S14 puanı **N/A** kalır.
 
 Veriler yalnız `%LOCALAPPDATA%/S153ResearchTerminal/runtime/scoring_completion/v2_sec_probe1/` ve `v2_audit2/` özel klasörlerindedir. Bu bölümdeki `.json` ve SEC ham 2,95 MB dosya GitHub'a eklenemez; yalnız parser/test kodu, statü metni ve veri hashleri repoda yer alır. V2 tam görev kabulü: **DONE 0/10, açık 10/10**; alt mühendislik görevleri doğrulanmıştır. Tam S14 0; tam S1/S2/S3 0; tam S15.3 0; S16-C 0/22; S16-E kullanıcı onayını bekliyor; S16-EA gerçek alarm 0. Tarihsel kanonik **0 hisse / 0 tarih**, WF9 **BLOCKED**, Learning V3 **NOT_TRAINED** korunur.
+
+## 2026-10-11 — V3 continuing implementation checkpoint
+
+V2 kaydı değişmeden korunmuştur. Ayrıntılı V3 teslimatı:
+[`SCORING_COMPLETION_V3_ENGINEERING.md`](SCORING_COMPLETION_V3_ENGINEERING.md).
+İzole `codex/scoring-completion-v3` dalında INOD'un orijinal SEC FY2024/2025
+10-K konsolide tablosuna dayanan **GMI 0.99544468734** doğrulandı; B_Q
+**5/7 doğrulanmış sayısal risk girdisine** yükseldi, fakat tam B_Q hâlâ N/A.
+FY2023–25 SEC kaynaklarından S6 için **4/7** ham Dechow girdisi hesaplandı.
+S11 hedefi **8/8 finansal kaynaklı**, gerekli dönemsel SIC emsalleri
+**0/20** olduğundan tam S11 N/A. Gerçek 14 SEC başvuru gövdesi (2×10-K,
+2×10-Q,10×8-K/8-K/A) işlendi; S13 **0/7 gerçek değerlendirilmiş nitel risk**,
+`REVIEW_REQUIRED`, bağımsız serious flag sayısı N/A. 10 gerçek SEC 8-K olayı
+S16-EA kaydına aday olarak eklendi; doğrulanmış alarm 0. Windows 13-sütun
+staging PASS, tam araştırma alt puanı **9 (V3 yeni 0)**, INOD S14 **2/6**,
+S16-C **0/22**, S16-E etkinleştirme `PENDING_APPROVAL`. Frozen modeller,
+Personal Edition ve aktif DB değişmedi. Görev 9–18 uçtan uca **DONE 0**.
