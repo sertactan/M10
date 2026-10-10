@@ -24,6 +24,10 @@ SOURCE_REPORTS = {
         "phase25s/sitc_official_reverse_split_spinoff_price_diagnostics.json",
         "MERIDYEN_PHASE25S_SITC_OFFICIAL_ACTION_SOURCE_PAIR_RESEARCH_V1",
     ),
+    "b_fun_transitions": (
+        "phase25l/b_fun_official_historical_identity_transition_evidence.json",
+        "MERIDYEN_PHASE25L_B_FUN_ISSUER_TRANSITION_EVIDENCE_V1",
+    ),
 }
 MAX_REPORT_BYTES = 12 * 1024 * 1024
 
@@ -133,6 +137,42 @@ def _verify_sitc_curb(x: dict) -> dict:
             "adjusted_price_certifications": 0}
 
 
+def _verify_b_fun_transitions(x: dict) -> dict:
+    events = x.get("issuer_event_evidence")
+    if not (
+        x.get("status") ==
+        "FOUR_OFFICIAL_ISSUER_IDENTITY_ACTION_REFERENCES_FOR_TWO_CONFLICT_TICKERS_NOT_FULL_PIT"
+        and x.get("source_conflicting_identity_rows_total") == 464
+        and x.get("source_conflicting_ticker_count") == 30
+        and x.get("official_dated_event_references") == 4
+        and x.get("event_tickers_with_issuer_date_evidence") == ["B", "FUN"]
+        and x.get("source_ticker_collision_rows_remaining_quarantined") == 464
+        and x.get("cash_merger_events_with_documented_terms") == 1
+        and x.get("ticker_identity_change_events") == 1
+        and x.get("legal_security_class_merger_transition_events") == 2
+        and isinstance(events, list) and len(events) == 4
+        and all(isinstance(e, dict)
+                and e.get("historical_simfin_id_identity_certified") is False
+                and str(e.get("official_source_url", "")).startswith("https://")
+                for e in events)
+        and x.get("source_price_corporate_adjustment_verified") == 0
+        and x.get("official_historic_SimFinId_CIK_full_window_certified") == 0
+        and x.get("historical_daily_PIT_verified") is False
+        and x.get("delisting_total_returns_certified") == 0
+        and x.get("canonical_eligible_securities") == 0
+        and x.get("original_source_modified") is False
+        and x.get("operational_DB_modified") is False
+        and x.get("WF9_executed") is False
+        and x.get("Learning_V3_trained") is False
+    ):
+        raise ValueError("B_FUN_ISSUER_EVENTS_NOT_FULL_PIT")
+    return {"official_issuer_event_references": 4,
+            "historically_ambiguous_tickers_reviewed": ["B", "FUN"],
+            "source_collisions_still_quarantined": 464,
+            "documented_barnes_cash_merger_usd_per_eligible_share": 47.50,
+            "delisting_total_return_certified": False}
+
+
 def phase25_evidence_snapshot(root: Path, name: str) -> dict[str, Any]:
     """Validate one existing source report: never silently promote to PIT."""
     entry = SOURCE_REPORTS.get(name)
@@ -146,6 +186,7 @@ def phase25_evidence_snapshot(root: Path, name: str) -> dict[str, Any]:
             "issuer_actions": _verify_issuer_actions,
             "identity_collisions": _verify_identity_collisions,
             "sitc_curb_events": _verify_sitc_curb,
+            "b_fun_transitions": _verify_b_fun_transitions,
         }[name]
         fields = verifier(report)
         return {"status": "VERIFIED_EXISTING_SOURCE_REPORT_RESEARCH_ONLY",
