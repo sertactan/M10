@@ -129,3 +129,35 @@ Official references:
 - https://hermes-agent.nousresearch.com/docs/user-guide/git-worktrees/
 - https://ai.google.dev/gemini-api/docs/pricing
 - https://docs.cloud.google.com/free/docs/free-cloud-features
+
+
+## Native profile safety template — added to PR #150
+
+A deliberately **inactive** upstream `config.yaml` candidate lives at
+`config/hermes_native_profile.safe.example.yaml`. It contains only
+officially documented settings: `terminal.cwd`, `terminal.home_mode`,
+`delegation.max_concurrent_children=1`, `max_spawn_depth=1`,
+`orchestrator_enabled=false`, skill/memory write approvals,
+`gateway.allow_all_users=false` and minimal native toolsets.
+No default model/provider, secret, bot token or deployment is set.
+CI runs `tests/test_hermes_native_profile.py` independently from
+local Windows archives. This file is **not** copied into the user's
+private `HERMES_HOME` while the Windows tunnel is unavailable.
+
+Caution: `terminal` and `execute_code` are powerful even with a
+`home_mode: profile` setting; it isolates CLI home/config, **not** the
+Windows filesystem permissions. Inspect actual native `hermes tools`
+and `hermes config` before enabling LLM-backed sessions. A single
+child limit is not a system-wide spend cap; all inference paths need
+independent enforceable one-call and nonbillable checks.
+
+When the tunnel recovers, verify the profile before testing any model:
+`hermes doctor`, `hermes skills list`, `hermes tools`,
+`hermes cron list` and `hermes gateway status` with the
+isolated `HERMES_HOME`, never the personal/default profile.
+Account-free verification is required *before* `delegate_task`.
+
+Official config docs:
+- https://hermes-agent.nousresearch.com/docs/user-guide/configuration
+- https://hermes-agent.nousresearch.com/docs/reference/toolsets-reference
+- https://hermes-agent.nousresearch.com/docs/user-guide/features/skills/
