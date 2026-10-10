@@ -1,3 +1,4 @@
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -13,7 +14,7 @@ CIK="0000903651"
 def fixture(base):
     db=base/"offline_backup.db"
     ids=[f"{CIK}-24-{i:06d}" for i in range(1,5)]
-    with sqlite3.connect(db) as con:
+    with closing(sqlite3.connect(db)) as con, con:
         con.execute("CREATE TABLE security_master (security_id TEXT,cik TEXT)")
         con.execute("INSERT INTO security_master VALUES ('S1',?)",(CIK,))
         con.execute("""CREATE TABLE fundamental_facts_source

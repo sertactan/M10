@@ -173,7 +173,7 @@ def _write_verified_bundle(tmp_path: Path) -> Path:
         filename = f"artifact_{index}.md"
         body = f"# {name}\n\nauthoritative-test-content-{index}\n"
         path = tmp_path / filename
-        path.write_text(body, encoding="utf-8")
+        path.write_bytes(body.encode("utf-8"))
         artifacts.append({
             "name": name,
             "path": filename,
