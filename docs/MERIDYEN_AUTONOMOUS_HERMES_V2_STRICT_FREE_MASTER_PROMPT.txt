@@ -328,3 +328,36 @@ No actual six-model delegation, bot send, remote Plugin binding, free
 inference, training, or Google Cloud provisioning occurred in this
 turn. See `docs/HERMES_NATIVE_EXECUTION_CHECKLIST.md` and
 `docs/HERMES_V2_PHASE_2_12_ACCEPTANCE.md` for verified criteria.
+
+
+## Phase25M/R/S evidence follow-through — 2026-10-10
+
+The GitHub Hermes feature branch now includes the upstream
+Phase25M/25R/25S original Python tools and docs. Do not reinstall
+Hermes or rewrite its native orchestration to consume them.
+Native A2/A3/A5/A6 skills are instructed to use read-only M10
+research evidence where available. Existing Phase25M has six
+official issuer distribution reference events over CRCT/IEP/EC,
+without proof of ex-date, USD/ADS conversion or adjusted-price
+factors. Existing Phase25R found 464 conflicting monthly issuer
+records across 30 tickers and 7 strong-cohort symbols; never
+accept these ticker-only historical identities. Existing
+Phase25S documents the SITC 1-for-4 2024 reverse split and
+the CURB spinoff; never reduce this to an assumed simple
+cash dividend or a certified vendor-adjusted closing price.
+
+Use `core/hermes_team/phase25_source_evidence.py` to inspect
+previously produced local reports **without** rescanning
+millions of source bars or changing private archives.
+The adapter verifies reports' structure, quarantine flags,
+denied canonical approval and SHA256 of the read report.
+It cannot independently verify SEC provenance, publication
+`available_at`, corporate-action vendor price factors,
+historical SimFinId↔CIK mapping, WF9 or Learning V3 outcomes.
+If the private report is missing or no longer matches its
+schema, say `INCONCLUSIVE`; do not infer the report ran.
+The Chat On Steroids Windows tunnel remains unavailable in
+this turn, so real local report reads and Hermes native
+LLM delegation remain unverified. Historical canonical
+acceptances remain zero, cloud cost guards absent, and no
+billable resources were created.
