@@ -34,3 +34,14 @@ SimFinId↔CIK full-window crosswalk or a verified backtest payoff.
 Read the existing local Phase25L report through the read-only
 `phase25_source_evidence` adapter; keep the 464 historical
 source identity conflicts quarantined.
+
+## Phase25P SEC acceptance versus public time
+
+EDGAR `Accepted` is only a lower bound, not public dissemination.
+For the dated HUYA 20-F, TDG 10-K and Barnes B 8-K indexes,
+use the existing `core.research.sec_publication_gate`.
+Require observed public dissemination and independent vendor
+feature `available_at` after SEC acceptance; both must precede
+the model decision time. A filing period-end does not grant
+historical PIT access. All three existing samples remain
+ineligible without the additional two verified clocks.
