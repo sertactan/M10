@@ -162,3 +162,34 @@ as job `6e92e18ee724`, **paused**. No Hermes scheduler gateway is running;
 must not call the job continuously operational until the gateway runs under a
 verified local-only configuration. Cron delivery target is local, not Telegram.
 Secrets remain outside Git and remote cloud deployment is not authorized.
+
+
+## 2026-10-10 GitHub-only official Hermes continuation
+
+- Last Windows machine check from this conversation was **unavailable**:
+  Chat On Steroids Core and Desktop both returned
+  `Tunnel-client has not been seen for 300 seconds`. No local
+  uncommitted changes, Windows runtime, original archives, or
+  user-specific free model quotas were accessible in this turn.
+- Added the Hermes-specific project context `.hermes.md`,
+  updated the A1 skill for one-at-a-time official `delegate_task`,
+  and created the inactive
+  `config/hermes_native_profile.safe.example.yaml`. A native
+  profile is **not** an independently running LLM team and no
+  actual delegation occurred here.
+- Added `tests/test_hermes_native_profile.py`: checks native-only
+  toolsets, one child, project-root cwd, no embedded model/keys,
+  and all six existing `SKILL.md` files. CI checks the repo
+  without Windows data, market calls, or paid provider keys.
+- The existing Hermes native no-agent cron was previously observed
+  to complete once and was re-paused. That remains earlier evidence;
+  it was **not** resumed in this turn.
+- All 133 researched Phase25Q candidates remain unapproved for
+  canonical PIT, despite 21 retrospective source months,
+  128,088 membership observations and 2,110,622 source price rows.
+  No live price or actual Learning V3 / WF9 performance is asserted.
+- Real user-account Free Tier, Telegram token, remote MCP TLS,
+  Google Cloud VM/IP/network hard cost guard and direct Windows
+  CLI access are the current outside dependencies.
+- Prior code/CI successes should not be misreported as
+  a real six-agent free LLM team or deployed Hermes service.
