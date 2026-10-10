@@ -245,3 +245,41 @@ Hermes `delegate_task` could not be performed. Model and account
 billing controls remain unverified; live inference stays disabled.
 No additional PIT selection has passed canonical acceptance,
 and no actual WF9/Learning V3 score or training occurred.
+
+
+## 2026-10-10 — Phase25L B/FUN and desktop UI integration from main
+
+[Merge commit 618f3c3](https://github.com/sertactan/M10/commit/618f3c3ae44288efb5ae7f6a78bf6eeabf534a54)
+incorporated the latest main additions: Phase25L SEC/issuer transition
+source research, its tests, and Phase25TU desktop PIT/learning evidence
+status UI. The feature branch did not edit existing financial models or
+the main branch.
+
+**Research event facts from upstream Phase25L:**
+- Barnes Group Inc (CIK `0000009984`), original NYSE ticker `B`,
+  has documented 2025-01-27 cash acquisition consideration of
+  **$47.50 per eligible common share**. This is not a documented
+  tradeable Jan 27 closing price or independently reconciled vendor
+  delisting total return.
+- Barrick's original `GOLD` to `B` ticker change took effect
+  2025-05-09 (CIK `0000756894`). Two independent issuers must
+  not be spliced into a single `B` ticker time series.
+- Old Cedar Fair L.P. (CIK `0000811532`) FUN partnership units
+  and old Six Flags (CIK `0000701374`) SIX shares ceased trading
+  2024-07-01; new Six Flags Entertainment Corp (CIK
+  `0001999001`) began NYSE `FUN` common-share trading
+  2024-07-02. Old LP units 1:1 and former SIX shares 0.58:1
+  are legally distinct security conversions.
+
+Phase25L adds **four** dated official issuer events explaining
+two historically ambiguous ticker strings. All **464 conflicting
+historical source rows remain quarantined**; source report records
+**zero** certified full-window SimFinId/CIK matches, vendor-adjusted
+price paths or eligible canonical returns. The Hermes M10 adapter
+now recognizes optional existing Phase25L private output, requires
+four event IDs plus official CIKs and actual Barnes $47.50 terms,
+and still returns `canonical_pit=false`,
+`wf9_executed=false`, `learning_v3_executed=false`.
+Archive-independent negative/tamper tests protect this contract.
+No real local Phase25L run occurred in this turn (Windows tunnel
+remained offline). Current status remains **research evidence only**.
