@@ -13,4 +13,4 @@ The tab was opened on the native Windows Qt platform with the actual private Pha
 
 The images were visually inspected: title and status read `EXPERIMENTAL ONLY`/`CANONICAL MODE BLOCKED`; chart has two distinct monthly lines; top rows show CETX and AGMH; source hashes and all risk warnings appear after scrolling. Screenshots contain private local paths and stay out of GitHub.
 
-Three new synthetic Qt tests pass locally. Existing pytest-based desktop suites could not run in the Windows project venv because that venv does not contain pytest; GitHub CI installs pytest and runs the complete repository suite. No production installer has been modified in this PR. The private data and 27-item master program are not declared complete by this UI milestone.
+Four new synthetic Qt tests pass locally. Existing pytest-based desktop suites could not run in the Windows project venv because that venv does not contain pytest; GitHub CI installs pytest and runs the complete repository suite. No production installer has been modified in this PR. The private data and 27-item master program are not declared complete by this UI milestone.
