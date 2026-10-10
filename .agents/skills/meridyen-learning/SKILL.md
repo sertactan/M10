@@ -21,3 +21,9 @@ or delisted terminal value. The canonical 133-candidate gate remains
 zero accepted. Report these as research evidence only.
 Do not run/claim WF9 or Learning V3 trained outcomes until independent
 historical identity, corporate-action and `available_at` gates pass.
+
+Phase25L reports four dated official events across B and FUN.
+These improve issuer-action research yet leave all 464
+source conflicts quarantined and 0 approved historical
+SimFinId/CIK full-window matches; do not report WF9 or
+Learning V3 improvement based on these event references.
