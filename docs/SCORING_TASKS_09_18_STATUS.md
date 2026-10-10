@@ -75,8 +75,8 @@ Yeni38 kayıtta CANONICAL_DERIVED etiketi olmasına rağmen available_at2026-08-
 
 Özel kök: `%LOCALAPPDATA%/S153ResearchTerminal/runtime/scoring_completion/`.
 
-- Son rapor: `final_v4/report.json` ve `.sha256`.
-- Dokuz skorun Decimal kanıtı: `final_v3/decimal_reference.json`; v4 yalnız intraday tanı ekler, skorlar değişmez.
+- Son rapor: `final_v5/report.json` ve `.sha256`.
+- Dokuz skorun Decimal kanıtı: `final_v3/decimal_reference.json`; v4 intraday tanı, v5 kurtarılan fakat girdileri eksik diğer model etiketlerini ekler; skorlar değişmez.
 - SEC: `sec_submission_probe/receipt.json` ve response.json.
 - Dakika verisi: `intraday_probe/receipt.json`, response.json, bars.json.
 - Gerçek Windows: `windows_smoke1/receipt.json`, `windows_smoke2/receipt.json` ve window.png.
@@ -85,3 +85,7 @@ Yeni38 kayıtta CANONICAL_DERIVED etiketi olmasına rağmen available_at2026-08-
 Offline çekirdek tekrar üretimi: `scripts/scoring_completion.py --phase27 <existing-stage> --phase28 <existing-stage> --archive <verified-readonly-copy> --sec-submissions <cached-response> --intraday-receipt <cached-intraday-receipt> --output <new-scoring_completion-path/report.json>`. Ağ çağrısı yapmaz. İntraday parser `app/scoring_intraday_research.py` önbelleği işleyebilir; indirme tekrar edilmesi gerekmez. Windows staging opt-in çevre değişkenleri M10_PHASE27_STAGING_DB, M10_PHASE28_STAGING_DB ve M10_SCORING_COMPLETION_REPORT'tur. Üretim/personal runtime'a bu ayarlar uygulanmadı.
 
 **Canonical 0 hisse/0 tarih; WF9 BLOCKED; Learning V3 NOT_TRAINED.** Kullanıcı onayı gerekenler: S16-E sayısal etkinleştirme; Personal Edition sürüm/DB aktarımı; yayın/merge. Bu çalışma bu onayları vermez.
+
+## GitHub teslimatı
+
+[PR #174](https://github.com/sertactan/M10/pull/174) OPEN; tabanı `codex/phase28-real-scoring` / PR #173. İlk uygulama commit'i `a29d6ee9831c9234f51ac6ecfb5f6ed72fbce2d1` için [Python CI SUCCESS](https://github.com/sertactan/M10/actions/runs/38071539171). Son etiket/belge takip commit'inin CI sonucu PR üzerinde ayrıca görülebilir. Otomatik merge yok; özel JSON/DB/SEC payload/fiyat barı/EXE/screenshot GitHub'a konulmadı.

@@ -199,6 +199,17 @@ def model_execution(data, features, at):
            "missing":["Complete DNA60", "Complete router/gate6", "Dated winner/control similarities", "N61/FPR risk evidence"]}
     aud,_=coverage_audit(data["ticker"],data["quote_price"],at,features)
     lookup={a["model"]:a for a in aud}
+    recovered_missing={
+        "S4":["Matched Beneish raw accounting fields and manipulation calibration"],
+        "S5":["Seven component accounting risks and evidenced interactions"],
+        "S8":["Matched distress model liabilities/equity inputs and Ohlson size deflator"],
+        "S9":["Nine exact fiscal binary signals including independently evidenced no issuance"],
+        "S10":["Valid cash-flow/accrual regression panel and residual-quality normalization"],
+    }
+    for name,missing in recovered_missing.items():
+        lookup[name].update(status="CONTRACT_RECOVERED_INPUTS_MISSING",missing=missing,
+                            evidence={"contract_sha256":SOURCE_SHA256,"engine_executed":False,
+                                      "note":"Definition recovered; complete-input implementation not qualified."})
     for name,val in (("S1",s1(dna,router,h,n61(f))), ("S2",s2(dna,gate6(f),h,false_positive_risk(f))),
                      ("S3",s3(dna,router,h))):
         lookup[name]["evidence"]={"engine_executed":True,"raw_result":val,"chain":chain}
