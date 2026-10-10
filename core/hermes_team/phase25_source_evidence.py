@@ -1,0 +1,165 @@
+"""Summarize immutable Phase25M/R/S evidence reports without re-running ingestion.
+
+These files are private Windows output artifacts. This adapter never invokes
+LLMs, brokers, web APIs, or writes into the local research archive.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+SOURCE_REPORTS = {
+    "issuer_actions": (
+        "phase25m/issuer_cash_evidence_secondary_P2.json",
+        "MERIDYEN_PHASE25M_OFFICIAL_ISSUER_DISTRIBUTION_TRIAGE_V1",
+    ),
+    "identity_collisions": (
+        "phase25r/staging_readonly_reconciliation.json",
+        "MERIDYEN_PHASE25R_FULL_STAGING_RESEARCH_COVERAGE_QA_V1",
+    ),
+    "sitc_curb_events": (
+        "phase25s/sitc_official_reverse_split_spinoff_price_diagnostics.json",
+        "MERIDYEN_PHASE25S_SITC_OFFICIAL_ACTION_SOURCE_PAIR_RESEARCH_V1",
+    ),
+}
+MAX_REPORT_BYTES = 12 * 1024 * 1024
+
+
+def _reject(reason: str) -> dict[str, Any]:
+    return {"status": "INCONCLUSIVE", "reason": reason,
+            "canonical_pit": False, "canonical_adjusted_prices": False,
+            "wf9_executed": False, "learning_v3_executed": False}
+
+
+def _read_safe_json(root: Path, relpath: str) -> tuple[dict, str]:
+    path = root / relpath
+    if root.is_symlink() or path.is_symlink() or any(
+        parent.is_symlink() for parent in path.parents if parent != path.anchor
+    ):
+        raise ValueError("UNSAFE_SYMLINK")
+    if not path.is_file() or path.stat().st_size > MAX_REPORT_BYTES:
+        raise ValueError("MISSING_OR_LARGE_REPORT")
+    raw = path.read_bytes()
+    if len(raw) > MAX_REPORT_BYTES:
+        raise ValueError("EXCESSIVE_REPORT")
+    obj = json.loads(raw.decode("utf-8"))
+    if not isinstance(obj, dict):
+        raise ValueError("INVALID_REPORT")
+    return obj, hashlib.sha256(raw).hexdigest()
+
+
+def _verify_issuer_actions(x: dict) -> dict:
+    if not (
+        x.get("status") ==
+        "P2_ISSUER_CASH_AND_UNIT_ACTION_REFERENCES_NOT_VENDOR_PRICE_CERTIFICATION"
+        and x.get("unique_issuers_with_official_distribution_documents") == 3
+        and x.get("individual_official_issuer_distribution_reference_events") == 6
+        and x.get("source_warnings_in_these_three_issuers") == 13
+        and x.get("remaining_other_issuer_source_warnings_not_reviewed_in_this_phase") == 154
+        and x.get("other_candidate_issuer_total") == 127
+        and x.get("canonical_adjusted_prices_certified") == 0
+        and x.get("historical_CIK_full_window_certified") == 0
+        and x.get("canonical_backtest_eligible") == 0
+        and x.get("WF9_executed") is False
+        and x.get("Learning_V3_executed") is False
+        and x.get("original_data_modified") is False
+        and x.get("operational_DB_modified") is False
+    ):
+        raise ValueError("ISSUER_ACTION_ACCEPTANCE_CONFLICT")
+    return {"official_event_references": 6, "issuer_count": 3,
+            "source_warnings_triaged": 13, "remaining_source_warnings": 154}
+
+
+def _verify_identity_collisions(x: dict) -> dict:
+    expected = {"B", "CWBC", "FUN", "STRR", "TEL", "TTE", "VIVO"}
+    symbols = x.get("conflicting_strong_cohort_tickers")
+    rows = x.get("membership_identity_conflict_quarantine")
+    if not (
+        x.get("status") ==
+        "21_MONTH_FULL_RESEARCH_SOURCE_COVERAGE_RECONCILED_NOT_CANONICAL"
+        and x.get("reconciled_3557_strong_monthly_price_candidates") == 3557
+        and x.get("conflicting_month_ticker_exchange_identity_rows") == 464
+        and x.get("duplicate_identical_month_ticker_exchange_rows") == 21
+        and x.get("conflicting_distinct_ticker_strings") == 30
+        and x.get("conflicting_strong_cohort_tickers_count") == 7
+        and isinstance(symbols, list) and set(symbols) == expected
+        and isinstance(rows, list) and len(rows) == 464
+        and all(isinstance(r, dict)
+                and r.get("conflicting_company_identity_quarantined") is True
+                for r in rows)
+        and x.get("canonical_approved_rows") == 0
+        and x.get("actual_WF9_executed") is False
+        and x.get("actual_Learning_V3_executed") is False
+        and x.get("production_DB_modified") is False
+        and x.get("source_files_modified") is False
+        and x.get("network_requests") == 0
+    ):
+        raise ValueError("HISTORICAL_IDENTITY_CONFLICT_NOT_QUARANTINED")
+    return {"ambiguous_source_rows": 464, "identical_duplicates": 21,
+            "distinct_conflicting_tickers": 30,
+            "strong_cohort_quarantined": sorted(expected),
+            "qualified_source_price_rows": x.get(
+                "reconciled_strong_candidate_source_valid_rows")}
+
+
+def _verify_sitc_curb(x: dict) -> dict:
+    actions = x.get("actions")
+    if not (
+        x.get("status") ==
+        "TWO_SEC_OFFICIAL_SITC_ACTION_EVENTS_DOCUMENTED_SOURCE_PRICES_NOT_CERTIFIED"
+        and x.get("issuer_documented_actions") == 2
+        and x.get("official_historic_event_issuer_CIK") == "0000894315"
+        and isinstance(actions, list) and len(actions) == 2
+        and {a.get("event_type") for a in actions if isinstance(a, dict)}
+        == {"REVERSE_SPLIT", "SPINOFF"}
+        and all(a.get("official_event_issuer_only") is True and
+                a.get("independent_adjusted_price_certified") is False and
+                a.get("lookahead_free_backtest_allowed") is False for a in actions)
+        and x.get("historical_SimFinId_CIK_full_window_verified") == 0
+        and x.get("corporate_action_vendor_adjusted_price_certified") == 0
+        and x.get("canonical_eligible_securities") == 0
+        and x.get("WF9_executed") is False
+        and x.get("Learning_V3_trained") is False
+        and x.get("production_DB_modified") is False
+        and x.get("original_vendor_sources_modified") is False
+        and x.get("network_requests") == 0
+    ):
+        raise ValueError("SITC_OFFICIAL_ACTION_NOT_PRICE_CERTIFICATION")
+    return {"issuer_actions": 2, "issuer_cik": "0000894315",
+            "source_price_pairs": x.get("source_pair_diagnostics_computed"),
+            "adjusted_price_certifications": 0}
+
+
+def phase25_evidence_snapshot(root: Path, name: str) -> dict[str, Any]:
+    """Validate one existing source report: never silently promote to PIT."""
+    entry = SOURCE_REPORTS.get(name)
+    if entry is None:
+        return _reject("UNRECOGNIZED_REPORT_NAME")
+    try:
+        report, digest = _read_safe_json(root, entry[0])
+        if report.get("schema") != entry[1]:
+            return _reject("EVIDENCE_SCHEMA_MISMATCH")
+        verifier = {
+            "issuer_actions": _verify_issuer_actions,
+            "identity_collisions": _verify_identity_collisions,
+            "sitc_curb_events": _verify_sitc_curb,
+        }[name]
+        fields = verifier(report)
+        return {"status": "VERIFIED_EXISTING_SOURCE_REPORT_RESEARCH_ONLY",
+                "kind": name, "source_report_sha256": digest,
+                **fields, "canonical_pit": False,
+                "canonical_adjusted_prices": False,
+                "wf9_executed": False, "learning_v3_executed": False}
+    except (OSError, ValueError, UnicodeError, KeyError, TypeError, OverflowError):
+        return _reject("PRIVATE_REPORT_ABSENT_OR_UNCERTIFIED")
+
+
+def local_phase25_sources() -> dict[str, Any]:
+    """Non-network snapshot; a missing private report is explicitly inconclusive."""
+    root = Path(os.environ.get("LOCALAPPDATA") or str(Path.home())) / (
+        "S153ResearchTerminal/runtime")
+    return {name: phase25_evidence_snapshot(root, name)
+            for name in SOURCE_REPORTS}
