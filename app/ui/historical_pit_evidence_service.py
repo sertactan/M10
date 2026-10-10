@@ -98,7 +98,9 @@ class HistoricalPitEvidenceService:
             source = _safe_json(directory / "manifest.json")
             if (source and source.get("schema") == STAGE_SCHEMA
                 and source.get("status") == "RESEARCH_ONLY_NOT_CANONICAL_PIT"
-                and source.get("staging_version") == directory.name[13:]
+                and isinstance(source.get("staging_version"), str)
+                and re.fullmatch(r"[0-9a-f]{64}", source["staging_version"])
+                and source["staging_version"].startswith(directory.name[13:])
                 and source.get("canonical_ready") is False
                 and source.get("backtest_eligible_securities") == 0
                 and source.get("production_DB_modified") is False
