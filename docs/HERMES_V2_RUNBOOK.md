@@ -280,3 +280,24 @@ training label or brokerage instruction.
 Desktop Phase25TU evidence UI code was merged into the feature
 branch as part of `main`, but it was **not exercised on Windows**
 in this turn; CI source tests are not a desktop click-through test.
+
+
+### SEC acceptance lower bound — Phase25P
+
+M10's existing `core.research.sec_publication_gate` and
+`scripts.phase25p_sec_acceptance_floor` were merged from main.
+Do not treat an SEC 10-K/20-F period-end or EDGAR
+`Accepted` clock as independently observed market information.
+The accepted time is a lower bound; an historical feature is usable
+only if genuine public dissemination and vendor feature
+`available_at` timestamps exist and the strategy decision
+time is later than both.
+
+A3/A5/A6 use the existing `phase25p` private report through
+`core.hermes_team.phase25_source_evidence`; source report must
+show three accepted-index records and **zero** historically
+usable features. A missing report is `INCONCLUSIVE`,
+not implicit approval. The upstream Phase25P program is only
+a source-evidence research script and does not open premium
+feeds or modify operational.db. No Windows execution was
+possible while the tunnel was offline.
