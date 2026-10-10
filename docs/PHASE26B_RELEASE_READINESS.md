@@ -25,3 +25,39 @@ Faz 26A'nın 734 Windows testi tekrarlanmadı. Faz 26B için Research Backtest, 
 ## Yayın kararı
 
 Canonical **0 hisse / 0 tarih**; WF9 **BLOCKED**; Learning V3 **NOT_TRAINED**. Tarihsel kimlik, kurumsal eylem, bağımsız düzeltilmiş fiyat ve çağdaş SEC available_at kanıtları hâlâ yok. Araştırma hesapları kanonik performans değildir. Yayın, kod imzası, seedlerin açık dağıtım onayı ve güncel resmi US seed/freshness kararı gelene kadar **BLOCKED**.
+
+## Faz 26B kapanış — gerçek durum (10 Ekim 2026, Japonya)
+
+**Karar: PARTIAL.** Faz 26B'nin temiz özel paketleme ve uygulama-durumu yedekleme işleri başarıyla tamamlandı; nihai yayın ve tam sistem kurtarma kabulü **BLOCKED**. İşler yeniden çalıştırılmadı: mevcut bitmiş işlem ve disk manifesti okundu. Kaynak operasyonel SQLite, S15/S16, Hermes ve özel fiyat girdileri değiştirilmedi. PR'lar birleştirilmedi.
+
+### Yedek / restore denetimi
+
+| Kanıt | Doğrulanan sonuç |
+|---|---|
+| Faz 26B manifesti | `%LOCALAPPDATA%/S153ResearchTerminal/runtime/phase26b/full_app_state_20261010T26B/manifest.json` |
+| Manifest SHA-256 | `C5FDFEA318E6FA00EF97F3778B5983965699A4E6826A3B1AF5D72E6833BE4E6D` |
+| Sonuç / tamamlanma | `BACKUP_AND_RESTORE_VERIFIED`; 2026-10-10 22:11:20.532623 JST |
+| Snapshot kayıtları | 4.754; 21.049.260.727 bayt; 7 `SQLITE_ONLINE_BACKUP`, 4.747 `VERIFIED_FILE_COPY` |
+| Veri güvenliği | Kaynak DB salt okunur; `source_files_modified=false`; snapshot/restore SHA eşleşme işaretleri 4.754/4.754 |
+| Bağımsız fiziksel kontroller | 0 eksik snapshot/restore dosyası, 0 uzunluk farkı, 0 yinelenen etiket, 0 geçersiz SHA alanı |
+| SQLite | 7/7 snapshot ve bağımsız restore için `PRAGMA quick_check=ok` (manifest kaydı) |
+| Kritik dosyalar | Güncel operational.db ve eski Phase24G `operational_inod_offline_backup.db`: her biri 9.208.848.384 bayt; ikisinde de aynı snapshot SHA `4f44855451bc942645b8ccf7be240c2e0462b336227736c6167b12af54c25636` |
+| Faz 26A korunumu | 654 kayıt, `BACKUP_AND_RESTORE_VERIFIED`; manifest SHA `DF78DF697A2947BAD9F3D18C96E64AF6B540A19E7EEF537380A077C87B6BC530` |
+
+Manifestteki SHA eşleşme sonuçları yedek üretim aşamasındaki bağımsız geri yükleme kopyalarına yönelik hesaplamalardır; kapanış denetiminde tüm dosyaların fiziksel varlıkları/boyutları ve manifestin kendi SHA değeri tekrar kontrol edildi. 21 GB'lık snapshot tekrar kopyalanmadı veya 42 GB'lık kanıtlanmış işlemin tümü ikinci defa hash'lenmedi.
+
+**Zaman ve kapsam:** Canlı operasyonel DB'nin son dosya değişiklik zamanı 2026-10-10 **20:49:46 JST**. SQLite online backup yaklaşık **21:19–21:21 JST** sürecinin tutarlı DB görünümünü kapsar (snapshot dosyası 21:21:18'de yazıldı). 22:11:20 tarihi yalnızca bütün uygulama-durumu yedeğinin tamamlandığı zaman; verilerin tümünün o ana ait olduğu anlamına gelmez. Phase24G bağımsız tarihsel dosyası ~21:45–21:48 JST kopyalandı; diğer 4.747 dosya sırayla işlendi. Tüm dizinler için tek, atomik sistem anı yoktur. Daha sonraki canlı değişimler, Windows sistem görüntüsü, dış kimlik bilgileri ve etkin üretim ortamına fiili restore bu test kapsamının dışındadır. Bu nedenle **tam sistem yedeği ve üretim kurtarma kabulü PARTIAL** kalır. SQLite içerik/kayıt kaybı kanıtı bulunmadı; canlı DB başlığındaki dört sayaç baytını hangi süreç değiştirdiği hâlâ belirsizdir.
+
+### Paket ve PR kesinleştirme
+
+- EXE: Python 3.11 / sürüm 1.0.6, **10.899.860 bayt**, SHA-256 `9604159E4AA418A25C3B6B0CA3DC7E39AB1760D1CBAF69A4598A4641CD536DE4`; Authenticode `NotSigned`. Windows PE `FileVersion` ve `ProductVersion` alanları boş.
+- Inno Setup installer: **72.688.769 bayt**, SHA-256 `8D16F0D4181DBE2F855F86CCC1F1C10B40F7F3A35CEE0964B4581040C8ECE294`; Authenticode `NotSigned`. Mevcut özel EXE ve installer'ın SHA değerleri tekrar hesaplanıp eşleştirildi.
+- Kullanılan kanıtlar: 53/53 odaklanmış test, temiz paket ilk çalıştırma, Qt pencere açılış/kapanış, kur/kaldır/yeniden kur ve kullanıcı DB korunumu. Faz 26A 734/734 tekrar koşturulmadı; paket tekrar derlenmedi.
+- PR **#171** `codex/phase26b-release` → **#170** `codex/phase26a-integration`, 2026-10-10 doğrulamasında **OPEN**, **MERGEABLE**, unmerged. Kod ve özel testler `d51dfe6`; bu kapanış belgeleri ek commit'lerde olabilir. GitHub **Python CI** `d51dfe6` için **SUCCESS**, run `38053378761` / job `114216855765`. Dokümantasyon commitleri için yeni kontroller ayrı değerlendirilir.
+- Dağıtım izinleri: özel test `PRIVATE_TEST_ONLY`; US SEC direct HTTP 403 ve 2026-06-01 tarihli ayna veri kaynağı, EXE/installer için kod imzalama sertifikası yok, tüm seed SHA'larına bağlı açık dağıtım onayı yok. Yayın kesin olarak **BLOCKED**.
+
+### Ana görev özeti
+
+Depoda özgün adları mevcut **23/27** ana maddenin durumu: **DONE 1 / PARTIAL 9 / BLOCKED 13**. Kalan dört özgün madde başlığı geri getirilemediği için **UNKNOWN/UNVERIFIED 4** olarak tutulur; bu maddeler sonuçlandırılmış sayılmaz. Ayrıntılı satırlar `docs/PHASE26B_MAIN_TODO_STATUS.md` içindedir. Canonical **0 hisse/0 hisse-tarih**, WF9 **BLOCKED**, Learning V3 **NOT_TRAINED**.
+
+Sonraki öncelik: bağımsız ve lisanslı güncel US seed kaynağına karar vermek ve dağıtım haklarını yazılı şekilde doğrulamak; sonrasında Authenticode imza/Windows PE sürüm kaynaklarını hazırlamak; ayrıca açıkça tanımlı tam sistem/OS yedeği ve kontrollü izole kurtarma kabulünü ayrı işlemek. Kanonik tarihsel kabul için SITC/CURB, total-return adjusted fiyatlar, SEC gerçek `available_at`, delisting ve PIT sürekliliği hâlâ delil bekliyor. Bu önkoşullar karşılanana kadar yayımlama, merge, WF9 veya Learning V3 eğitimi yapılmaz.
