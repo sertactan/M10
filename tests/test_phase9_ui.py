@@ -42,9 +42,9 @@ def test_phase9_shell_has_required_global_header_and_tabs(qapp):
         assert window.market.count() == 1
         assert window.market.currentText() == "United States"
         assert window.horizon.currentData() == 12
-        assert window.tabs.count() == 5
-        assert [window.tabs.tabText(i) for i in range(5)] == [
-            "V1.2", "V1.4.1", "S16", "S16-EA", "COMPARE"
+        assert window.tabs.count() == 6
+        assert [window.tabs.tabText(i) for i in range(6)] == [
+            "V1.2", "V1.4.1", "S16", "S16-EA", "COMPARE", "RESEARCH BACKTEST"
         ]
         assert window.v12_page.score.text() == "—"
         assert window.v12_page.status.text() == "NOT LOADED"
