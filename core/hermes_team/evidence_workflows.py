@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 from core.hermes_team.pit_stage import audit_stage
+from core.hermes_team.phase25_source_evidence import local_phase25_sources
 
 AUDITS = {
     "strategy": "scripts.phase25i_real_market_gate_matrix",
@@ -65,6 +66,8 @@ def perform_local_evidence_task(task: str) -> dict:
                 "process_exit_code": proc.returncode,
                 "llm_called": False,
                 "research_stage": _research_stage_status(),
+            "phase25_official_evidence": local_phase25_sources(),
+                "phase25_official_evidence": local_phase25_sources(),
             }
         return {
             "status": result["status"],
