@@ -387,6 +387,198 @@ def attach_sec_companyfacts_partial(report, receipt_path):
     return report
 
 
+def attach_v3_financial_quality(report, receipt_path, companyfacts_path,
+                                submissions_path, filing_body_path=None):
+    """Attach SEC-backed partial legs without silently promoting a stock score.
+
+    The V3 receipt must be sealed and reproducible from exact private raw SEC
+    bytes; the local 10-K HTML must agree if an attested presentation was used.
+    Research partials are never S14 canonical or an implied B_Q score.
+    """
+    from app.scoring_v3_sec_quality import recover
+    from scripts.scoring_v3_quality_probe import verify_presentation
+    receipt_path=Path(receipt_path)
+    if (receipt_path.name!='quality_v3.json' or receipt_path.is_symlink()
+        or not receipt_path.is_file()):
+        raise ValueError('Missing sealed V3 SEC financial research receipt')
+    if Path(str(receipt_path)+'.sha256').read_text(encoding='ascii').strip()!=digest(receipt_path):
+        raise ValueError('V3_SEC_RESEARCH_SEAL_CHANGED')
+    receipt=json.loads(receipt_path.read_text(encoding='utf8'))
+    c, s=Path(companyfacts_path),Path(submissions_path)
+    if not c.is_file() or not s.is_file() or c.is_symlink() or s.is_symlink():
+        raise ValueError('Original raw SEC cached sources required')
+    source,subs=c.read_bytes(),s.read_bytes()
+    if sha256(source).hexdigest()!=receipt.get('source_sha256') or sha256(subs).hexdigest()!=receipt.get('submissions_sha256'):
+        raise ValueError('V3_SEC_RESEARCH_SOURCE_CHANGED')
+    reviewed=receipt.get('presentation_review',{})
+    if reviewed.get('verified') is True:
+        path=Path(filing_body_path) if filing_body_path is not None else None
+        if not path or path.is_symlink() or not path.is_file():
+            raise ValueError('Attested income statement document required')
+        if digest(path)!=reviewed.get('document_sha256'):
+            raise ValueError('10-K body hash changed')
+        if verify_presentation(path.read_bytes(),source,subs)!=reviewed:
+            raise ValueError('10-K source presentation review changed')
+    recomputed=recover(source,subs,retrieved_at=receipt['retrieved_at'],
+                       presentation_review=reviewed)
+    if json.loads(json.dumps(recomputed,ensure_ascii=False,allow_nan=False))!=receipt:
+        raise ValueError('V3_SEC_RESEARCH_RECOMPUTATION_MISMATCH')
+    if (not report.get('stocks') or report['stocks'][0]['ticker']!='INOD'
+        or report['stocks'][0].get('quality',{}).get('B_Q',{}).get('score') is not None):
+        raise ValueError('V3 financial diagnostics may not overwrite a real B_Q score')
+    stock=report['stocks'][0]
+    if any(m['score'] is not None and m['model'] in ('S6','S14') for m in stock['models']):
+        raise ValueError('V3 research-only diagnostics may not overwrite scored model')
+    stock['sec_quality_v3']={
+        'schema':receipt['schema'], 'scope':receipt['scope'],
+        'source_sha256':receipt['source_sha256'],
+        'receipt_sha256':digest(receipt_path),
+        'filings':receipt['filings'],
+        'source_fiscal_years':[2023,2024,2025],
+        'B_Q_risk_components':receipt['beneish']['risk_components'],
+        'B_Q_risk_count':receipt['beneish']['verified_risk_count'],
+        'B_Q_required_risk_count':7,
+        'B_Q_ratios':receipt['beneish']['ratios'],
+        'B_Q_score':None,
+        'S6_partial':receipt['dechow']['verified_partial'],
+        'S6_partial_count':receipt['dechow']['partial_input_count'],
+        'S6_score':None,'S14_score':None,
+        'missing_beneish':receipt['beneish']['missing'],
+        'missing_dechow':receipt['dechow']['missing'],
+        'historical_pit_accepted':False}
+    return report
+
+
+def attach_v3_sec_forensic_candidates(report, receipt_path, submissions_path,
+                                     filing_cache):
+    """Verify 2024–26 SEC body candidates and expose review status, no S13 risk.
+
+    Every displayed candidate's source bytes are independently re-hashed and
+    parsed from the local official filing cache. Term hits cannot become
+    reviewed risk or independent serious flags.
+    """
+    from scripts.scoring_v3_sec_filing_evidence import collect
+    receipt_path=Path(receipt_path)
+    if (receipt_path.is_symlink() or not receipt_path.is_file()
+        or receipt_path.suffix.lower()!='.json'):
+        raise ValueError('Forensic candidate research receipt missing')
+    previous=json.loads(receipt_path.read_text(encoding='utf8'))
+    if (previous.get('ticker')!='INOD' or previous.get('status')!='REVIEW_REQUIRED'
+        or previous.get('S13') is not None or previous.get('S14') is not None
+        or previous.get('canonical_accepted') is not False
+        or previous.get('independent_serious_flags_review')!='REVIEW_REQUIRED'):
+        raise ValueError('Forensic raw candidates cannot promote S13 score')
+    fresh=collect(Path(submissions_path),Path(filing_cache),contact=None,
+                  offline=True,max_downloads=0,as_of=previous['as_of'],max_8k=30)
+    for key in ('filings','blocks','status','expected_filing_count',
+                'body_filing_count','missing_body_accessions'):
+        if previous.get(key)!=fresh.get(key):
+            raise ValueError('SEC forensic receipt mismatches signed local SEC bodies: '+key)
+    if not report.get('stocks') or report['stocks'][0].get('ticker')!='INOD':
+        raise ValueError('INOD research collection required')
+    stock=report['stocks'][0]
+    s13=next((m for m in stock['models'] if m['model']=='S13'),None)
+    if s13 is None or s13['score'] is not None:
+        raise ValueError('Forensic research candidates cannot overwrite scored S13')
+    overview={
+        'status':'REVIEW_REQUIRED',
+        'body_filing_count':previous['body_filing_count'],
+        'expected_filing_count':previous['expected_filing_count'],
+        'reviewed_risk_block_count':0,
+        'required_risk_block_count':7,
+        'passage_filing_counts':{k:v['passage_sources_count'] for k,v in previous['blocks'].items()},
+        'review_missing':['HUMAN_SEVEN_BLOCK_RUBRIC',
+            'INDEPENDENT_SERIOUS_FLAG_REVIEW',
+            'REVENUE_RECOGNITION_CREDIT_RISK_CONTEXT',
+            'SHARE_BASED_COMPENSATION_GOVERNANCE_CONTEXT'],
+        'source_report_sha256':digest(receipt_path),
+        'sources':[{'accession':row['accession'], 'form':row['form'],
+                    'source_ref':row['source_ref'],
+                    'content_sha256':row['source_content_sha256'],
+                    'accepted_at':row['accepted_at'],
+                    'retrieved_at':row['retrieved_at']}
+                   for row in previous['filings']],
+        'independent_serious_flags':None,
+        'S13_score':None,'canonical_accepted':False,
+    }
+    stock['sec_forensic_v3']=overview
+    s13['status']='REVIEW_REQUIRED'
+    s13['missing']=overview['review_missing']
+    s13['evidence']={'candidate_sources':overview,
+                      'review_risk_scores_are_not_inferred':True,
+                      'engine_executed':False}
+    events=[{'accession':x['accession'],'form':x['form'],
+             'sec_accepted_at':x['accepted_at'],
+             'source_ref':x['source_ref'],
+             'source_content_sha256':x['content_sha256'],
+             'first_publication_at':None,'provider_historical_available_at':None,
+             'timestamp_usable_as_verified_news':False}
+            for x in overview['sources'] if x['form'] in ('8-K','8-K/A')]
+    stock['sec_event_candidates_v3']={
+        'status':'SEC_ACCEPTANCE_EVENT_CANDIDATES_ONLY',
+        'count':len(events),'events':events,'verified_early_alerts':0,
+        'source':'OFFICIAL_SEC_ARCHIVE_FILING_BODY',
+        'research_scope_only':True,
+        'missing':['FIRST_PUBLICATION_TIMESTAMP','PROVIDER_AS_OF_AVAILABILITY',
+                   'SAME_CLOCK_BASELINE','EXCHANGE_CERTIFIED_SESSION_CALENDAR']}
+    alert=next((m for m in stock['models'] if m['model']=='S16-EA'),None)
+    if alert is not None:
+        if alert['score'] is not None:
+            raise ValueError('Cannot promote research filing candidates as S16-EA')
+        alert.setdefault('evidence',{})['sec_event_candidates_v3']=stock['sec_event_candidates_v3']
+    return report
+
+
+def attach_v3_jones_peer_audit(report, receipt_path, companyfacts_path,
+                               submissions_path):
+    """Show real S11 target-vs-peer coverage, never count incomplete OLS."""
+    receipt_path=Path(receipt_path)
+    if receipt_path.name!='report.json' or not receipt_path.parent.name.startswith('v3_jones_'):
+        raise ValueError('Only isolated SEC Jones research reports accepted')
+    if receipt_path.is_symlink() or not receipt_path.is_file():
+        raise ValueError('Jones research report missing')
+    if Path(str(receipt_path)+'.sha256').read_text(encoding='ascii').strip()!=digest(receipt_path):
+        raise ValueError('SEC_JONES_RESEARCH_SEAL_CHANGED')
+    payload=json.loads(receipt_path.read_text(encoding='utf8'))
+    result=payload.get('INOD_S11',{})
+    target=result.get('target') or {}
+    if (payload.get('scope')!='CURRENT_RESEARCH_ONLY_NOT_HISTORICAL_PIT'
+            or payload.get('canonical_accepted') is not False
+            or result.get('canonical_accepted') is not False
+            or result.get('ticker')!='INOD'
+            or result.get('score') is not None
+            or target.get('cik')!='0000903651'
+            or not isinstance(target.get('selected'),list)
+            or result.get('eligible_peer_count') != 0
+            or result.get('minimum_peer_count') != 20):
+        raise ValueError('Unexpected S11 cohort or unverified score promotion')
+    if (digest(companyfacts_path)!=target.get('companyfacts_sha256')
+            or digest(submissions_path)!=target.get('submissions_sha256')):
+        raise ValueError('SEC_JONES_RESEARCH_RAW_SOURCE_CHANGED')
+    if report['stocks'][0]['ticker']!='INOD':
+        raise ValueError('INOD report required')
+    s11=next(m for m in report['stocks'][0]['models'] if m['model']=='S11')
+    if s11['score'] is not None:
+        raise ValueError('Cannot replace an accepted numeric S11 model score')
+    data={
+        'status':'SOURCE_TARGET_COMPLETE_PEER_COHORT_MISSING',
+        'target_exact_accounting_fields':len(target['selected']),
+        'required_target_exact_accounting_fields':8,
+        'eligible_industry_year_peers':result['eligible_peer_count'],
+        'minimum_eligible_peers':result['minimum_peer_count'],
+        'stock_universe_count':payload['universe']['total_security_master'],
+        'missing':result.get('blockers',[]),
+        'source_sha256':target['companyfacts_sha256'],
+        'report_sha256':digest(receipt_path),
+        'S11':None,'historical_pit_accepted':False,
+    }
+    report['stocks'][0]['sec_jones_v3']=data
+    s11['status']='DATA_MISSING'
+    s11['missing']=data['missing']
+    s11['evidence']={'peer_research_audit':data,'engine_executed':False}
+    return report
+
+
 def save_report(report,path):
     path=Path(path)
     if path.exists() or path.is_symlink() or "scoring_completion" not in {p.casefold() for p in path.resolve().parts}:
