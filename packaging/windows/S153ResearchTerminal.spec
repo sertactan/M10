@@ -4,6 +4,21 @@ import os
 
 project_root = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 
+import sys
+from pathlib import Path
+sys.path.insert(0, project_root)
+from scripts.phase26b_seed_gate import verify
+
+seed_dir_text = os.environ.get("M10_RELEASE_SEED_DIR")
+if not seed_dir_text:
+    raise RuntimeError("M10_RELEASE_SEED_DIR is required; local or DB-derived seeds are forbidden")
+seed_dir = Path(seed_dir_text).resolve()
+notices = Path(project_root) / "THIRD_PARTY_DATA_LICENSES.md"
+private_test = os.environ.get("M10_PRIVATE_TEST_PACKAGE") == "1"
+approval_text = os.environ.get("M10_RELEASE_SEED_APPROVAL")
+verify(seed_dir, notices, private_test=private_test,
+       approval=Path(approval_text) if approval_text else None)
+
 a = Analysis(
     [os.path.join(project_root, "main.py")],
     pathex=[project_root],
@@ -17,13 +32,14 @@ a = Analysis(
             os.path.join("data", "database"),
         ),
         (
-            os.path.join(project_root, "data", "seeds", "sec_us_current.csv"),
+            os.path.join(seed_dir, "sec_us_current.csv"),
             os.path.join("data", "seeds"),
         ),
         (
-            os.path.join(project_root, "data", "seeds", "jp_tr_hk_current.csv"),
+            os.path.join(seed_dir, "jp_tr_hk_current.csv"),
             os.path.join("data", "seeds"),
         ),
+        (os.path.join(seed_dir, "manifest.json"), os.path.join("data", "seeds")),
         (
             os.path.join(project_root, "THIRD_PARTY_DATA_LICENSES.md"),
             ".",

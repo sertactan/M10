@@ -83,9 +83,19 @@ jobs:
           if ($tr -lt 300) { throw "TR seed unexpectedly small: $tr" }
           if ($hk -lt 1500) { throw "HK seed unexpectedly small: $hk" }
 
+      - name: Verify clean public seed provenance
+        shell: pwsh
+        run: |
+          python scripts/phase26b_seed_gate.py prepare-test --seed-dir data/seeds --notices THIRD_PARTY_DATA_LICENSES.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/phase26b_seed_gate.py verify-test --seed-dir data/seeds --notices THIRD_PARTY_DATA_LICENSES.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build Windows application
         shell: pwsh
         run: |
+          $env:M10_RELEASE_SEED_DIR = (Resolve-Path 'data/seeds').Path
+          $env:M10_PRIVATE_TEST_PACKAGE = '1'
           pyinstaller --noconfirm --clean packaging/windows/S153ResearchTerminal.spec
           if (!(Test-Path "dist/S153ResearchTerminal/S153ResearchTerminal.exe")) {
             throw "PyInstaller executable was not produced"
@@ -153,6 +163,13 @@ jobs:
           if (!(Test-Path $schema)) {
             throw "Packaged SQLite schema is missing: $schema"
           }
+
+      - name: Verify packaged public seed manifest
+        shell: pwsh
+        run: |
+          $seed = 'dist/S153ResearchTerminal/_internal/data/seeds'
+          python scripts/phase26b_seed_gate.py verify-test --seed-dir $seed --notices THIRD_PARTY_DATA_LICENSES.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify packaged SEC universe seed
         shell: pwsh
@@ -416,6 +433,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          python scripts/phase26b_seed_gate.py verify-release `
+            --seed-dir data/seeds `
+            --notices THIRD_PARTY_DATA_LICENSES.md `
+            --approval release_evidence/PHASE26B_SEED_APPROVAL.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $repo = "${{ github.repository }}"
           $version = (Get-Content "config/RELEASE_VERSION.txt" -Raw).Trim()
           if (-not $version) { throw "config/RELEASE_VERSION.txt is empty" }
