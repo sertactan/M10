@@ -139,6 +139,15 @@ def _verify_sitc_curb(x: dict) -> dict:
 
 def _verify_b_fun_transitions(x: dict) -> dict:
     events = x.get("issuer_event_evidence")
+    event_map = {
+        e.get("event"): e for e in events if isinstance(e, dict)
+    } if isinstance(events, list) else {}
+    expected_events = {
+        "BARNES_APOLLO_CASH_MERGER_DELIST": "0000009984",
+        "BARRICK_GOLD_TO_B_TICKER_CHANGE": "0000756894",
+        "CEDAR_FAIR_AND_SIX_FLAGS_MERGER_EFFECTIVE": "0000811532",
+        "COMBINED_SIX_FLAGS_FUN_NEW_SECURITY": "0001999001",
+    }
     if not (
         x.get("status") ==
         "FOUR_OFFICIAL_ISSUER_IDENTITY_ACTION_REFERENCES_FOR_TWO_CONFLICT_TICKERS_NOT_FULL_PIT"
@@ -151,6 +160,11 @@ def _verify_b_fun_transitions(x: dict) -> dict:
         and x.get("ticker_identity_change_events") == 1
         and x.get("legal_security_class_merger_transition_events") == 2
         and isinstance(events, list) and len(events) == 4
+        and set(event_map) == set(expected_events)
+        and all(event_map[name].get("source_CIK") == cik
+                for name, cik in expected_events.items())
+        and event_map["BARNES_APOLLO_CASH_MERGER_DELIST"].get(
+            "terminal_cash_USD_per_eligible_common_share") == 47.50
         and all(isinstance(e, dict)
                 and e.get("historical_simfin_id_identity_certified") is False
                 and str(e.get("official_source_url", "")).startswith("https://")
