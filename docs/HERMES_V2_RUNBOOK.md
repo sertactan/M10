@@ -227,3 +227,37 @@ Operator checklist:
 
 Keep the native cron paused and the gateway stopped by default
 until nonbillable account access and all security checks have passed.
+
+
+## Phase25M/R/S evidence import into official Hermes native skill workflow
+
+Native Hermes A2/A3/A5/A6 skills now refer to the existing
+Phase25M/R/S issuer-action and historical identity research
+artifacts rather than inventing reports or rerunning the entire
+2,110,622-row Phase25Q data pipeline. Hermes' existing terminal
+or code-execution tools may inspect the source files when the M10
+working directory and read permissions have been explicitly reviewed.
+
+For Python-first evidence-summary callers:
+`core.hermes_team.phase25_source_evidence.local_phase25_sources()`
+reads the specific existing private report paths under
+`%LOCALAPPDATA%\S153ResearchTerminal\runtime\phase25m`,
+`phase25r` and `phase25s` in read-only mode. It never writes
+private reports or raw prices. If source reports are absent,
+corrupt, stale in provenance, symlinked, or have changed schema/
+acceptance flags, it reports `INCONCLUSIVE`.
+
+A source-report SHA256 is only an integrity fingerprint for the
+bytes actually read; it is **not** a cryptographic certification of
+the original SEC disclosure timing, vendor-adjustment method,
+split price continuity, terminal delisting returns or complete
+point-in-time identity.
+
+Native system-wide LLM cap requires verifying parent plus child
+requests through one policy gateway, not just
+`delegation.max_concurrent_children: 1`. A real Hermes
+model-driven `delegate_task` has not been run in this turn,
+because the Windows tunnel and account-level free-API evidence
+are unavailable. Do not confuse the deterministic local
+A1→A2/A3/A4/A5/A6 SQLite transfers with native Hermes LLM child
+execution.
