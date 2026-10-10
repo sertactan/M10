@@ -90,6 +90,12 @@ class ResearchTerminalWindow(QMainWindow):
                 phase28_db=Path(phase28) if phase28 else None,
             )
             self.tabs.addTab(self.phase27_page, "S1–S16 CURRENT RESEARCH")
+            completion = os.environ.get("M10_SCORING_COMPLETION_REPORT")
+            if completion and phase28:
+                from app.ui.scoring_completion_page import ScoringCompletionPage
+                self.scoring_completion_page = ScoringCompletionPage(
+                    Path(completion), Path(stage), Path(phase28))
+                self.tabs.addTab(self.scoring_completion_page, "SCORING COMPLETION · RESEARCH")
         self.tabs.currentChanged.connect(self._refresh_research_tab)
         root.addWidget(self.tabs, 1)
 
@@ -106,10 +112,11 @@ class ResearchTerminalWindow(QMainWindow):
         root.addLayout(footer)
 
     def _refresh_research_tab(self, index: int) -> None:
-        research = self.tabs.widget(index) is self.research_backtest_page
+        backtest = self.tabs.widget(index) is self.research_backtest_page
+        research = backtest or self.tabs.widget(index) is getattr(self, "scoring_completion_page", None)
         self.stock_header.setVisible(not research)
         self.context_panel.setVisible(not research)
-        if research:
+        if backtest:
             self.research_backtest_page.refresh()
 
     def _build_header(self) -> QFrame:
