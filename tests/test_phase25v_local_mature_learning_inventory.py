@@ -1,5 +1,6 @@
 """Isolated, synthetic SQLite tests: no private M10 data and no mutations."""
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -18,7 +19,7 @@ class Phase25VTest(unittest.TestCase):
     def test_mature_counts_are_distinct_cutoff_aware_and_read_only(self):
         with TemporaryDirectory() as d:
             market, learn = Path(d) / "operational.db", Path(d) / "meridyen_learning.sqlite3"
-            with sqlite3.connect(market) as con:
+            with closing(sqlite3.connect(market)) as con:
                 con.executescript("""
                 CREATE TABLE wf5_replay_runs (run_id TEXT, status TEXT);
                 CREATE TABLE wf6_walk_forward_runs (run_id TEXT, status TEXT);
@@ -27,7 +28,7 @@ class Phase25VTest(unittest.TestCase):
                 INSERT INTO wf6_walk_forward_runs VALUES ('w6','BLOCKED');
                 INSERT INTO wf5_replay_observations VALUES ('a');
                 """)
-            with sqlite3.connect(learn) as con:
+            with closing(sqlite3.connect(learn)) as con:
                 con.executescript("""
                 CREATE TABLE learning_v2_wf5_batches (
                   digest TEXT, run_id TEXT, cutoff TEXT,

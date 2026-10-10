@@ -44,3 +44,11 @@ A positive label count is a **DB-reported count**, NOT a certified mature outcom
 4. Read actual Windows learning SQLite; compare any native label counts with wf5-labels-audit and Phase15 OOS SHA256 validation only when complete eligible source-run IDs and batch hashes exist.
 
 **Never edit S1/S2/S14/S15/S16 frozen models, production SQLite, source CSV, Hermes branches, or private learned weights.** The present addition is a source-backed research guide and an isolated, read-only diagnostic.
+
+## Windows verification — 2026-10-10
+
+- The 21 original monthly listing CSVs matched their manifest SHA-256 and byte counts; the original SimFin CSV matched the Phase25Q SHA-256. Retrieval timestamps remain in October 2026, so these files still do not establish contemporaneous 2024–2025 PIT availability.
+- The real operational SQLite opened read-only. In the requested 2024-01-01 through 2025-09-30 window it has 0 canonical membership rows, 0 `BACKTEST_ADJUSTED` selections and 0 corporate-action rows. Completed WF5 and WF6 runs and WF5 observations each count 0.
+- No prior local Learning V2 SQLite was found in the checked M10 runtime and workspace locations. A new, separate empty Learning V2 SQLite was initialized outside the public repository and a local SHA-256 and SQLite integrity-verified snapshot was made and restored to a new path with integrity `ok`. The inventory now reports 0 legacy outcomes and no native WF5 label tables; mature 2X/5X/10X counts remain unknown, not measured zero.
+- The isolated Phase25V Windows unit tests pass after explicitly closing their temporary SQLite connections. This is a Windows fixture fix, not a change to the inventory logic or frozen models.
+- WF9, WF5/WF6 historical execution and Learning V3 remain blocked by the canonical data and provenance gates above. Learning V3 status: `NOT_TRAINED`; OOS evaluation: `NOT_EVALUATED`.
