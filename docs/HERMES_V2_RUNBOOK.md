@@ -261,3 +261,22 @@ because the Windows tunnel and account-level free-API evidence
 are unavailable. Do not confuse the deterministic local
 A1→A2/A3/A4/A5/A6 SQLite transfers with native Hermes LLM child
 execution.
+
+
+### Phase25L B/FUN issuer transition audit
+
+When Windows returns, use the **existing** official M10 research
+`scripts.phase25l_b_fun_official_identity_transitions` with its
+previously produced Phase25R file (no download or reimport).
+Source-only output lives at
+`%LOCALAPPDATA%\S153ResearchTerminal\runtime\phase25l\b_fun_official_historical_identity_transition_evidence.json`.
+Hermes' M10 data adapter `core.hermes_team.phase25_source_evidence`
+accepts that report only if its B/FUN source fields, 4 official
+event references, documented issuer CIKs, $47.50 Barnes
+consideration and all fail-closed gate values match.
+It returns only compact research metadata, never a canonical price,
+training label or brokerage instruction.
+
+Desktop Phase25TU evidence UI code was merged into the feature
+branch as part of `main`, but it was **not exercised on Windows**
+in this turn; CI source tests are not a desktop click-through test.
