@@ -283,3 +283,40 @@ and still returns `canonical_pit=false`,
 Archive-independent negative/tamper tests protect this contract.
 No real local Phase25L run occurred in this turn (Windows tunnel
 remained offline). Current status remains **research evidence only**.
+
+
+## 2026-10-10 — Phase25P actual SEC acceptance-time evidence
+
+[Feature-branch merge b38c860](https://github.com/sertactan/M10/commit/b38c86050ab3b46b4fddfb65929fb909964bb269)
+incorporates the original M10 Phase25P research gate from main.
+The existing `core.research.sec_publication_gate` separates
+three distinct timestamps: SEC index **Accepted**, independently
+observed public dissemination, and vendor/model feature
+`available_at`. None can be inferred merely from financial
+period-end. An historical decision must come after all three.
+
+The upstream report includes three SEC-index accepted records:
+- HUYA 20-F for 2024-12-31, SEC Accepted
+  2025-04-17 10:43:22 UTC.
+- TDG 10-K for 2024-09-30, SEC Accepted
+  2024-11-07 21:05:07 UTC.
+- Barnes B 8-K, SEC Accepted 2024-10-25 10:47:43 UTC.
+
+These records document acceptance as a historical **lower bound**,
+not actual dissemination or vendor ingestion. Until the two
+additional clocks are independently verified, **0 historical
+model features are eligible**. No completed WF9, Learning V3
+training, or improvement in canonical S16 data acceptance is
+claimed from the accepted timestamp alone.
+
+The Hermes M10 source adapter reads an optional *existing*
+Phase25P private report, checks 3 official SEC accession identities
+and exact UTC conversions against the M10 core accepted-index
+records, rejects any report asserting unverified publication or
+feature clocks, and returns only fail-closed research metadata.
+Added archive-independent synthetic, tamper and
+absence tests. A3/A5/A6 native skills are updated to respect this
+gate, and the original M10 publication-gate formula is unchanged.
+
+**Windows offline:** No actual Windows Phase25P report generation or
+LLM-driven Hermes task was executed here.
