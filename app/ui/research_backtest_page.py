@@ -22,7 +22,9 @@ REQUIRED_RISKS = {"LOOKAHEAD_EX_POST_COHORT", "SURVIVORSHIP_AND_DELISTING",
 
 
 def default_report_path() -> Path:
-    return Path(os.environ["LOCALAPPDATA"]) / "S153ResearchTerminal" / "runtime" / "phase25z" / "research_backtest_v2_desktop.json"
+    local_data = os.environ.get("LOCALAPPDATA")
+    base = Path(local_data) if local_data else Path.home() / ".local" / "share"
+    return base / "S153ResearchTerminal" / "runtime" / "phase25z" / "research_backtest_v2_desktop.json"
 
 
 def read_research_report(path: Path) -> tuple[dict, str]:

@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -66,6 +67,12 @@ class ResearchBacktestUITests(unittest.TestCase):
         self.app.processEvents()
         self.assertTrue(window.context_panel.isVisible())
         window.close()
+
+    def test_window_constructs_when_windows_localappdata_is_absent(self):
+        with patch.dict(os.environ, {"LOCALAPPDATA": ""}):
+            window = ResearchTerminalWindow()
+            self.assertIn("phase25z", str(window.research_backtest_page.report_path))
+            window.close()
 
     def test_canonical_promotion_in_report_is_rejected(self):
         self.report["canonical_accepted_securities"] = 1
