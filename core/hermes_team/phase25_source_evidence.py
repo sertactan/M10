@@ -28,6 +28,10 @@ SOURCE_REPORTS = {
         "phase25l/b_fun_official_historical_identity_transition_evidence.json",
         "MERIDYEN_PHASE25L_B_FUN_ISSUER_TRANSITION_EVIDENCE_V1",
     ),
+    "sec_publication_floor": (
+        "phase25p/sec_acceptance_not_public_dissemination.json",
+        "MERIDYEN_PHASE25P_SEC_ACCEPTED_NOT_PUBLIC_AVAILABILITY_V1",
+    ),
 }
 MAX_REPORT_BYTES = 12 * 1024 * 1024
 
@@ -187,6 +191,48 @@ def _verify_b_fun_transitions(x: dict) -> dict:
             "delisting_total_return_certified": False}
 
 
+def _verify_sec_publication_floor(x: dict) -> dict:
+    # Refer to original *existing* M10 evidence rather than inventing
+    # a generic publication timestamp from a filing period-end.
+    from core.research.sec_publication_gate import OBSERVED_ACCEPTANCES
+
+    records = x.get("records")
+    expected = {f.accession: f for f in OBSERVED_ACCEPTANCES}
+    actual = {
+        r.get("accession"): r for r in records if isinstance(r, dict)
+    } if isinstance(records, list) else {}
+    if not (
+        x.get("status") ==
+        "THREE_SEC_INDEX_ACCEPTANCES_DOCUMENTED_NO_HISTORIC_FEATURE_PIT_CERTIFICATION"
+        and x.get("observed_official_SEC_index_acceptance_stamps") == 3
+        and x.get("historical_public_dissemination_stamps_independently_verified") == 0
+        and x.get("model_signal_eligible_records") == 0
+        and isinstance(records, list) and len(records) == 3
+        and set(actual) == set(expected)
+        and all(
+            actual[acc].get("ticker") == f.ticker
+            and actual[acc].get("cik") == f.cik
+            and actual[acc].get("SEC_index_accepted_at_ET") == f.sec_index_accepted_et
+            and actual[acc].get("SEC_index_accepted_at_UTC") ==
+                f.sec_accepted_at_utc.isoformat()
+            and actual[acc].get("original_SEC_index_url") == f.sec_index_url
+            and actual[acc].get("public_dissemination_time_independently_verified") is False
+            and actual[acc].get("SEC_feature_available_at_independently_verified") is False
+            and actual[acc].get("feature_usable_for_historical_training") is False
+            for acc, f in expected.items()
+        )
+        and x.get("operational_DB_modified") is False
+        and x.get("models_modified") is False
+        and x.get("WF9_executed") is False
+        and x.get("Learning_V3_executed") is False
+    ):
+        raise ValueError("SEC_ACCEPTED_TIMESTAMP_NOT_PUBLIC_AVAILABLE_AT")
+    return {"SEC_index_accepted_timestamp_records": 3,
+            "independently_verified_public_dissemination_records": 0,
+            "model_features_historically_usable": 0,
+            "publication_gate": "DENY_UNTIL_PUBLIC_AND_FEATURE_CLOCKS_VERIFIED"}
+
+
 def phase25_evidence_snapshot(root: Path, name: str) -> dict[str, Any]:
     """Validate one existing source report: never silently promote to PIT."""
     entry = SOURCE_REPORTS.get(name)
@@ -201,6 +247,7 @@ def phase25_evidence_snapshot(root: Path, name: str) -> dict[str, Any]:
             "identity_collisions": _verify_identity_collisions,
             "sitc_curb_events": _verify_sitc_curb,
             "b_fun_transitions": _verify_b_fun_transitions,
+            "sec_publication_floor": _verify_sec_publication_floor,
         }[name]
         fields = verifier(report)
         return {"status": "VERIFIED_EXISTING_SOURCE_REPORT_RESEARCH_ONLY",
