@@ -193,3 +193,55 @@ Secrets remain outside Git and remote cloud deployment is not authorized.
   CLI access are the current outside dependencies.
 - Prior code/CI successes should not be misreported as
   a real six-agent free LLM team or deployed Hermes service.
+
+
+## 2026-10-10 — Phase25M/R/S upstream merge and source-only adapter
+
+GitHub main `f2a755b` was merged into the feature branch by
+[merge commit 74dcb41](https://github.com/sertactan/M10/commit/74dcb414d3224bd5ff2324f80170e454e89e2e9b).
+Nine upstream additions only (Phase25M/R/S docs, scripts and tests); no
+canonical S15.3/S16/S16-EA formulas or user runtime files changed.
+
+Additional **pre-existing source evidence** brought into scope:
+- Phase25M: 6 official issuer distribution references for CRCT, IEP and EC,
+  matching 13/167 anomalous source intervals. 154 other warnings remain
+  outside this issuer review. No ex-date/ADS/FX/elective-unit or adjustment
+  factor certification.
+- Phase25R: 21 retrospective monthly listings include 464 conflicting
+  month+exchange+ticker historical issuer rows and 21 identical duplicate
+  rows; 30 conflicting ticker strings, including 7 in the strong cohort:
+  B, CWBC, FUN, STRR, TEL, TTE and VIVO. All seven need identity
+  quarantine; 3,557 previously strong candidates are not PIT certified.
+  Phase25R reconciled 1,557,903 qualified price observations using
+  the original source reports. The new Hermes adapter does **not**
+  recalculate them.
+- Phase25S: official SEC documents support SITC Aug 16 2024 1-for-4
+  reverse split and Oct 1 2024 distribution of two CURB shares per
+  SITC common share on the Sep 23 record date. Official issuer event
+  evidence is **not** sufficient for complete SimFin adjustment,
+  historical security-class, or total shareholder-return certification.
+  The earlier Windows report explicitly warned that a real Phase25S
+  local execution had not been observed.
+
+Added `core/hermes_team/phase25_source_evidence.py`, which only reads
+the *already existing* private Phase25M/R/S JSON outputs, checks exact
+schemas and fail-closed certification flags, checks Phase25R's
+quarantine-list length and 7 tickers, records a SHA256 digest of the
+report bytes, and emits compact status without private raw source
+rows. Absence or conflict => `INCONCLUSIVE`. It is a verification
+of report **consistency**, not independent validation of all SEC
+facts nor proof of timely historical availability.
+
+`core/hermes_team/evidence_workflows.py` attaches these evidence
+snapshots to existing Phase25i/25j Python-only tasks (not LLM
+delegation). `tests/test_hermes_phase25_source_evidence.py` and
+the additional source-workflow integration test use temporary
+fixtures; no Windows archive, SEC network call, premium data feed,
+broker, or production DB mutation.
+
+**Runtime status this turn:** Windows Chat On Steroids tunnel remained
+offline, so a real Windows Phase25R/25M/25S file read and native
+Hermes `delegate_task` could not be performed. Model and account
+billing controls remain unverified; live inference stays disabled.
+No additional PIT selection has passed canonical acceptance,
+and no actual WF9/Learning V3 score or training occurred.
