@@ -81,12 +81,47 @@ def _s():
     }
 
 
-def test_all_three_real_format_reports_stay_research_only(tmp_path):
+
+def _l():
+    return {
+        "schema": "MERIDYEN_PHASE25L_B_FUN_ISSUER_TRANSITION_EVIDENCE_V1",
+        "status": "FOUR_OFFICIAL_ISSUER_IDENTITY_ACTION_REFERENCES_FOR_TWO_CONFLICT_TICKERS_NOT_FULL_PIT",
+        "source_conflicting_identity_rows_total": 464,
+        "source_conflicting_ticker_count": 30,
+        "official_dated_event_references": 4,
+        "event_tickers_with_issuer_date_evidence": ["B", "FUN"],
+        "source_ticker_collision_rows_remaining_quarantined": 464,
+        "cash_merger_events_with_documented_terms": 1,
+        "ticker_identity_change_events": 1,
+        "legal_security_class_merger_transition_events": 2,
+        "issuer_event_evidence": [
+            {"historical_simfin_id_identity_certified": False,
+             "official_source_url": "https://www.sec.gov/Archives/test",
+             "event": event}
+            for event in ("BARNES_APOLLO_CASH_MERGER_DELIST",
+                          "BARRICK_GOLD_TO_B_TICKER_CHANGE",
+                          "CEDAR_FAIR_AND_SIX_FLAGS_MERGER_EFFECTIVE",
+                          "COMBINED_SIX_FLAGS_FUN_NEW_SECURITY")
+        ],
+        "source_price_corporate_adjustment_verified": 0,
+        "official_historic_SimFinId_CIK_full_window_certified": 0,
+        "historical_daily_PIT_verified": False,
+        "delisting_total_returns_certified": 0,
+        "canonical_eligible_securities": 0,
+        "original_source_modified": False,
+        "operational_DB_modified": False,
+        "WF9_executed": False,
+        "Learning_V3_trained": False,
+    }
+
+
+def test_all_four_real_format_reports_stay_research_only(tmp_path):
     base = tmp_path / "S153ResearchTerminal" / "runtime"
     _store(base, "phase25m/issuer_cash_evidence_secondary_P2.json", _m())
     _store(base, "phase25r/staging_readonly_reconciliation.json", _r())
     _store(base, "phase25s/sitc_official_reverse_split_spinoff_price_diagnostics.json", _s())
-    for name in ("issuer_actions", "identity_collisions", "sitc_curb_events"):
+    _store(base, "phase25l/b_fun_official_historical_identity_transition_evidence.json", _l())
+    for name in ("issuer_actions", "identity_collisions", "sitc_curb_events", "b_fun_transitions"):
         result = phase25_evidence_snapshot(base, name)
         assert result["status"] == "VERIFIED_EXISTING_SOURCE_REPORT_RESEARCH_ONLY"
         assert result["canonical_pit"] is False
@@ -134,3 +169,14 @@ def test_absent_or_unrecognized_private_report(monkeypatch, tmp_path):
     assert all(value["status"] == "INCONCLUSIVE" for value in results.values())
     assert phase25_evidence_snapshot(tmp_path, "not-a-phase")[
         "reason"] == "UNRECOGNIZED_REPORT_NAME"
+
+
+def test_b_fun_transition_tamper_is_inconclusive(tmp_path):
+    report = _l()
+    report["source_ticker_collision_rows_remaining_quarantined"] = 0
+    _store(tmp_path,
+           "phase25l/b_fun_official_historical_identity_transition_evidence.json",
+           report)
+    value = phase25_evidence_snapshot(tmp_path, "b_fun_transitions")
+    assert value["status"] == "INCONCLUSIVE"
+    assert value["canonical_pit"] is False
