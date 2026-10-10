@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 import hashlib
 import os
 from pathlib import Path
@@ -24,7 +25,7 @@ def _old_database(tmp_path):
     )
     m.connection.commit()
     m.close()
-    with sqlite3.connect(src) as conn:
+    with closing(sqlite3.connect(src)) as conn, conn:
         for table in REQUIRED:
             if table.startswith(("wf5_", "wf6_")):
                 conn.execute("DROP TABLE IF EXISTS " + table)

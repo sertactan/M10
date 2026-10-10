@@ -27,6 +27,48 @@ def default_report_path() -> Path:
     return base / "S153ResearchTerminal" / "runtime" / "phase25z" / "research_backtest_v2_desktop.json"
 
 
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_research_sources(report: dict, *, runtime_root: Path | None = None) -> None:
+    """Fail closed when a private input or the original price source has changed."""
+    root = (runtime_root or default_report_path().parents[1]).resolve()
+    inputs = report.get("input_sha256")
+    if not isinstance(inputs, dict) or len(inputs) != 4:
+        raise ValueError("Research input hash set is incomplete")
+    manifests = []
+    for name, expected in inputs.items():
+        if not isinstance(name, str) or not isinstance(expected, str) or len(expected) != 64:
+            raise ValueError("Invalid research input hash")
+        path = Path(name)
+        if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(root):
+            raise ValueError("Private research input unavailable")
+        if _sha256(path) != expected.lower():
+            raise ValueError("Private research input SHA-256 changed")
+        if path.name == "manifest.json":
+            manifests.append(path)
+    if len(manifests) != 1:
+        raise ValueError("Private staging manifest unavailable")
+    manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+    if (manifest.get("source_price_sha256") != report.get("source_price_sha256")
+            or manifest.get("staging_version") != report.get("source_staging_version")
+            or manifest.get("canonical_ready") is not False):
+        raise ValueError("Staging manifest no longer matches research report")
+    price_name = manifest.get("price_data_original_path")
+    if not isinstance(price_name, str):
+        raise ValueError("Original source price path unavailable")
+    price = Path(price_name)
+    if price.is_symlink() or not price.is_file():
+        raise ValueError("Original source price file unavailable")
+    if _sha256(price) != report["source_price_sha256"].lower():
+        raise ValueError("Original source price SHA-256 changed")
+
 def read_research_report(path: Path) -> tuple[dict, str]:
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 5_000_000:
         raise ValueError("Private V2 report unavailable or too large")
@@ -36,6 +78,7 @@ def read_research_report(path: Path) -> tuple[dict, str]:
         raise ValueError("Research report must be an object")
     if (obj.get("schema") != REPORT_SCHEMA or obj.get("status") != "EXPERIMENTAL_RESEARCH_ONLY"
             or obj.get("pilot_size") != 25 or len(obj.get("cohort_tickers", [])) != 25
+            or obj.get("period") != {"start": "2024-01-01", "end": "2025-09-30"}
             or obj.get("canonical_accepted_securities") != 0 or obj.get("canonical_accepted_security_dates") != 0
             or obj.get("wf9_status") != "BLOCKED" or obj.get("learning_v3_status") != "NOT_TRAINED"
             or obj.get("research_mode") != "ENABLED_EXPERIMENTAL_ONLY"
@@ -44,10 +87,11 @@ def read_research_report(path: Path) -> tuple[dict, str]:
     if (not isinstance(obj.get("risk_ledger"), list)
             or not all(isinstance(r, dict) and isinstance(r.get("detail"), str) for r in obj["risk_ledger"])):
         raise ValueError("Invalid risk ledger")
-    risk_codes = {r.get("code") for r in obj["risk_ledger"]}
+    risk_levels = {r.get("code"): r.get("level") for r in obj["risk_ledger"]}
     d = obj.get("diagnostics", {})
     intervals = d.get("monthly_diagnostics", [])
-    if (not REQUIRED_RISKS <= risk_codes or len(intervals) != 20
+    if (not all(risk_levels.get(code) == "BLOCKED" for code in REQUIRED_RISKS)
+            or len(intervals) != 20
             or not all("source_adj_index" in r and "source_close_index" in r and "to" in r for r in intervals)
             or not isinstance(obj.get("period"), dict)
             or not all(isinstance(obj["period"].get(k), str) for k in ("start", "end"))
@@ -138,13 +182,17 @@ class ResearchBacktestPage(QWidget):
     def refresh(self) -> None:
         try:
             report, report_hash = read_research_report(self.report_path)
-        except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+            verify_research_sources(report, runtime_root=self.report_path.parents[1])
+        except (OSError, ValueError, TypeError, KeyError, UnicodeError, json.JSONDecodeError) as exc:
             self.loaded_report = None
             self.status.setText(f"Research report unavailable: {exc}")
             self.summary.setText("Canonical data unavailable · WF9: BLOCKED · Learning V3: NOT_TRAINED")
             self.contributions.setRowCount(0)
             self.outliers.setRowCount(0)
             self.chart.removeAllSeries()
+            self.pilots.setText("Pilot securities: unavailable")
+            self.source_info.setText("Source and SHA-256: unavailable")
+            self.warnings.setText("Research-only source proof unavailable; no result displayed.")
             return
         self.loaded_report = report
         d = report["diagnostics"]
