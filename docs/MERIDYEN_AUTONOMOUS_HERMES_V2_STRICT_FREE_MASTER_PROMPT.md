@@ -289,3 +289,42 @@ Never turn synthetic test fixture prices into "current prices".
 For the OpenRouter Free plan, local caps must not exceed 50 requests/day
 and 20/minute without independent nonbillable tier proof; do not infer
 that public pricing is enough to enable a connected user account.
+
+
+## 2026-10-10 addendum — official Hermes native execution only
+
+**Architecture priority:** use official NousResearch Hermes Agent; do
+NOT build or deploy another autonomous agent/orchestrator. Six experts
+are project skills and sequential `delegate_task` leaf sessions
+controlled by native Hermes (not six 24/7 LLM servers). Native
+`cronjob` is preferred over an external scheduler.
+
+New inactive native-profile candidate:
+`config/hermes_native_profile.safe.example.yaml`.
+Native execution prerequisites before any live model call:
+(1) `HERMES_HOME` points to isolated M10 data path;
+(2) `terminal.cwd` is the M10 Git checkout;
+(3) default native model/provider, delegation model/provider, and
+all alternative LLM routes are audited and routed to a verified
+single-call nonbillable gateway;
+(4) `delegation.max_concurrent_children=1`,
+`max_spawn_depth=1` and `orchestrator_enabled=false`;
+(5) `skills.write_approval=true` and
+`memory.write_approval=true`;
+(6) active provider key, per-project model access, RPM/TPM/RPD,
+billing and hard charge protections are verified with the user's
+actual account. Otherwise NO `delegate_task` calls.
+
+The existing Python evidence source readers and MCP adapters remain
+tools only. No S16-E/S16-C score may originate from LLM JSON;
+without trusted formula and PIT evidence both are INCONCLUSIVE.
+The real Phase25Q staging is retrospective research data rather
+than canonical contemporaneous PIT. No backtest success can be
+claimed without independent valid evidence.
+
+This GitHub-only continuation could not inspect or alter the user's
+Windows installation because Chat On Steroids tunnel was offline.
+No actual six-model delegation, bot send, remote Plugin binding, free
+inference, training, or Google Cloud provisioning occurred in this
+turn. See `docs/HERMES_NATIVE_EXECUTION_CHECKLIST.md` and
+`docs/HERMES_V2_PHASE_2_12_ACCEPTANCE.md` for verified criteria.
