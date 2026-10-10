@@ -36,9 +36,11 @@ class _ResearchTask(QRunnable):
 class Phase27CurrentPage(QWidget):
     """No implicit network calls: fetching requires explicit enter or button."""
 
-    def __init__(self, db_path: Path, archive: Path | None = None, parent=None):
+    def __init__(self, db_path: Path, archive: Path | None = None, parent=None,
+                 *, phase28_db: Path | None = None):
         super().__init__(parent)
         self.db_path, self.archive = Path(db_path), Path(archive) if archive else None
+        self.phase28_db = Path(phase28_db) if phase28_db else None
         self._task: _ResearchTask | None = None
         self._pool = QThreadPool.globalInstance()
         self._details: dict[str, dict] = {}
@@ -139,20 +141,64 @@ class Phase27CurrentPage(QWidget):
         )
         self.table.setRowCount(0)
         self._details = {}
-        for audit in report["model_audits"]:
+        overlay = self._read_phase28(report)
+        audits = overlay.get("models", report["model_audits"]) if overlay else report["model_audits"]
+        if overlay:
+            self.summary.setText(
+                self.summary.text() + " · PHASE28 "
+                + f"{overlay['phase28_feature_count']} sourced finance/quality features; "
+                + f"FULL S1-S16 {overlay['full_model_score_count']} (research scoring acceptance)"
+            )
+            self.warning.setText(
+                "PHASE28 · CURRENT RESEARCH ONLY · SEC accepted_at NOT VERIFIED · "
+                "PARTIAL FINANCIAL COMPONENTS ARE NOT FULL SCORES · "
+                "Historical Canonical 0/0 · WF9 BLOCKED · Learning V3 NOT_TRAINED"
+            )
+        for audit in audits:
             i = self.table.rowCount()
             self.table.insertRow(i)
             self._details[audit["model"]] = audit
+            coverage = audit.get("coverage_pct", audit.get("coverage"))
             for col, value in enumerate((
                 audit["model"], "N/A" if audit["score"] is None else f"{audit['score']:.2f}",
-                audit["status"], f"{audit['coverage']:.1f}%",
+                audit["status"], f"{coverage:.1f}%" if coverage is not None else "N/A",
             )):
                 self.table.setItem(i, col, QTableWidgetItem(value))
         self.details.setPlainText(
             "Source: " + report["price_provider"] + " · SHA-256 " + report["price_payload_sha256"]
             + "\nResearch-only derived features: "
             + json.dumps(report["research_features"], sort_keys=True)
+            + ("\nPHASE28 (RESEARCH_ONLY): " + json.dumps(
+                 {"financial_features":overlay["features"],
+                  "partial_component_diagnostics":overlay["diagnostics"]},
+                 ensure_ascii=False, sort_keys=True) if overlay else "")
         )
+
+    def _read_phase28(self, source_report: dict) -> dict | None:
+        """Optional, offline, read-only upgrade to the *existing* Phase27 page."""
+        stage = self.phase28_db
+        if not stage or not stage.is_file() or stage.is_symlink():
+            return None
+        if "phase28" not in {part.casefold() for part in stage.resolve().parts}:
+            return None
+        try:
+            with closing(sqlite3.connect(stage.resolve().as_uri() + "?mode=ro",
+                                         uri=True, timeout=3)) as db:
+                row = db.execute(
+                    "SELECT report_json FROM phase28_runs WHERE ticker=?",
+                    (source_report["ticker"],)
+                ).fetchone()
+                if row is None:
+                    return None
+                result = json.loads(row[0])
+                # A stale Phase28 snapshot must not overwrite changed Phase27
+                # quotes or identities with mismatched price records.
+                if result.get("ticker") != source_report["ticker"] or (
+                        result.get("price_time") != source_report["quote_time"]):
+                    return None
+                return result
+        except (ValueError, sqlite3.DatabaseError, OSError, KeyError):
+            return None
 
     def show_details(self) -> None:
         row = self.table.currentRow()

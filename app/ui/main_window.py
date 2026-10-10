@@ -84,8 +84,10 @@ class ResearchTerminalWindow(QMainWindow):
         stage = os.environ.get("M10_PHASE27_STAGING_DB")
         if stage:
             archive = os.environ.get("M10_PHASE27_HISTORICAL_ARCHIVE")
+            phase28 = os.environ.get("M10_PHASE28_STAGING_DB")
             self.phase27_page = Phase27CurrentPage(
                 Path(stage), Path(archive) if archive else None,
+                phase28_db=Path(phase28) if phase28 else None,
             )
             self.tabs.addTab(self.phase27_page, "S1–S16 CURRENT RESEARCH")
         self.tabs.currentChanged.connect(self._refresh_research_tab)
