@@ -25,3 +25,9 @@ eligible-share merger terms are not proof of a tradeable
 2025-01-27 session closing price or complete vendor terminal-return
 treatment. Never use B/FUN as canonical PIT merely because a
 SEC event URL exists.
+
+Phase25P veto: SEC EDGAR Accepted timestamp is only an
+earliest-possible public bound; do not make a historical
+recommendation unless independent publication AND vendor
+feature-availability clocks are present and valid for
+that specific decision timestamp.
