@@ -1,17 +1,77 @@
 {
   "schema": "MERIDYEN_HERMES_ROLES_V1",
   "version": "2026-10-10",
-  "team_controller": "Hermes Agent (not installed)",
+  "team_controller": "Official NousResearch Hermes Agent (Windows install observed; native six-role reasoning not activated)",
   "max_concurrent_llm_requests": 1,
   "fallback": "DISABLED",
   "production_code_mutation": false,
   "live_trading": false,
   "roles": [
-    {"id": "A1", "name": "Chief Strategist", "tasks": ["strategy"], "permissions": ["review", "plan"]},
-    {"id": "A2", "name": "Market Discovery", "tasks": ["scan"], "permissions": ["python_read_only"]},
-    {"id": "A3", "name": "Fundamental Analyst", "tasks": ["fundamental"], "permissions": ["python_read_only"]},
-    {"id": "A4", "name": "Catalyst S16-EA", "tasks": ["catalyst"], "permissions": ["verified_news_review"]},
-    {"id": "A5", "name": "Risk and Data Validator", "tasks": ["risk"], "permissions": ["python_read_only", "veto"]},
-    {"id": "A6", "name": "Learning and Performance Auditor", "tasks": ["learning"], "permissions": ["python_read_only", "challenger_only"]}
-  ]
+    {
+      "id": "A1",
+      "name": "Chief Strategist",
+      "tasks": [
+        "strategy"
+      ],
+      "permissions": [
+        "review",
+        "plan"
+      ]
+    },
+    {
+      "id": "A2",
+      "name": "Market Discovery",
+      "tasks": [
+        "scan"
+      ],
+      "permissions": [
+        "python_read_only"
+      ]
+    },
+    {
+      "id": "A3",
+      "name": "Fundamental Analyst",
+      "tasks": [
+        "fundamental"
+      ],
+      "permissions": [
+        "python_read_only"
+      ]
+    },
+    {
+      "id": "A4",
+      "name": "Catalyst S16-EA",
+      "tasks": [
+        "catalyst"
+      ],
+      "permissions": [
+        "verified_news_review"
+      ]
+    },
+    {
+      "id": "A5",
+      "name": "Risk and Data Validator",
+      "tasks": [
+        "risk"
+      ],
+      "permissions": [
+        "python_read_only",
+        "veto"
+      ]
+    },
+    {
+      "id": "A6",
+      "name": "Learning and Performance Auditor",
+      "tasks": [
+        "learning"
+      ],
+      "permissions": [
+        "python_read_only",
+        "challenger_only"
+      ]
+    }
+  ],
+  "native_hermes_config": false,
+  "native_delegation_live": false,
+  "free_llm_account_verified": false
 }
