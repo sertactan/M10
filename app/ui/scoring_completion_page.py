@@ -15,9 +15,9 @@ class ScoringCompletionPage(QWidget):
         self.warning.setWordWrap(True);root.addWidget(self.warning)
         self.status=QLabel('No verified report loaded');self.status.setWordWrap(True);root.addWidget(self.status)
         button=QPushButton('Load verified offline results');button.clicked.connect(self.refresh);root.addWidget(button)
-        self.comparison=QTableWidget(0,13)
+        self.comparison=QTableWidget(0,14)
         self.comparison.setHorizontalHeaderLabels(('Stock','Cached price','Price time','S7','S12',
-            'S14','S14 legs','B_Q inputs','S6 inputs','S16-E','S16-C','Features','Full formula scores'))
+            'S11','S14','S14 legs','B_Q inputs','S6 inputs','S16-E','S16-C','Features','Full formula scores'))
         self.comparison.setEditTriggers(QTableWidget.NoEditTriggers)
         self.comparison.itemSelectionChanged.connect(self.select_stock)
         self.comparison.setMinimumHeight(210)
@@ -42,7 +42,8 @@ class ScoringCompletionPage(QWidget):
                             for k in ('B_Q','S6','S7','S11','S12','S13'))
                 v3=s.get('sec_quality_v3') or {}
                 values=(s['ticker'],f"{s['price']:.2f} {s['currency']}",s['price_time'],
-                        s['quality']['S7']['score'],s['quality']['S12']['score'],s14,
+                        s['quality']['S7']['score'],s['quality']['S12']['score'],
+                        s['quality']['S11']['score'],s14,
                         f"{present}/6",
                         f"{v3['B_Q_risk_count']}/7" if v3 else 'N/A',
                         f"{v3['S6_partial_count']}/7" if v3 else 'N/A',
@@ -76,6 +77,12 @@ class ScoringCompletionPage(QWidget):
             evidence['sec_event_candidates_v3']=stock['sec_event_candidates_v3']
         if stock.get('sec_jones_v3'):
             evidence['sec_jones_v3']=stock['sec_jones_v3']
+        if stock.get('task9_financial_evidence'):
+            evidence['task9_financial_evidence']=stock['task9_financial_evidence']
+        if stock.get('task9_forensic_context'):
+            evidence['task9_forensic_context']=stock['task9_forensic_context']
+        if stock.get('task9_jones_research'):
+            evidence['task9_jones_research']=stock['task9_jones_research']
         self.details.setPlainText(json.dumps(evidence,ensure_ascii=False,indent=2))
     def select_model(self):
         i,j=self.comparison.currentRow(),self.models.currentRow()
