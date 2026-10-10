@@ -97,11 +97,15 @@ def _l():
         "issuer_event_evidence": [
             {"historical_simfin_id_identity_certified": False,
              "official_source_url": "https://www.sec.gov/Archives/test",
-             "event": event}
-            for event in ("BARNES_APOLLO_CASH_MERGER_DELIST",
-                          "BARRICK_GOLD_TO_B_TICKER_CHANGE",
-                          "CEDAR_FAIR_AND_SIX_FLAGS_MERGER_EFFECTIVE",
-                          "COMBINED_SIX_FLAGS_FUN_NEW_SECURITY")
+             "event": event, "source_CIK": cik,
+             **({"terminal_cash_USD_per_eligible_common_share": 47.50}
+                if event == "BARNES_APOLLO_CASH_MERGER_DELIST" else {})}
+            for event, cik in (
+                ("BARNES_APOLLO_CASH_MERGER_DELIST", "0000009984"),
+                ("BARRICK_GOLD_TO_B_TICKER_CHANGE", "0000756894"),
+                ("CEDAR_FAIR_AND_SIX_FLAGS_MERGER_EFFECTIVE", "0000811532"),
+                ("COMBINED_SIX_FLAGS_FUN_NEW_SECURITY", "0001999001"),
+            )
         ],
         "source_price_corporate_adjustment_verified": 0,
         "official_historic_SimFinId_CIK_full_window_certified": 0,
