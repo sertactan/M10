@@ -196,3 +196,34 @@ external VM IPv4 charge (normally $0.005/h after 1 free hour/month) and
 Cloud NAT make continuously connected Hermes non-guaranteed free.
 Do not deploy or enable billing without independent verified safeguards
 that *actually prevent charges*. Budget alerts do not enforce a hard cap.
+
+
+## Official Hermes-first continuation — inactive profile candidate
+
+The GitHub branch now contains a native Hermes profile template
+`config/hermes_native_profile.safe.example.yaml`; it has **not**
+been installed in the private M10 `HERMES_HOME` because the
+Windows tunnel was offline in this turn.
+
+Use the official `hermes tools` and `hermes config` interfaces to
+review tools/config before applying it; do not overwrite an existing
+`config.yaml`. There is no configured free LLM or API key.
+`delegation.max_concurrent_children: 1` prevents parallel
+subagent batches within the profile, but only a verified private
+inference gateway and provider billing guard can attempt to ensure
+a single system-wide, nonbillable call.
+
+The A1 native `delegate_task` procedure is in
+`.agents/skills/meridyen-chief-strategist/SKILL.md`. Skills plus
+documented delegation configuration are not proof that an LLM
+actually executed the six specialists. The previous Python task
+queue is retained only for local deterministic M10 evidence runs,
+not extended into a replacement Hermes program.
+
+Static CI test: `python -m pytest -q tests/test_hermes_native_profile.py`
+(Python PyYAML available in the current GitHub CI dependency set).
+Operator checklist:
+`docs/HERMES_NATIVE_EXECUTION_CHECKLIST.md`.
+
+Keep the native cron paused and the gateway stopped by default
+until nonbillable account access and all security checks have passed.
