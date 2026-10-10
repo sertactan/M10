@@ -119,13 +119,38 @@ def _l():
     }
 
 
-def test_all_four_real_format_reports_stay_research_only(tmp_path):
+
+def _p():
+    from core.research.sec_publication_gate import OBSERVED_ACCEPTANCES
+    return {
+        "schema": "MERIDYEN_PHASE25P_SEC_ACCEPTED_NOT_PUBLIC_AVAILABILITY_V1",
+        "status": "THREE_SEC_INDEX_ACCEPTANCES_DOCUMENTED_NO_HISTORIC_FEATURE_PIT_CERTIFICATION",
+        "observed_official_SEC_index_acceptance_stamps": 3,
+        "historical_public_dissemination_stamps_independently_verified": 0,
+        "model_signal_eligible_records": 0,
+        "records": [{
+            "ticker": f.ticker, "cik": f.cik, "accession": f.accession,
+            "form": f.form, "period_end": f.reported_period_end,
+            "SEC_index_accepted_at_ET": f.sec_index_accepted_et,
+            "SEC_index_accepted_at_UTC": f.sec_accepted_at_utc.isoformat(),
+            "original_SEC_index_url": f.sec_index_url,
+            "public_dissemination_time_independently_verified": False,
+            "SEC_feature_available_at_independently_verified": False,
+            "feature_usable_for_historical_training": False,
+        } for f in OBSERVED_ACCEPTANCES],
+        "operational_DB_modified": False, "models_modified": False,
+        "WF9_executed": False, "Learning_V3_executed": False,
+    }
+
+
+def test_all_five_real_format_reports_stay_research_only(tmp_path):
     base = tmp_path / "S153ResearchTerminal" / "runtime"
     _store(base, "phase25m/issuer_cash_evidence_secondary_P2.json", _m())
     _store(base, "phase25r/staging_readonly_reconciliation.json", _r())
     _store(base, "phase25s/sitc_official_reverse_split_spinoff_price_diagnostics.json", _s())
     _store(base, "phase25l/b_fun_official_historical_identity_transition_evidence.json", _l())
-    for name in ("issuer_actions", "identity_collisions", "sitc_curb_events", "b_fun_transitions"):
+    _store(base, "phase25p/sec_acceptance_not_public_dissemination.json", _p())
+    for name in ("issuer_actions", "identity_collisions", "sitc_curb_events", "b_fun_transitions", "sec_publication_floor"):
         result = phase25_evidence_snapshot(base, name)
         assert result["status"] == "VERIFIED_EXISTING_SOURCE_REPORT_RESEARCH_ONLY"
         assert result["canonical_pit"] is False
@@ -184,3 +209,12 @@ def test_b_fun_transition_tamper_is_inconclusive(tmp_path):
     value = phase25_evidence_snapshot(tmp_path, "b_fun_transitions")
     assert value["status"] == "INCONCLUSIVE"
     assert value["canonical_pit"] is False
+
+
+def test_edgar_acceptance_alone_does_not_create_model_available_at(tmp_path):
+    report = _p()
+    report["records"][0]["public_dissemination_time_independently_verified"] = True
+    _store(tmp_path, "phase25p/sec_acceptance_not_public_dissemination.json", report)
+    blocked = phase25_evidence_snapshot(tmp_path, "sec_publication_floor")
+    assert blocked["status"] == "INCONCLUSIVE"
+    assert blocked["canonical_pit"] is False
