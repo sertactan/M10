@@ -127,3 +127,22 @@ S16-EA kaydına aday olarak eklendi; doğrulanmış alarm 0. Windows 13-sütun
 staging PASS, tam araştırma alt puanı **9 (V3 yeni 0)**, INOD S14 **2/6**,
 S16-C **0/22**, S16-E etkinleştirme `PENDING_APPROVAL`. Frozen modeller,
 Personal Edition ve aktif DB değişmedi. Görev 9–18 uçtan uca **DONE 0**.
+
+## 2026-10-11 — Görev 9 kaynak temelli gerçek S11 kabulü
+
+İzole `codex/task9-quality-evidence` dalında resmî FY2025 SEC 10-K
+**tarihli SIC=7374** kaynağı ve 20 bağımsız sektör-yıl emsali doğrulandı.
+Original Modified Jones OLS `OLS_rank=3`, gerçek INOD discretionary accrual
+`DA=0.24692983352913417` ve kaynak formülün mutlak normalizasyonundan
+**S11 = 0.00/100** (*gerçek tam Research skor*, N/A değil) hesaplandı.
+Bağımsız `Decimal` normal denklem OLS referansı ve orijinal SEC önbelleğinden
+**0 HTTP çağrılı** yeniden çalıştırma başarıyla aynı skoru üretti.
+Gerçek araştırma alt puanları 9→**10**; INOD S14 kapsamı 2/6→**3/6**.
+Tam S14 puanı hâlâ N/A; B_Q DEPI/LVGI ve bağımsız risk incelemesi eksik,
+S6 2023/24/25 kanıtlı ISSUE=1 ile 4/7→**5/7** ama RSST+inventory eksik,
+S13 27 gerçek SEC bağlam bulgusuyla 7/7 belge grubunda araştırma yapıldı
+ancak sayısal rubrik ve serious flags için insan incelemesi bekliyor.
+Kaynak/muhasebe eşleşmeleri ve kabul kanıtları:
+[`TASK9_REAL_EVIDENCE_RECOVERY.md`](TASK9_REAL_EVIDENCE_RECOVERY.md).
+Görev 9 tamamlanmış ilan edilmiyor (**PARTIAL**); frozen S14 formülü ve
+Personal Edition 1.0.6, canlı DB, Hermes, önceki dallar korunuyor.

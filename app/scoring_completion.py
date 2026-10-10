@@ -579,6 +579,187 @@ def attach_v3_jones_peer_audit(report, receipt_path, companyfacts_path,
     return report
 
 
+def attach_task9_issuance_evidence(report, receipt_path, companyfacts_path,
+                                   submissions_path, filing_cache):
+    """Source-recompute ISSUE=1 into S6 research coverage, not a full S6 score.
+
+    Validates both filed 10-K bytes, exact-year original SEC XBRL records,
+    accession acceptance, audited issuance statements and SHA-sealed receipt.
+    """
+    from app.task9_financial_recovery import recover_task9_evidence
+    receipt_path=Path(receipt_path)
+    if (receipt_path.name!='financial_recovery.json' or receipt_path.is_symlink()
+        or not receipt_path.parent.name.startswith('task9_')
+        or not receipt_path.is_file()):
+        raise ValueError('Task9 private research receipt missing')
+    seal=Path(str(receipt_path)+'.sha256')
+    if not seal.is_file() or seal.read_text(encoding='ascii').strip()!=digest(receipt_path):
+        raise ValueError('TASK9_FINANCIAL_EVIDENCE_SEAL_CHANGED')
+    packet=json.loads(receipt_path.read_text(encoding='utf-8'))
+    if (packet.get('schema')!='MERIDYEN_TASK9_FILING_EVIDENCE_V1'
+        or packet.get('S6') is not None or packet.get('B_Q') is not None
+        or packet.get('S14') is not None or packet.get('historical_pit_accepted') is not False):
+        raise ValueError('Task9 receipt attempts to promote research score')
+    fact_path=Path(companyfacts_path)
+    subs_path=Path(submissions_path)
+    if any(not path.is_file() or path.is_symlink() for path in (fact_path,subs_path)):
+        raise ValueError('Task9 original SEC sources required')
+    facts,subs=fact_path.read_bytes(),subs_path.read_bytes()
+    filenames={2024:'000141057825000194_inod-20241231x10k.htm',
+               2025:'000110465926020655_inod-20251231x10k.htm'}
+    sources={}
+    for year,name in filenames.items():
+        source=Path(filing_cache)/name
+        if not source.is_file() or source.is_symlink():
+            raise ValueError('Task9 original 10-K body missing')
+        sources[year]=source.read_bytes()
+    recomputed=recover_task9_evidence(facts,subs,sources,retrieved_at=packet['as_of'])
+    if json.loads(json.dumps(recomputed,allow_nan=False,ensure_ascii=False))!=packet:
+        raise ValueError('TASK9_FINANCIAL_EVIDENCE_REPLAY_MISMATCH')
+    if (not report.get('stocks') or report['stocks'][0]['ticker']!='INOD'
+        or report['stocks'][0].get('quality',{}).get('S14',{}).get('score') is not None):
+        raise ValueError('INOD incomplete scoring packet required')
+    stock=report['stocks'][0]
+    s6=next((m for m in stock['models'] if m['model']=='S6'),None)
+    if s6 is None or s6.get('score') is not None:
+        raise ValueError('Research ISSUE cannot replace accepted S6 score')
+    previous=stock.get('sec_quality_v3')
+    if not previous or previous['S6_partial_count']!=4:
+        raise ValueError('Prior four independent S6 features required')
+    score_input=packet['S6_ISSUE']
+    if score_input!=1 or packet['S6_total_verified_components']!=5:
+        raise ValueError('Unverified positive cash exercise cannot become ISSUE')
+    data={
+        'source_scope':'CURRENT_RESEARCH_NOT_HISTORICAL_PIT',
+        'receipt_sha256':digest(receipt_path),
+        'companyfacts_sha256':packet['companyfacts_sha256'],
+        'filing_bodies_sha256':packet['filing_bodies_sha256'],
+        'issuance':packet['issuance'],
+        'S6_ISSUE':1, 'S6_verified_count':5, 'S6_score':None,
+        'credit_facility':packet['credit_facility'],
+        'long_term_obligations':packet['long_term_obligations'],
+        'ppe_depreciation':packet['ppe_depreciation'],
+        'inventory':packet['inventory'], 'RSST':packet['RSST'],
+        'LVGI':None,'DEPI':None,'B_Q':None,'S14':None,
+        'historical_pit_accepted':False,
+    }
+    previous['S6_partial']['ISSUE']=1
+    previous['S6_partial_count']=5
+    previous['missing_dechow']=[k for k in previous['missing_dechow']
+                                 if k!='DOCUMENTED_ISSUANCE']
+    stock['task9_financial_evidence']=data
+    s6.setdefault('evidence',{})['task9_verified_issuance_source']=data
+    return report
+
+
+def attach_task9_forensic_context(report, receipt_path, filing_cache,
+                                  source_v3_report, frozen_s13_contract):
+    """Attach 27 contextual findings with source replay, NOT an S13 judgment."""
+    from scripts.task9_forensic_review import review_private
+    receipt_path=Path(receipt_path)
+    if (receipt_path.name not in ('review_v1.json','review_v2.json')
+            or receipt_path.parent.name!='task9_forensic'
+            or not receipt_path.is_file() or receipt_path.is_symlink()):
+        raise ValueError('Only isolated Task9 S13 source review allowed')
+    seal=Path(str(receipt_path)+'.sha256')
+    if not seal.is_file() or seal.read_text(encoding='ascii').strip()!=digest(receipt_path):
+        raise ValueError('TASK9_FORENSIC_REVIEW_SEAL_CHANGED')
+    expected=json.loads(receipt_path.read_text(encoding='utf8'))
+    if (expected.get('status')!='REVIEW_REQUIRED' or expected.get('S13') is not None
+        or expected.get('S14') is not None or expected.get('serious_flag_count') is not None
+        or expected.get('independent_serious_flags') is not None
+        or expected.get('human_review_packet',{}).get('signed_risk_decisions') is not None):
+        raise ValueError('Task9 contextual findings cannot promote unreviewed S13')
+    fresh=review_private(Path(filing_cache),Path(source_v3_report),
+                         Path(frozen_s13_contract),as_of=expected['as_of'])
+    if json.loads(json.dumps(fresh,ensure_ascii=False,allow_nan=False))!=expected:
+        raise ValueError('TASK9_CONTEXTUAL_S13_REPLAY_MISMATCH')
+    if not report.get('stocks') or report['stocks'][0]['ticker']!='INOD':
+        raise ValueError('Missing INOD five-stock research report')
+    stock=report['stocks'][0]
+    s13=next((x for x in stock['models'] if x['model']=='S13'),None)
+    if not s13 or s13['score'] is not None:
+        raise ValueError('Cannot replace an accepted S13 score')
+    counts={k:r['source_verified_findings'] for k,r in expected['blocks'].items()}
+    total=sum(counts.values())
+    packet={
+        'status':'SOURCE_CONTEXT_VERIFIED_RUBRIC_REVIEW_REQUIRED',
+        'filing_bodies_verified':expected['filing_bodies_verified'],
+        'context_block_count':sum(v>0 for v in counts.values()),
+        'reviewed_numeric_risk_block_count':0,
+        'source_findings_count':total,'source_findings_per_block':counts,
+        'source_review_sha256':digest(receipt_path),
+        'serious_flag_count':None,'S13':None,
+        'human_review_required':expected['human_review_packet'],
+        'contextual_findings':{k:r['findings'] for k,r in expected['blocks'].items()},
+        'canonical_accepted':False,
+    }
+    stock['task9_forensic_context']=packet
+    s13.setdefault('evidence',{})['task9_context_review']=packet
+    s13['status']='REVIEW_REQUIRED'
+    return report
+
+
+def attach_task9_jones_real_score(report, receipt_path, sec_cache):
+    """Admit independently replayed official FY2025 S11=0 as REAL Research.
+
+    Zero is an actual full model score, not a missing value. Mandatory six-leg
+    S14 frozen aggregator remains N/A at 3/6: S6/B_Q/S13 are still unscored.
+    """
+    from app.task9_jones_acceptance import verify_jones_task9_receipt
+    from app.recovered_quality import _result
+    verified=verify_jones_task9_receipt(Path(receipt_path),cache=Path(sec_cache))
+    if verified['score_status']!='REAL_SCORE_ACCEPTED_RESEARCH':
+        raise ValueError('Only independent real Jones research accepted')
+    if (len(report.get('stocks',[]))!=5
+        or report['stocks'][0]['ticker']!='INOD'
+        or report.get('canonical_securities')!=0 or report.get('canonical_dates')!=0):
+        raise ValueError('Task9 source must attach only to five-stock Research staging')
+    stock=report['stocks'][0]
+    model=next((m for m in stock['models'] if m['model']=='S11'),None)
+    frozen_s14=next((m for m in stock['models'] if m['model']=='S14'),None)
+    if not model or model['score'] is not None or not frozen_s14 or frozen_s14['score'] is not None:
+        raise ValueError('Existing Jones/S14 score must not be overwritten')
+    q=stock['quality']
+    if any(q[k]['score'] is not None for k in ('B_Q','S6','S11','S13')):
+        raise ValueError('Inconsistent six-leg S14 evidence')
+    if any(q[k]['score'] is None for k in ('S7','S12')):
+        raise ValueError('Cannot advance Jones coverage with invalid prior legs')
+    at=datetime.fromisoformat(stock['as_of'])
+    scored=_result('S11',at,score=verified['score'],period='2025-12-31',
+                   missing=[],components=verified['components'],
+                   status='VERIFIED_DONE')
+    scored['evidence']['independently_replayed_official_sec']=verified
+    evidence_payload={'model':'S11','as_of':at.isoformat(),'score':scored['score'],
+                      'version':scored['version'],'evidence':scored['evidence'],
+                      'components':scored['components']}
+    scored['evidence_hash']=sha256(json.dumps(evidence_payload,sort_keys=True).encode()).hexdigest()
+    q['S11']=scored
+    model.update(score=verified['score'],status='REAL_SCORE_ACCEPTED_RESEARCH',
+                 version=scored['version'],evidence=scored['evidence'],
+                 missing=[],coverage_pct=100.0,present=8,required=8,
+                 research_as_of=verified['as_of'],
+                 historical_pit_accepted=False,canonical_accepted=False)
+    legs={k:r['score'] for k,r in q.items()}
+    s14_score,s14_components=s14(legs)
+    if s14_score is not None or sum(x is not None for x in legs.values())!=3:
+        raise ValueError('Frozen S14 six-leg completeness violated')
+    frozen_s14.update(score=None,status='DATA_MISSING',present=3,coverage_pct=50.0,
+                       missing=[k for k,x in legs.items() if x is None],
+                       evidence={'engine_executed':True,'legs':q,'components':s14_components})
+    stock['task9_jones_research']=verified
+    stock['full_model_count']=sum(m['score'] is not None for m in stock['models'])
+    report['full_model_count']=sum(x['full_model_count'] for x in report['stocks'])
+    report['full_score_securities']=sum(x['full_model_count']>0 for x in report['stocks'])
+    if stock['full_model_count']!=3 or report['full_model_count']!=10:
+        raise ValueError('Incomplete Jones score count recomputation')
+    old_audit=stock.get('sec_jones_v3')
+    if old_audit is not None:
+        old_audit['status']='SUPERSEDED_BY_TASK9_SEC_SIC_AND_20_PEER_ACCEPTANCE'
+        old_audit['replaced_by_receipt_sha256']=verified['source_file_sha256']
+    return report
+
+
 def save_report(report,path):
     path=Path(path)
     if path.exists() or path.is_symlink() or "scoring_completion" not in {p.casefold() for p in path.resolve().parts}:
@@ -619,6 +800,32 @@ def load_report(path, source, phase28):
             raise ValueError("Invalid model inventory")
         for m in s["models"]:
             if m["score"] is not None:
+                if m["model"]=='S11':
+                    packet=s.get('task9_jones_research')
+                    q11=s['quality']['S11']
+                    if (s['ticker']!='INOD' or not packet
+                        or packet.get('canonical_accepted') is not False
+                        or packet.get('historical_pit_accepted') is not False
+                        or m['score']!=packet.get('score')
+                        or q11['score']!=m['score']
+                        or m['status']!='REAL_SCORE_ACCEPTED_RESEARCH'
+                        or m.get('research_as_of')!=packet.get('as_of')):
+                        raise ValueError('Jones Research-only evidence invalid')
+                    if (q11['evidence'].get('independently_replayed_official_sec')!=packet
+                        or m['evidence']!=q11['evidence']
+                        or q11['evidence_hash']!=sha256(json.dumps({
+                            'model':'S11','as_of':q11['as_of'],
+                            'score':q11['score'],'version':q11['version'],
+                            'evidence':q11['evidence'],
+                            'components':q11['components']},sort_keys=True).encode()).hexdigest()):
+                        raise ValueError('Jones research source hash or model input changed')
+                    independently=__import__('app.task9_jones_acceptance',
+                        fromlist=['verify_jones_task9_receipt']).verify_jones_task9_receipt(
+                            Path(packet['private_receipt_path']),
+                            cache=Path(packet['cache_path']))
+                    if independently!=packet:
+                        raise ValueError('Jones independent SEC peer replay changed')
+                    continue
                 if m["model"] not in ("S7","S12"):
                     raise ValueError("Unproven stock score promotion")
                 q=s["quality"][m["model"]]
@@ -627,6 +834,14 @@ def load_report(path, source, phase28):
                     raise ValueError("Quality reference mismatch")
         if s["full_model_count"]!=sum(m["score"] is not None for m in s["models"]):
             raise ValueError("Score count mismatch")
+        if s.get('task9_jones_research'):
+            expected_present=sum(s['quality'][k]['score'] is not None
+                                 for k in ('B_Q','S6','S7','S11','S12','S13'))
+            model14=next(m for m in s['models'] if m['model']=='S14')
+            if (expected_present!=3 or model14['present']!=expected_present
+                or model14['score'] is not None or
+                any(s['quality'][k]['score'] is not None for k in ('B_Q','S6','S13'))):
+                raise ValueError('Frozen S14 completeness must remain at 3/6')
     if report["full_model_count"]!=sum(s["full_model_count"] for s in report["stocks"]):
         raise ValueError("Score count mismatch")
     if report["full_score_securities"]!=sum(s["full_model_count"]>0 for s in report["stocks"]):
