@@ -18,3 +18,10 @@ fully explained. Require ex-date, class identity, split factor,
 spinoff child consideration, and lawful PIT `available_at` evidence.
 The source adapters only verify pre-existing private research
 report consistency; they never set canonical authorization.
+
+Phase25L narrows the explanation for B/FUN historical legal
+identities but does not clear ticker collisions. Barnes $47.50
+eligible-share merger terms are not proof of a tradeable
+2025-01-27 session closing price or complete vendor terminal-return
+treatment. Never use B/FUN as canonical PIT merely because a
+SEC event URL exists.
