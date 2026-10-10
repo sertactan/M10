@@ -23,6 +23,7 @@ from app.ui.analysis_worker import AnalysisTask
 from app.ui.compare_page import ComparePage
 from app.ui.context_panels import AnalysisContextPanel, StockHeaderPanel
 from app.ui.data_health_dialog import DataHealthDialog
+from app.ui.historical_pit_evidence_dialog import HistoricalPitEvidenceDialog
 from app.ui.data_control_center_dialog import DataControlCenterDialog
 from app.ui.model_page import ModelPage
 from app.ui.scanner_dialog import MarketScannerDialog
@@ -39,6 +40,7 @@ class ResearchTerminalWindow(QMainWindow):
         scanner_service_factory: Callable[[], object] | None = None,
         data_health_service_factory: Callable[[], object] | None = None,
         control_center_service_factory: Callable[[], object] | None = None,
+        historical_pit_service_factory: Callable[[], object] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -46,6 +48,7 @@ class ResearchTerminalWindow(QMainWindow):
         self.scanner_service_factory = scanner_service_factory
         self.data_health_service_factory = data_health_service_factory
         self.control_center_service_factory = control_center_service_factory
+        self.historical_pit_service_factory = historical_pit_service_factory
         self.thread_pool = QThreadPool.globalInstance()
         self.setWindowTitle("S15.3 Research Terminal")
         self.resize(1440, 900)
@@ -127,6 +130,10 @@ class ResearchTerminalWindow(QMainWindow):
         self.control_center_button.clicked.connect(self._open_control_center)
         layout.addWidget(self.control_center_button)
 
+        self.pit_evidence_button = QPushButton("PIT / LEARNING")
+        self.pit_evidence_button.clicked.connect(self._open_historical_pit)
+        layout.addWidget(self.pit_evidence_button)
+
         self.scanner_button = QPushButton("MARKET SCANNER")
         self.scanner_button.clicked.connect(self._open_scanner)
         layout.addWidget(self.scanner_button)
@@ -159,6 +166,18 @@ class ResearchTerminalWindow(QMainWindow):
         dialog.setModal(False)
         dialog.show()
         self._control_center_dialog = dialog
+
+    def _open_historical_pit(self) -> None:
+        if self.historical_pit_service_factory is None:
+            self.status.setText("Historical PIT evidence service is not connected")
+            return
+        dialog = HistoricalPitEvidenceDialog(
+            service_factory=self.historical_pit_service_factory,
+            parent=self,
+        )
+        dialog.setModal(False)
+        dialog.show()
+        self._historical_pit_dialog = dialog
 
     def _open_scanner(self) -> None:
         if self.scanner_service_factory is None:
