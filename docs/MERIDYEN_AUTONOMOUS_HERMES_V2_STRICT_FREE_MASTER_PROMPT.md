@@ -361,3 +361,28 @@ this turn, so real local report reads and Hermes native
 LLM delegation remain unverified. Historical canonical
 acceptances remain zero, cloud cost guards absent, and no
 billable resources were created.
+
+
+### Phase25L official historic B/FUN identity integration
+
+Continue from the upstream Phase25L report before inventing a
+new identity-mapping engine. Official source facts distinguish
+Barnes NYSE B with cash merger terms ($47.50 per eligible share)
+on 2025-01-27 from Barrick's ticker GOLD→B effective 2025-05-09,
+and distinguish former Cedar Fair FUN LP units from the new
+2024-07-02 Six Flags FUN common share (former SIX share ratio 0.58).
+These are *issuer event facts* and do not certify SimFin's historical
+ticker/CIK mapping, daily adjusted prices, exact SEC public
+availability timestamps, tradeable terminal returns, or
+survivorship-free training. Keep every one of the 464 historically
+conflicting issuer rows quarantined until individually resolved
+by independent dated evidence.
+
+The M10 `phase25_source_evidence` read-only adapter now understands
+Phase25L in addition to Phase25M/R/S. It validates the optional
+existing local research report's four issuer events, CIKs,
+Barnes merger terms and fail-closed fields without rerunning
+Phase25Q ingestion; absent or tampered reports are INCONCLUSIVE.
+Phase25TU source code for a PIT/learning evidence UI was also
+merged from main; without Windows GUI access it is not yet
+user-interface tested in this Hermes continuation.
