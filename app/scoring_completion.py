@@ -337,6 +337,56 @@ def attach_intraday(report, receipt_path):
     return report
 
 
+def attach_sec_companyfacts_partial(report, receipt_path):
+    """Surface new official XBRL ratios without promoting any model score.
+
+    Both the original private SEC response bytes and the derived evidence
+    receipt must remain available at attachment time. Report output is sealed
+    separately. Source retrieval is current research, never historical PIT.
+    """
+    from app.sec_companyfacts_quality import (extract_exact_companyfacts,
+                                              partial_beneish_diagnostics)
+    receipt_path=Path(receipt_path)
+    if receipt_path.is_symlink() or receipt_path.name!="quality_partial.json":
+        raise ValueError("Expected private SEC XBRL research receipt")
+    raw_path=receipt_path.with_name("companyfacts.json")
+    if raw_path.is_symlink() or not raw_path.is_file():
+        raise ValueError("SEC Companyfacts source missing")
+    evidence=json.loads(receipt_path.read_text(encoding="utf8"))
+    raw=raw_path.read_bytes()
+    if digest(raw_path)!=evidence.get("source_sha256"):
+        raise ValueError("SEC Companyfacts raw source hash changed")
+    if evidence.get("ticker")!="INOD" or evidence.get("scope")!="CURRENT_RESEARCH_ONLY_NOT_HISTORICAL_PIT":
+        raise ValueError("Unknown SEC raw research identity/scope")
+    rebuilt=extract_exact_companyfacts(raw,ticker="INOD",cik=evidence["cik"],
+        accession=evidence["accession"],retrieved_at=evidence["retrieved_at"],
+        fiscal_years=(2024,2025))
+    if (rebuilt["selected"]!=evidence.get("selected")
+        or rebuilt["missing"]!=evidence.get("missing")
+        or partial_beneish_diagnostics(rebuilt["rows"],2025)!=evidence.get("partial_beneish_2025")):
+        raise ValueError("SEC partial research receipt no longer matches source")
+    if (len(report.get("stocks",[]))!=5 or report["stocks"][0]["ticker"]!="INOD"
+            or any(m["model"]=="S14" and m["score"] is not None
+                   for m in report["stocks"][0]["models"])):
+        raise ValueError("SEC research receipt cannot be attached to promoted S14")
+    partial=evidence["partial_beneish_2025"]
+    stock=report["stocks"][0]
+    stock["sec_companyfacts_partial"]={
+        "source":"SEC_EDGAR_COMPANYFACTS", "source_sha256":rebuilt["source_sha256"],
+        "accepted_at":evidence.get("accepted_at"),
+        "retrieved_at":rebuilt["retrieved_at"],
+        "accession":rebuilt["accession"], "fiscal_years":[2024,2025],
+        "available_ratio_count":sum(v is not None for v in partial["ratios"].values()),
+        "ratios":partial["ratios"], "missing_normalized_tags":rebuilt["missing"],
+        "B_Q":None,"S14":None,"historical_pit_accepted":False,
+        "receipt_evidence_sha256":digest(receipt_path),
+    }
+    stock["quality"]["B_Q"].setdefault("components",{})["official_sec_partial_ratios"] = {
+        "source_sha256":rebuilt["source_sha256"],"ratios":partial["ratios"],
+        "status":"PARTIAL_RAW_XBRL_NOT_FULL_B_Q"}
+    return report
+
+
 def save_report(report,path):
     path=Path(path)
     if path.exists() or path.is_symlink() or "scoring_completion" not in {p.casefold() for p in path.resolve().parts}:

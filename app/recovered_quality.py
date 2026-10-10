@@ -11,6 +11,9 @@ import json
 import math
 import re
 from core.scoring.math import piecewise_score
+from app.recovered_beneish import calculate_beneish
+from app.recovered_dechow import calculate_dechow
+from app.recovered_jones import compute_s11
 
 VERSION = "S1_S14_CANONICAL_V1.0_RECOVERED_RESEARCH_V1"
 SOURCE_SHA256 = "53dce841fd5ebdfeb00636f327493be1255ea8b60e6df4eadd921a7098813794"
@@ -160,11 +163,48 @@ def _s12(rows, at):
     return _result("S12", at, score=score, inputs=inputs, period=end, components=components)
 
 
-def compute_quality(facts, at):
-    """Return the six recovered S14 legs; only complete S7/S12 score numerically.
+def _bq(rows, at, forensic_review=None):
+    sales = _one(rows, "REVENUE", "ANNUAL")
+    if not _annual(sales):
+        return _result("B_Q", at, missing=["REVENUE_VALID_ANNUAL_PERIOD"])
+    score, components, inputs, missing = calculate_beneish(
+        rows, sales["period_end"], sales["period_start"], forensic_review)
+    return _result("B_Q", at, score=score, components=components, inputs=inputs,
+                   missing=missing, period=sales["period_end"])
+
+
+def _reviewed_external(model, result, at):
+    """Embed an independently gated source calculation without PIT promotion."""
+    if result.get("canonical_accepted") is not False or result.get("scope")!="RESEARCH_ONLY_NOT_CANONICAL_PIT":
+        raise ValueError("External quality result must remain research-only")
+    raw_evidence=result.get("evidence", {})
+    if not isinstance(raw_evidence, dict) or not result.get("evidence_hash"):
+        raise ValueError("External quality source evidence missing")
+    evidence={"contract":SOURCE,"contract_sha256":SOURCE_SHA256,
+              "contract_lines":CONTRACTS[model]["lines"],
+              "inputs":raw_evidence.get("inputs",[]),
+              "source_computation":raw_evidence,
+              "source_computation_hash":result["evidence_hash"],
+              "historical_pit_accepted":False}
+    score=result.get("score")
+    payload={"model":model,"as_of":at.isoformat(),"score":score,
+             "evidence":evidence,"components":result.get("components",{})}
+    return {"score":score,"status":"VERIFIED_DONE" if score is not None else "DATA_MISSING",
+            "scope":"RESEARCH_ONLY_NOT_CANONICAL_PIT",
+            "version":result.get("version",VERSION),
+            "missing":result.get("missing",[]),"components":result.get("components",{}),
+            "period":result.get("period"),"as_of":at.isoformat(),
+            "evidence":evidence,"evidence_hash":hashlib.sha256(
+                json.dumps(payload,sort_keys=True).encode()).hexdigest(),
+            "canonical_accepted":False}
+
+
+def compute_quality(facts, at, *, forensic_review=None, dechow_packet=None,
+                    jones_packet=None, forensic_packet=None):
+    """Return six S14 legs; B_Q requires accounting data and a complete flags review.
 
     Facts must describe one issuer. No cached score, guessed peer set, missing
-    evidence or synthetic defaults can satisfy the four other model contracts.
+    evidence or synthetic defaults satisfy the remaining model contracts.
     """
     if not isinstance(at, datetime) or at.tzinfo is None:
         raise ValueError("Offset-aware research as_of is required")
@@ -178,4 +218,29 @@ def compute_quality(facts, at):
                for model, meta in CONTRACTS.items()}
     results["S7"] = _s7(rows, at)
     results["S12"] = _s12(rows, at)
+    if dechow_packet is not None:
+        if not isinstance(dechow_packet, dict):
+            raise ValueError("S6 complete packet must be a mapping")
+        s6=calculate_dechow(as_of=at,**dechow_packet)
+        results["S6"]=_reviewed_external("S6",s6,at)
+    if jones_packet is not None:
+        if not isinstance(jones_packet, dict):
+            raise ValueError("S11 complete target and peer packet required")
+        s11=compute_s11(jones_packet.get("target"),jones_packet.get("peers"),at)
+        results["S11"]=_reviewed_external("S11",s11,at)
+    if forensic_packet is not None:
+        # Local import: forensic_evidence imports the pinned quality contract.
+        from app.forensic_evidence import compute_s13
+        s13=compute_s13(forensic_packet,at)
+        results["S13"]=_reviewed_external("S13",s13,at)
+        if forensic_review is None and s13["score"] is not None:
+            filing={r["filing_id"]:r for r in s13["evidence"]["filings"]}
+            forensic_review={"review_complete":True,
+                "scope":"S13_COMPLETE_INDEPENDENT_FORENSIC_REVIEW",
+                "serious_flags":[{
+                    "id":flag["flag_id"],
+                    "source_ref":filing[flag["filing_ids"][0]]["source_ref"],
+                    "evidence_hash":filing[flag["filing_ids"][0]]["content_sha256"]}
+                    for flag in s13["evidence"]["independent_serious_flags"]]}
+    results["B_Q"] = _bq(rows, at, forensic_review)
     return results

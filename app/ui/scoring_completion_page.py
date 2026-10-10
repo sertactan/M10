@@ -15,8 +15,9 @@ class ScoringCompletionPage(QWidget):
         self.warning.setWordWrap(True);root.addWidget(self.warning)
         self.status=QLabel('No verified report loaded');self.status.setWordWrap(True);root.addWidget(self.status)
         button=QPushButton('Load verified offline results');button.clicked.connect(self.refresh);root.addWidget(button)
-        self.comparison=QTableWidget(0,7)
-        self.comparison.setHorizontalHeaderLabels(('Stock','Cached price','Price time','S7','S12','Features','Full formula scores'))
+        self.comparison=QTableWidget(0,11)
+        self.comparison.setHorizontalHeaderLabels(('Stock','Cached price','Price time','S7','S12',
+            'S14','S14 legs','S16-E','S16-C','Features','Full formula scores'))
         self.comparison.setEditTriggers(QTableWidget.NoEditTriggers)
         self.comparison.itemSelectionChanged.connect(self.select_stock)
         self.comparison.setMinimumHeight(210)
@@ -36,8 +37,12 @@ class ScoringCompletionPage(QWidget):
             self.report=load_report(self.report_path,self.source,self.phase28)
             for s in self.report['stocks']:
                 i=self.comparison.rowCount();self.comparison.insertRow(i)
+                s14=next((m['score'] for m in s['models'] if m['model']=='S14'),None)
+                present=sum(s['quality'][k]['score'] is not None
+                            for k in ('B_Q','S6','S7','S11','S12','S13'))
                 values=(s['ticker'],f"{s['price']:.2f} {s['currency']}",s['price_time'],
-                        s['quality']['S7']['score'],s['quality']['S12']['score'],len(s['features']),s['full_model_count'])
+                        s['quality']['S7']['score'],s['quality']['S12']['score'],s14,
+                        f"{present}/6",None,None,len(s['features']),s['full_model_count'])
                 for j,v in enumerate(values):
                     self.comparison.setItem(i,j,QTableWidgetItem('N/A' if v is None else f'{v:.2f}' if isinstance(v,float) else str(v)))
             self.status.setText(f"Offline snapshot {self.report['generated_at']} · {self.report['full_model_count']} full research formula scores · prices retain original timestamps; not live")
@@ -56,7 +61,10 @@ class ScoringCompletionPage(QWidget):
             for j,v in enumerate((m['model'],'N/A' if m['score'] is None else f"{m['score']:.2f}",m['status'],', '.join(m['missing']))):
                 self.models.setItem(row,j,QTableWidgetItem(str(v)))
         self.models.resizeColumnsToContents()
-        self.details.setPlainText(json.dumps({k:stock[k] for k in ('quality','control_chain','s16_features','daily','features')},ensure_ascii=False,indent=2))
+        evidence={k:stock[k] for k in ('quality','control_chain','s16_features','daily','features')}
+        if stock.get('sec_companyfacts_partial'):
+            evidence['sec_companyfacts_partial']=stock['sec_companyfacts_partial']
+        self.details.setPlainText(json.dumps(evidence,ensure_ascii=False,indent=2))
     def select_model(self):
         i,j=self.comparison.currentRow(),self.models.currentRow()
         if self.report and i>=0 and j>=0:

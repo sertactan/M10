@@ -89,3 +89,24 @@ Offline çekirdek tekrar üretimi: `scripts/scoring_completion.py --phase27 <exi
 ## GitHub teslimatı
 
 [PR #174](https://github.com/sertactan/M10/pull/174) OPEN; tabanı `codex/phase28-real-scoring` / PR #173. İlk uygulama commit'i `a29d6ee9831c9234f51ac6ecfb5f6ed72fbce2d1` için [Python CI SUCCESS](https://github.com/sertactan/M10/actions/runs/38071539171). Son etiket/belge takip commit'inin CI sonucu PR üzerinde ayrıca görülebilir. Otomatik merge yok; özel JSON/DB/SEC payload/fiyat barı/EXE/screenshot GitHub'a konulmadı.
+
+## 2026-10-11 — S1–S16 Scoring Completion V2 ek geliştirme kaydı
+
+Bu bölüm PR #174'ün üzerindeki **yeni izole** `codex/scoring-completion-v2` dalını ve farklı bir zaman aralığını açıklar; üstteki Faz 28/PR #174 tarihsel teslim kaydı değiştirilmedi. Ayrıntılı mühendislik ve Windows doğrulaması: `SCORING_COMPLETION_V2_ENGINEERING.md`.
+
+| No | Görev | Mevcut durum | Yeni yapılan iş | Son durum | Kanıt |
+|---|---|---|---|---|---|
+| 9 | S14 formülleri | PARTIAL | Frozen kaynak SHA doğrulandı; B_Q, S6, S11 Modified Jones ve S13 ayrı kaynaklı fail-closed uygulandı ve opsiyonel quality gate'e bağlandı; INOD resmi XBRL tanı özellikleri çıkartıldı. | PARTIAL — yeni gerçek tam S14 bacağı 0 | `app/recovered_beneish.py`, `recovered_dechow.py`, `recovered_jones.py`, `forensic_evidence.py`; sentetik testler; özel XBRL kanıtı |
+| 10 | INOD S14 | 2/6 | Resmi SEC Companyfacts FY2024/2025 kıyasından DSRI, AQI, SGAI, SGI, TATA hesaplandı; skor kapısı tekrar çalıştırıldı. | **2/6, tam S14: N/A** | `v2_sec_probe1/quality_partial.json`, `v2_audit2/report.json` (yalnız özel cache) |
+| 11 | S1–S3 | PARTIAL | Önceki real feature + historical input engelleri izole raporda yeniden doğrulandı. | PARTIAL; tam S1/S2/S3: 0 | `v2_audit2/report.json`, `control_chain` |
+| 12 | S15.3 | PARTIAL | V1.2, V1.4, V1.4.1 önceki özgün motor durumları korunarak offline kanıt kontrolü yapıldı. | PARTIAL; üç sürümde tam skor 0 | `v2_audit2/report.json`, model `missing` |
+| 13 | SEC | PARTIAL | Resmi Companyfacts 2.949.045 bayt tek izinli HTTP 200, SHA-256 + SEC Submissions saat eşleştirmesi; özel önbellek ve kaynak/tag doğrulama. | PARTIAL; research source recovered, historical PIT yok | `scripts/scoring_sec_companyfacts_probe.py`, `app/sec_companyfacts_quality.py`; SEC receipt |
+| 14 | S16-C | 0/22 | Günlük ham kanıt ve normalize/PIT kabul eksikleri offline raporda doğrulandı. | **0/22**, tam skor 0 | `s16_features`, `daily` |
+| 15 | S16-E | PENDING_APPROVAL | Mevcut taslak ve kalibrasyon/onay kapısı değişmeden test edildi. | PENDING_APPROVAL; etkin değil | `app/scoring_estimated_draft.py` |
+| 16 | S16-EA | PARTIAL | SEC acceptance audit ve NY DST/closed-minute/same-clock/first-news-timestamp fail-closed doğrulama kodlandı. 5 gerçek ET günü, 20 gün şartı karşılanmıyor. | PARTIAL; doğrulanmış alarm 0 | `app/scoring_event_evidence.py`; 14 test; özel intraday receipt |
+| 17 | Beş hisse | PARTIAL | İmzalı özel offline report ile 5 hisse yeniden değerlendirildi; INOD SEC kısmi oranları ayrıca iliştirildi. | PARTIAL; toplam tam alt skor **9** | `v2_audit2/report.json` ve `.sha256` |
+| 18 | Windows | PARTIAL | Gerçek staging kaynaklarında iki offscreen Qt aç/kapat turu; 11 sütun S14/6, S16-E/C ayrımı, SEC kısmi kanıtı ayrıntısı. | STAGING TESTED; kurulu PE değişmedi | `app/ui/scoring_completion_page.py`, `test_scoring_completion_ui.py`, izole Qt smoke |
+
+**Yeni XBRL kanıtı:** FY2025/FY2024 aynı SEC 10-K accession `0001104659-26-020655`, Companyfacts ham SHA-256 `6ccc9dcc93b9c303cee51c166f345350fb16258408c884e2ed5d1231f2741b38`. Gerçek **DSRI 1.1245852440**, **AQI 0.5989734840**, **SGAI 0.9446728769**, **SGI 1.4763670282**, **TATA -0.08642707586**; bunlar eksiksiz yedi risk puanı değil. Ayrı COGS, yalnız depreciation, toplam interest-bearing debt, inventory standard tag kanıtı eksik. Özellikle `DepreciationDepletionAndAmortization` saf amortisman dışı *Depreciation* olarak sessizce kullanılmadı; `LongTermDebt` toplam faizli borç olarak kullanılmadı. S13 için yedi filing-body incelemesi ve bağımsız flag review yok. Kesin S14 puanı **N/A** kalır.
+
+Veriler yalnız `%LOCALAPPDATA%/S153ResearchTerminal/runtime/scoring_completion/v2_sec_probe1/` ve `v2_audit2/` özel klasörlerindedir. Bu bölümdeki `.json` ve SEC ham 2,95 MB dosya GitHub'a eklenemez; yalnız parser/test kodu, statü metni ve veri hashleri repoda yer alır. V2 tam görev kabulü: **DONE 0/10, açık 10/10**; alt mühendislik görevleri doğrulanmıştır. Tam S14 0; tam S1/S2/S3 0; tam S15.3 0; S16-C 0/22; S16-E kullanıcı onayını bekliyor; S16-EA gerçek alarm 0. Tarihsel kanonik **0 hisse / 0 tarih**, WF9 **BLOCKED**, Learning V3 **NOT_TRAINED** korunur.
