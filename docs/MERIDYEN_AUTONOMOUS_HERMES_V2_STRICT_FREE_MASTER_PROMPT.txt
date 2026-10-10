@@ -386,3 +386,24 @@ Phase25Q ingestion; absent or tampered reports are INCONCLUSIVE.
 Phase25TU source code for a PIT/learning evidence UI was also
 merged from main; without Windows GUI access it is not yet
 user-interface tested in this Hermes continuation.
+
+
+### Phase25P no-lookahead SEC source timing
+
+The M10 official Phase25P core gate is now present on the Hermes
+feature branch. SEC EDGAR accession **Accepted** establishes only
+the earliest possible dissemination, not actual public release nor
+vendor-ingested historical `available_at`. Known official
+accepted timestamps for HUYA, TDG and Barnes B still lack
+independent public dissemination and feature ingestion stamps,
+so all three remain INCONCLUSIVE for historical model use.
+
+Native Hermes A3/A5/A6 must use existing M10
+`core.research.sec_publication_gate`, compare accepted <=
+independently observed publication <= vendor available_at <=
+decision timestamp, and reject missing or timezone-naive clocks.
+Do not rewrite the canonical formulas or equate filing period-end
+with first usable information. A read-only private Phase25P
+report verifier was added to
+`core.hermes_team.phase25_source_evidence`; zero WF9/learning
+claims are permitted based on acceptance stamps alone.
