@@ -27,3 +27,10 @@ These improve issuer-action research yet leave all 464
 source conflicts quarantined and 0 approved historical
 SimFinId/CIK full-window matches; do not report WF9 or
 Learning V3 improvement based on these event references.
+
+Phase25P adds three SEC index acceptance stamps; actual public
+dissemination and feature ingestion times are not independently
+certified. Those 3 records remain unusable for historical
+model selection, regardless of period-end or initial EDGAR
+acceptance. Apply `core.research.sec_publication_gate` and
+never assign `available_at=Accepted` by default.
