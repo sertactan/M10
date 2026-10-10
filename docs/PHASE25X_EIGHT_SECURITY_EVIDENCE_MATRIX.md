@@ -51,4 +51,3 @@ $root = "$env:LOCALAPPDATA\S153ResearchTerminal\runtime"
 ```
 
 Real private reports: `evidence_matrix_research_only_v1.json` and final `evidence_matrix_research_only_v2.json` in the private Phase25X directory. Both contain the same evidence payload (SHA-256 `44f2b269fb7c86555eaa834b95e70866d08ff2a1b85c2a88bc309db7a67ff581`). The final v2 run also enforces private output confinement and per-row quarantine checks. Tests are synthetic and contain no user data. No S15/S16 formula, production model, Hermes code, operational database or upstream source was changed. No PR is merged automatically.
-
