@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import sqlite3
+from contextlib import closing
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -11,7 +12,7 @@ from scripts.phase25w_research_pit_pilot import assess, STRONG_CONFLICTS
 def fixture(root):
     root = Path(root)
     db = root / "research_pit.sqlite"
-    with sqlite3.connect(db) as c:
+    with closing(sqlite3.connect(db)) as c:
         c.executescript("""
             CREATE TABLE source_daily_price(
                 simfin_id TEXT, ticker TEXT, trade_date TEXT,
@@ -35,7 +36,7 @@ def fixture(root):
             INSERT INTO source_daily_price VALUES ('3','B','2024-01-30',0,0,0);
         """)
     market = root / "operational.db"
-    with sqlite3.connect(market) as c:
+    with closing(sqlite3.connect(market)) as c:
         c.executescript("""
             CREATE TABLE universe_snapshot_membership(snapshot_date TEXT);
             CREATE TABLE canonical_price_selection(purpose TEXT,start_date TEXT,end_date TEXT);
@@ -127,8 +128,9 @@ class Phase25WTest(unittest.TestCase):
     def test_upstream_canonical_flags_cannot_be_promoted(self):
         with TemporaryDirectory() as d:
             mp, qp, stage, market = fixture(d)
-            with sqlite3.connect(stage) as c:
+            with closing(sqlite3.connect(stage)) as c:
                 c.execute("UPDATE candidate_gate SET canonical_approved=1 WHERE simfin_id='1'")
+                c.commit()
             with self.assertRaisesRegex(ValueError, "UPSTREAM_RESEARCH_ONLY_GUARD_CHANGED"):
                 assess(mp, qp, market)
 
