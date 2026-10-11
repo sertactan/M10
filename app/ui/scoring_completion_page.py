@@ -1,6 +1,7 @@
 """Offline comparison UI for recovered research formula scores."""
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 from PySide6.QtWidgets import QWidget,QVBoxLayout,QLabel,QPushButton,QTableWidget,QTableWidgetItem,QPlainTextEdit
 from app.scoring_completion import load_report
@@ -10,6 +11,7 @@ class ScoringCompletionPage(QWidget):
         super().__init__(parent)
         self.report_path,self.source,self.phase28=map(Path,(report_path,source,phase28))
         self.report=None
+        self.v4_rsst=None
         root=QVBoxLayout(self)
         self.warning=QLabel('RESEARCH ONLY · Annual fallback formula scores · S14 incomplete · Canonical 0/0 · Estimated activation pending approval')
         self.warning.setWordWrap(True);root.addWidget(self.warning)
@@ -32,21 +34,32 @@ class ScoringCompletionPage(QWidget):
         self.details=QPlainTextEdit();self.details.setReadOnly(True);root.addWidget(self.details)
     def refresh(self):
         # Clear first: a bad or changed source must not leave yesterday's scores visible.
-        self.report=None;self.comparison.setRowCount(0);self.models.setRowCount(0);self.details.clear()
+        self.report=None;self.v4_rsst=None;self.comparison.setRowCount(0);self.models.setRowCount(0);self.details.clear()
         try:
             self.report=load_report(self.report_path,self.source,self.phase28)
+            receipt=os.environ.get('M10_SCORING_V4_RSST_RECEIPT')
+            if receipt:
+                required=('M10_SCORING_V4_COMPANYFACTS_ZIP','M10_SCORING_V4_MODEL_SOURCE',
+                          'M10_SCORING_V4_FILING_CACHE')
+                if any(not os.environ.get(key) for key in required):
+                    raise ValueError('V4 RSST original-source replay paths required')
+                from app.scoring_v4_dechow import verify_private_receipt
+                self.v4_rsst=verify_private_receipt(receipt,*(os.environ[key] for key in required))
             for s in self.report['stocks']:
                 i=self.comparison.rowCount();self.comparison.insertRow(i)
                 s14=next((m['score'] for m in s['models'] if m['model']=='S14'),None)
                 present=sum(s['quality'][k]['score'] is not None
                             for k in ('B_Q','S6','S7','S11','S12','S13'))
                 v3=s.get('sec_quality_v3') or {}
+                s6_text=(f"5/7 + RSST {self.v4_rsst['RSST_research_candidate']:.5f} review"
+                         if s['ticker']=='INOD' and self.v4_rsst else
+                         f"{v3['S6_partial_count']}/7" if v3 else 'N/A')
                 values=(s['ticker'],f"{s['price']:.2f} {s['currency']}",s['price_time'],
                         s['quality']['S7']['score'],s['quality']['S12']['score'],
                         s['quality']['S11']['score'],s14,
                         f"{present}/6",
                         f"{v3['B_Q_risk_count']}/7" if v3 else 'N/A',
-                        f"{v3['S6_partial_count']}/7" if v3 else 'N/A',
+                        s6_text,
                         None,None,len(s['features']),s['full_model_count'])
                 for j,v in enumerate(values):
                     self.comparison.setItem(i,j,QTableWidgetItem('N/A' if v is None else f'{v:.2f}' if isinstance(v,float) else str(v)))
@@ -83,6 +96,10 @@ class ScoringCompletionPage(QWidget):
             evidence['task9_forensic_context']=stock['task9_forensic_context']
         if stock.get('task9_jones_research'):
             evidence['task9_jones_research']=stock['task9_jones_research']
+        if stock['ticker']=='INOD' and self.v4_rsst:
+            evidence['v4_rsst_research_candidate']={k:self.v4_rsst[k] for k in
+                ('RSST_decimal','delta_usd','average_assets_usd','RSST_frozen_accepted','missing',
+                 'companyfacts_sha256','model_source_sha256','filing_bodies_sha256')}
         self.details.setPlainText(json.dumps(evidence,ensure_ascii=False,indent=2))
     def select_model(self):
         i,j=self.comparison.currentRow(),self.models.currentRow()
