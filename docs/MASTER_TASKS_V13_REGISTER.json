@@ -1,0 +1,539 @@
+{
+  "schema": "M10_MASTER_TASK_CLOSURE_V13_1",
+  "baseline_commit": "f211205bffb66ab8145ee9cdde896d31ff455cdb",
+  "contract_references": [
+    "docs/SCORING_TASKS_09_18_STATUS.md",
+    "docs/SCORING_COMPLETION_V11.md",
+    "docs/RECOVERED_QUALITY_CONTRACTS.md"
+  ],
+  "statuses": [
+    "DONE",
+    "PARTIAL",
+    "BLOCKED",
+    "PENDING_APPROVAL",
+    "REVIEW_REQUIRED"
+  ],
+  "work_log": {
+    "9": {
+      "completed": "Two original INOD 10-K iXBRL bodies sealed and candidate 2023/24 short-term investment facts isolated",
+      "code_action": "Review candidate accounting scope, then run original complete model gates",
+      "external_block": "original STI/LTI/PREF accounting classification and seven signed S13 categories",
+      "human_decision": "Authorized S13 seven-category review",
+      "receipt": "docs/MASTER_TASKS_V13_QUALITY.md",
+      "acceptance_test": "scoring_v12_quality_audit.py --verify"
+    },
+    "10": {
+      "completed": "INOD iXBRL candidate does not close S6/B_Q/S13; complete S14 remains unavailable",
+      "code_action": "Recalculate frozen geometric S14 after all missing legs are accepted",
+      "external_block": "six original accepted legs and Decimal geometric replay",
+      "human_decision": "S13 expert review through Task 9",
+      "receipt": "docs/MASTER_TASKS_V13_QUALITY.md",
+      "acceptance_test": "complete-six-leg S14 Decimal/source replay"
+    },
+    "11": {
+      "completed": "Four INOD partial SEC legs joined to nine original evidence rows; raw F52/F53 growth independently calculated",
+      "code_action": "Materialize missing dated Core48/Control12 factor families and independent H/router checks",
+      "external_block": "frozen numeric mapping, Core48/Control12 and historical H",
+      "human_decision": "None for current diagnostic",
+      "receipt": "docs/MASTER_TASKS_V13_CORE.md; docs/MASTER_TASKS_V13_CORE_FACTORS.md",
+      "acceptance_test": "full original S1/S2/S3 gate and reference replay"
+    },
+    "12": {
+      "completed": "Independent route coverage and dated SEC-share market-cap candidate audited",
+      "code_action": "Bind S15.2, M10/T10, route, magnitude and fit to dated sources",
+      "external_block": "S15.2 M10/T10 and three version-specific gates",
+      "human_decision": "None for current diagnostic",
+      "receipt": "docs/MASTER_TASKS_V13_S15.md",
+      "acceptance_test": "each version READY/complete original gate and replay"
+    },
+    "13": {
+      "completed": "Seven original INOD submissions accessions and SEC accepted-at chronology reconciled",
+      "code_action": "Capture independently evidenced dissemination, provider arrival and version chain",
+      "external_block": "historical public and provider availability",
+      "human_decision": "Source access if a historical provider is required",
+      "receipt": "docs/MASTER_TASKS_V13_PIT.md",
+      "acceptance_test": "strict as-of version selector against real historical captures"
+    },
+    "14": {
+      "completed": "PIT accepted-at chronology narrowed; no feature promoted to canonical",
+      "code_action": "Materialize each source-timed feature and dated cross-sectional normalization",
+      "external_block": "22/22 source-timed normalized features and dated universe",
+      "human_decision": "None before evidence availability",
+      "receipt": "docs/MASTER_TASKS_V13_PIT.md",
+      "acceptance_test": "22/22 original normalized features and independent replay"
+    },
+    "15": {
+      "completed": "25-issuer pilot audit and fixed OOS eligibility gates; eligible cases zero",
+      "code_action": "Preregister cohort and independent OOS calibration in isolation",
+      "external_block": "mature labels and historical factor/provider captures",
+      "human_decision": "Explicit versioned formula and production activation approval, separately",
+      "receipt": "docs/MASTER_TASKS_V13_ESTIMATED.md",
+      "acceptance_test": "holdout calibration then staging and approved activation"
+    },
+    "16": {
+      "completed": "Original INOD minute response sealed; only four prior same-clock dates and ten unverified event candidates",
+      "code_action": "Bind first-public news and provider-timed OHLCV/session evidence",
+      "external_block": "20 prior same-clock sessions and original first-public/provider times",
+      "human_decision": "None before source completeness",
+      "receipt": "docs/MASTER_TASKS_V13_EVENT.md",
+      "acceptance_test": "look-ahead-free hit/miss/false-positive replay"
+    },
+    "17": {
+      "completed": "Packaged EXE replayed five-stock original 17-score comparison",
+      "code_action": "Add only independently accepted complete models to comparison and UI",
+      "external_block": "new full original model acceptances",
+      "human_decision": "None for the read-only comparison",
+      "receipt": "E:/M10/.master_tasks_v13_private/windows/acceptance_ui.json",
+      "acceptance_test": "scoring_v12_comparison.py --verify"
+    },
+    "18": {
+      "completed": "Loadable EXE and privately installed copy passed real Qt open-close-reopen/17-score replay; isolated uninstall removed EXE",
+      "code_action": "Validate a loadable isolated build and final installed acceptance",
+      "external_block": "separate live installation and migration approval",
+      "human_decision": "Explicit installation, DB migration and PR merge approval separately",
+      "receipt": "E:/M10/.master_tasks_v13_private/windows/acceptance_ui.json",
+      "acceptance_test": "portable and installed packaged acceptance receipts, identical SHA-256, isolated uninstall exit 0"
+    }
+  },
+  "tasks": [
+    {
+      "id": 9,
+      "name": "S14 quality components",
+      "status": "PARTIAL",
+      "dependencies": [
+        "original S6/B_Q source classifications",
+        "authorized S13 expert"
+      ],
+      "next_step": "Complete original financial classifications and submit seven-category S13 packet to authorized expert",
+      "criteria": [
+        {
+          "id": "9.contract",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/RECOVERED_QUALITY_CONTRACTS.md"
+          ],
+          "test": "frozen SHA verification"
+        },
+        {
+          "id": "9.s6",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "exact source, Decimal, decomposition, receipt replay"
+        },
+        {
+          "id": "9.bq",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "all seven Beneish risks and hard gates, independent replay"
+        },
+        {
+          "id": "9.s13",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "seven signed expert categories and independent serious flags"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "INOD complete S14",
+      "status": "BLOCKED",
+      "dependencies": [
+        "Task 9 full S6",
+        "Task 9 full B_Q",
+        "authorized S13 expert"
+      ],
+      "next_step": "After all six original legs pass, independently replay frozen geometric S14",
+      "criteria": [
+        {
+          "id": "10.known_legs",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/SCORING_COMPLETION_V11.md"
+          ],
+          "test": "V9 17-score source replay"
+        },
+        {
+          "id": "10.six_legs",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "six original legs independently accepted"
+        },
+        {
+          "id": "10.geometric",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "independent Decimal geometric reference and UI replay"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "S1/S2/S3 complete acceptance",
+      "status": "PARTIAL",
+      "dependencies": [
+        "Core48",
+        "Control12",
+        "Historical H",
+        "DNA60/router and Gate6"
+      ],
+      "next_step": "Bind missing feature families to exact real sources and test each original gate",
+      "criteria": [
+        {
+          "id": "11.contract",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/SCORING_TASKS_09_18_STATUS.md"
+          ],
+          "test": "original model hash and required-feature inventory"
+        },
+        {
+          "id": "11.s1",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "real S1 complete input and reference replay"
+        },
+        {
+          "id": "11.s2",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "real S2 complete input and reference replay"
+        },
+        {
+          "id": "11.s3",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "real S3 complete input and reference replay"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "S15.3 three versions",
+      "status": "PARTIAL",
+      "dependencies": [
+        "S15.2",
+        "M10/T10 coverage",
+        "magnitude and model fit"
+      ],
+      "next_step": "Close each version's original ready gate separately",
+      "criteria": [
+        {
+          "id": "12.contract",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/SCORING_TASKS_09_18_STATUS.md"
+          ],
+          "test": "versioned original spec hash"
+        },
+        {
+          "id": "12.v12",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "V1.2 READY and original receipt replay"
+        },
+        {
+          "id": "12.v14",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "V1.4 dual magnitude/model fit and replay"
+        },
+        {
+          "id": "12.v141",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "V1.4.1 V1.2 prerequisite and own gates"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Historical SEC PIT",
+      "status": "PARTIAL",
+      "dependencies": [
+        "provider first-available history",
+        "original/revised filing versions"
+      ],
+      "next_step": "Acquire and replay dated dissemination and provider availability evidence",
+      "criteria": [
+        {
+          "id": "13.filing_identity",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/SCORING_COMPLETION_V11.md"
+          ],
+          "test": "original accession and filing-date receipt replay"
+        },
+        {
+          "id": "13.available_at",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "provider available-at after accepted/published time"
+        },
+        {
+          "id": "13.versioning",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "original/restated filing chronology"
+        },
+        {
+          "id": "13.issuer_mapping",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "as-of CIK/ticker identity"
+        },
+        {
+          "id": "13.replay",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "historical feature materialization and as-of replay"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "S16-C Canonical",
+      "status": "BLOCKED",
+      "dependencies": [
+        "Task 13 PIT availability",
+        "dated universe and cross-sectional normalization"
+      ],
+      "next_step": "Accept real dated features one by one; calculate full score only after all original gates",
+      "criteria": [
+        {
+          "id": "14.contract",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/S16_V1_CANONICAL_SPEC.md"
+          ],
+          "test": "frozen 22-feature inventory"
+        },
+        {
+          "id": "14.features",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "22/22 real PIT normalized features"
+        },
+        {
+          "id": "14.universe",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "dated historical universe and missingness gate"
+        },
+        {
+          "id": "14.score",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "independent frozen score and offline replay"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "S16-E Estimated",
+      "status": "PENDING_APPROVAL",
+      "dependencies": [
+        "independent OOS calibration",
+        "separate explicit user activation approval"
+      ],
+      "next_step": "Build independent OOS evidence; submit bounded activation decision after technical gates pass",
+      "criteria": [
+        {
+          "id": "15.separation",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/PHASE28_S16_E_ESTIMATED_DESIGN_DRAFT.md"
+          ],
+          "test": "Estimated/Canonical output separation"
+        },
+        {
+          "id": "15.contract",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "approved independent numeric specification"
+        },
+        {
+          "id": "15.oos",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "genuine out-of-sample calibration"
+        },
+        {
+          "id": "15.approval",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "explicit user activation approval and staging acceptance"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "S16-EA Early Warning",
+      "status": "PARTIAL",
+      "dependencies": [
+        "first-published event time",
+        "historical same-clock intraday bars"
+      ],
+      "next_step": "Match first-visible event to source-timed bars and independently replay alerts",
+      "criteria": [
+        {
+          "id": "16.contract",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/SCORING_TASKS_09_18_STATUS.md"
+          ],
+          "test": "frozen event and session gate checks"
+        },
+        {
+          "id": "16.event_time",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "original first-publication/provider-lag receipt"
+        },
+        {
+          "id": "16.bars",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "historical same-clock OHLCV and session evidence"
+        },
+        {
+          "id": "16.replay",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "look-ahead-free hit/miss/false-positive replay"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Five-stock complete comparison",
+      "status": "PARTIAL",
+      "dependencies": [
+        "remaining original model acceptances",
+        "source-timed price representation"
+      ],
+      "next_step": "Extend comparison only when additional full model receipts pass; keep N/A per issuer",
+      "criteria": [
+        {
+          "id": "17.baseline17",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/SCORING_COMPLETION_V11.md"
+          ],
+          "test": "17 original Research receipt replay"
+        },
+        {
+          "id": "17.matrix",
+          "baseline_verified": false,
+          "verified": true,
+          "evidence": [
+            "scripts/scoring_v12_comparison.py"
+          ],
+          "test": "five-stock sealed source replay"
+        },
+        {
+          "id": "17.price_and_scope",
+          "baseline_verified": false,
+          "verified": true,
+          "evidence": [
+            "app/scoring_v12_comparison.py"
+          ],
+          "test": "dated-cache price and Estimated/Canonical separation"
+        },
+        {
+          "id": "17.complete_models",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "all required original model acceptances and comparison UI"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Windows Personal Edition",
+      "status": "PARTIAL",
+      "dependencies": [
+        "final build and installed acceptance",
+        "separate user deployment approval"
+      ],
+      "next_step": "Verify isolated installer, then seek separate approval for any live installation and DB migration",
+      "criteria": [
+        {
+          "id": "18.staging",
+          "baseline_verified": true,
+          "verified": true,
+          "evidence": [
+            "docs/SCORING_COMPLETION_V11.md"
+          ],
+          "test": "five-stock 15-column Qt smoke"
+        },
+        {
+          "id": "18.regression",
+          "baseline_verified": false,
+          "verified": true,
+          "evidence": [
+            "scripts/master_tasks_v12_windows.py"
+          ],
+          "test": "source/NA/Research/Estimated/Canonical Qt regression and sealed receipt"
+        },
+        {
+          "id": "18.build",
+          "baseline_verified": false,
+          "verified": true,
+          "evidence": [
+            "E:/M10/.master_tasks_v13_private/windows/acceptance_ui.json",
+            "packaging/windows/S153ResearchTerminal.spec",
+            "app/ui/v13_packaged_acceptance.py",
+            "E:/M10/.master_tasks_v13_private/windows/acceptance_installed_ui.json"
+          ],
+          "test": "Final packaged and privately installed EXE Qt open-close-reopen/source replay PASS; portable/installed sha256 b57b392bf774e2f5a398b429f70a748c9130c1ab0689e20946b5d890ba6be23c; isolated uninstall PASS"
+        },
+        {
+          "id": "18.deployment",
+          "baseline_verified": false,
+          "verified": false,
+          "evidence": [],
+          "test": "explicit user approval and installed app acceptance"
+        }
+      ]
+    }
+  ],
+  "v12_checkpoint_commit": "baad538ea89664f94424137f103647628cb0447d",
+  "v12_verified_criteria": 13,
+  "v13_source_commit": "929a321dfd81e5804d9009c191ff4d4a14a26b1f",
+  "v13_date_jst": "2026-10-12"
+}
