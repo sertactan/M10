@@ -17,9 +17,9 @@ class ScoringCompletionPage(QWidget):
         self.warning.setWordWrap(True);root.addWidget(self.warning)
         self.status=QLabel('No verified report loaded');self.status.setWordWrap(True);root.addWidget(self.status)
         button=QPushButton('Load verified offline results');button.clicked.connect(self.refresh);root.addWidget(button)
-        self.comparison=QTableWidget(0,14)
+        self.comparison=QTableWidget(0,15)
         self.comparison.setHorizontalHeaderLabels(('Stock','Cached price','Price time','S7','S12',
-            'S11','S14','S14 legs','B_Q inputs','S6 inputs','S16-E','S16-C','Features','Full formula scores'))
+            'S11','S9','S14','S14 legs','B_Q inputs','S6 inputs','S16-E','S16-C','Features','Full formula scores'))
         self.comparison.setEditTriggers(QTableWidget.NoEditTriggers)
         self.comparison.itemSelectionChanged.connect(self.select_stock)
         self.comparison.setMinimumHeight(210)
@@ -56,7 +56,8 @@ class ScoringCompletionPage(QWidget):
                          f"{v3['S6_partial_count']}/7" if v3 else 'N/A')
                 values=(s['ticker'],f"{s['price']:.2f} {s['currency']}",s['price_time'],
                         s['quality']['S7']['score'],s['quality']['S12']['score'],
-                        s['quality']['S11']['score'],s14,
+                        s['quality']['S11']['score'],next((m['score'] for m in s['models']
+                            if m['model']=='S9'),None),s14,
                         f"{present}/6",
                         f"{v3['B_Q_risk_count']}/7" if v3 else 'N/A',
                         s6_text,
@@ -96,6 +97,8 @@ class ScoringCompletionPage(QWidget):
             evidence['task9_forensic_context']=stock['task9_forensic_context']
         if stock.get('task9_jones_research'):
             evidence['task9_jones_research']=stock['task9_jones_research']
+        if stock.get('v7_s9_research'):
+            evidence['v7_s9_research']=stock['v7_s9_research']
         if stock['ticker']=='INOD' and self.v4_rsst:
             evidence['v4_rsst_research_candidate']={k:self.v4_rsst[k] for k in
                 ('RSST_decimal','delta_usd','average_assets_usd','RSST_frozen_accepted','missing',

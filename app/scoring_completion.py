@@ -827,6 +827,51 @@ def attach_v6_eton_jones_real_score(report, receipt_path, sec_cache, runtime):
                                      ticker='ETON')
 
 
+def attach_v7_s9_real_scores(report, receipts, *, companyfacts_archive,
+                             cache_root, runtime):
+    """Attach independently replayed FY2025 Piotroski S9 results to Research."""
+    from app.scoring_v7_piotroski import verify_s9_receipt
+    if (report.get('full_model_count') != 12 or report.get('canonical_securities') != 0
+            or report.get('canonical_dates') != 0
+            or [s['ticker'] for s in report.get('stocks', [])] != list(TICKERS)):
+        raise ValueError('V7 S9 requires the verified V6 twelve-score five-stock checkpoint')
+    if set(receipts) != {'TMDX', 'PENG', 'ETON'}:
+        raise ValueError('V7 S9 receipt set must match the three fully evidenced issuers')
+    for ticker in ('TMDX', 'PENG', 'ETON'):
+        verified = verify_s9_receipt(receipts[ticker],
+                                     companyfacts_archive=companyfacts_archive,
+                                     cache_root=cache_root, runtime=runtime)
+        verified['private_receipt_path'] = str(Path(receipts[ticker]).resolve())
+        stock = next(s for s in report['stocks'] if s['ticker'] == ticker)
+        model = next(m for m in stock['models'] if m['model'] == 'S9')
+        if model.get('score') is not None or stock.get('v7_s9_research'):
+            raise ValueError('V7 may not overwrite an existing S9 result')
+        if (verified.get('score_status') != 'REAL_SCORE_ACCEPTED_RESEARCH'
+                or verified.get('canonical_accepted') is not False
+                or verified.get('historical_pit_accepted') is not False
+                or verified.get('independent_decimal_reference', {}).get('signals')
+                   != verified.get('signals')
+                or verified.get('signal_count') != sum(verified.get('signals', {}).values())
+                or not math.isclose(verified['score'], 100*verified['signal_count']/9,
+                                    abs_tol=1e-12)):
+            raise ValueError('V7 S9 frozen formula acceptance failed')
+        model.update(score=verified['score'], status='REAL_SCORE_ACCEPTED_RESEARCH',
+                     missing=[], coverage_pct=100.0, present=9, required=9,
+                     research_as_of=verified['as_of'], historical_pit_accepted=False,
+                     canonical_accepted=False,
+                     evidence={'independently_replayed_official_sec': verified})
+        stock['v7_s9_research'] = verified
+        stock['full_model_count'] = sum(m['score'] is not None for m in stock['models'])
+    report['full_model_count'] = sum(s['full_model_count'] for s in report['stocks'])
+    report['full_score_securities'] = sum(s['full_model_count'] > 0 for s in report['stocks'])
+    if report['full_model_count'] != 15:
+        raise ValueError('V7 must add exactly three full S9 scores to the twelve-score baseline')
+    report['generated_at'] = max(
+        [report['generated_at']] +
+        [report['stocks'][i]['v7_s9_research']['as_of'] for i in (1, 3, 4)])
+    return report
+
+
 def save_report(report,path):
     path=Path(path)
     if path.exists() or path.is_symlink() or "scoring_completion" not in {p.casefold() for p in path.resolve().parts}:
@@ -867,6 +912,28 @@ def load_report(path, source, phase28):
             raise ValueError("Invalid model inventory")
         for m in s["models"]:
             if m["score"] is not None:
+                if m["model"]=='S9':
+                    packet=s.get('v7_s9_research')
+                    if (s['ticker'] not in ('TMDX','PENG','ETON') or not packet
+                        or packet.get('canonical_accepted') is not False
+                        or packet.get('historical_pit_accepted') is not False
+                        or packet.get('score_status')!='REAL_SCORE_ACCEPTED_RESEARCH'
+                        or m['score']!=packet.get('score')
+                        or m.get('status')!='REAL_SCORE_ACCEPTED_RESEARCH'
+                        or m.get('research_as_of')!=packet.get('as_of')
+                        or m.get('evidence',{}).get('independently_replayed_official_sec')!=packet):
+                        raise ValueError('Piotroski Research-only evidence invalid')
+                    if not math.isclose(m['score'],100*packet['signal_count']/9,abs_tol=1e-12):
+                        raise ValueError('Piotroski frozen normalization mismatch')
+                    from app.scoring_v7_piotroski import verify_s9_receipt
+                    receipt=Path(packet['private_receipt_path'])
+                    independently=verify_s9_receipt(receipt,
+                        companyfacts_archive=packet['companyfacts_archive_path'],
+                        cache_root=packet['private_cache_path'],runtime=packet['runtime_path'])
+                    independently['private_receipt_path'] = str(receipt.resolve())
+                    if independently!=packet:
+                        raise ValueError('Piotroski independent SEC replay changed')
+                    continue
                 if m["model"]=='S11':
                     packet=(s.get('task9_jones_research') if s['ticker']=='INOD'
                             else s.get('v6_jones_research') if s['ticker'] in ('CRMD','ETON')
