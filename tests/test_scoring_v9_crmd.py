@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -16,6 +17,14 @@ from app.scoring_v8_s9_audit import audit_company
 class CRMDOriginalFilingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        # Raw official SEC caches are intentionally private on Windows and
+        # absent from public GitHub CI. Never upload those bytes as fixtures.
+        if not os.environ.get('LOCALAPPDATA'):
+            raise unittest.SkipTest('Private original SEC cache is unavailable in CI')
+        from app.scoring_v9_crmd import PRIOR_10K_URL
+        root=Path('E:/M10/.scoring_v9_private/crmd')
+        if not root.is_dir():
+            raise unittest.SkipTest('Private CRMD original 10-K cache unavailable')
         cls.companyfacts, cls.submissions, cls.body25, cls.body24 = cli.sources()
         cls.partial = audit_company("CRMD", cls.companyfacts, cls.submissions,
                                     filing_body=cls.body25)
