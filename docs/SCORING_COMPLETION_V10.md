@@ -24,12 +24,12 @@ V9 originals: S7=5, S9=5, S11=3, S12=4. V9 genuine INOD and CRMD 55.555556 S9 an
 |---|---:|---|---:|---|
 | S1/S2/S3 | 0 | Existing diagnostics retained | 0 | Core48, Control12, Historical H, DNA60/router and hard gates |
 | S4/S5 | 0 | New verified pure depreciation DEPI components for CRMD, ETON, PENG | 0 | Original S1 dependencies, full Beneish risks, independent serious findings |
-| S6 | 0 | INOD genuine 5/7 retained; source separation enforced | 0 | STI/LTI/DLC/DLTT, WC/NCO/FIN, real inventory changes |
+| S6 | 0 | INOD genuine 5/7 retained; **ETON original FY2023–2025 SEC yields independently replayed conditional F_D=1.498935725, frozen 70-bin candidate only** | 0 | ETON actual STI/LTI/PREF source classification, independent WC/NCO/FIN review and primary filing hash; INOD original missing inventory |
 | S7 | 5 | V9 original receipts replayed | 0 | — |
-| **S8** | 0 | Original FY2025 SEC issuer-accurate partial Ohlson/Altman, numeric non-FFO logit, GNP/SIZE reference replay | **0** | Historical-fidelity FFO/FUTL; fiscal-year EBIT; manufacturer fiscal-end market equity, independent original Z_Q |
+| **S8** | 0 | Original FY2025 SEC issuer-accurate partial Ohlson/Altman, INOD operating-profit/equity statement bridges and conditional Z''=7.707498, GNP/SIZE replay | **0** | Verified original FFO/FUTL accounting identity; EBIT and minority equity policy; manufacturer fiscal-end market equity, independent original Z_Q |
 | S9 | 5 | V9 five full scores retained, no S9 rewriting | 0 | — |
-| **S10** | 0 | Original FY2022/23 CRMD TCA rows, FY2022 exact AR zero, targeted official original 10-K receipts | **0** | FY2026 CFO for FY2025 rows; five dated SIC×accounting-regime peer panels; verified five years and frozen percentile conventions |
-| S11 | 3 | Genuine INOD 0, CRMD and ETON retained | 0 | Missing original industry minimum peers for TMDX/PENG |
+| **S10** | 0 | Original FY2022/23 CRMD TCA rows independently replayed at 65-digit Decimal. Alternative FY2020–24 five-residual window tested | **0** | Missing original dated SIC×accounting-regime peer panels and complete five years; FY2026 CFO for alternative FY2021–25 window; frozen percentile conventions |
+| S11 | 3 | Genuine INOD 0, CRMD and ETON retained; separate original-byte replay: TMDX 12/20 peers, PENG 1/20 peers | 0 | Minimum 20 dated distinct SIC-matched actual peers for TMDX/PENG |
 | S12 | 4 | ETON partial 70.19324578 NOT promoted | 0 | FY2025 CCR and FCFCR require positive net income |
 | B_Q | 0 | CRMD/ETON/PENG separate DEPI evidenced; INOD 5/7 unchanged | 0 | INOD unproven pure depreciation and TOTAL_DEBT LVGI; zero/zero conditional `SPEC_EDGE_CASE` |
 | S13 | 0 | Original 14 official bodies, 27 source findings, unsigned seven blocks confirmed | 0 | Independent human judgments and serious flags 0/7 signed |
@@ -57,6 +57,16 @@ New source-pinned original `us-gaap:Depreciation` plus exact filed `us-gaap:Prop
 
 INOD B_Q LVGI numerator and denominator **do not become proven TOTAL_DEBT** just because V9 S9 proves $0/$0 under a narrower **long-term bank borrowing** concept. If the original B_Q TOTAL_DEBT truly equals that scope, the ratio would be mathematically **0/0, SPEC_EDGE_CASE**, not a free pass; without scope evidence it remains missing. Neither epsilon nor neutral score was added. S6 accepted 5/7 with unresolved real inventory and STI/LTI/DLC/DLTT, and S13 human serious/materiality decisions **remain entirely unsigned**. INOD frozen S14 remains **N/A at 3/6**, preserving real S11=0.
 
+### V10 independent source extensions after initial branch creation
+
+Three additional independent audits produced **new actual source-backed component evidence**, but **no full scored model**:
+
+1. **INOD S8:** audited original 2025 SEC statement bridges: retained earnings USD51,158,000; operating profit USD39,873,000; pretax USD41,425,000; noncontrolling interest USD −83,000; consolidated book equity USD107,062,000. Conditional nonmanufacturing Altman Z'' 7.7074978776 (uses an **unaccepted** EBIT and consolidated equity mapping); historical pure FFO has materially different possible accounting definitions. Independent V2 receipt SHA `0327998aad23a77f0a7585e3d80b020a884a3e24a13076d0466f2b60375b7428`; details `docs/SCORING_V10_EXTENSION_S8.md`.
+2. **S10/S11 peers:** CRMD original FY2022 TCA USD2,285,613 and FY2023 TCA USD14,315,240 independently Decimal-verified; **zero existing authenticated FY2020–24 original SIC SGML headers within the *examined caches***, not zero historical SEC filings in existence. TMDX FY2025 original SIC3845 has 12/20 distinct eligible peers; PENG SIC3674 1/20. Both have original 8/8 target inputs but S11 N/A. Offline cache-only replay SHA `ebfb0c47d6407b98f35dc41fa8997a2e465da33418b4c597585fb194e73e6066`; details `docs/SCORING_V10_EXTENSION_PEERS.md`.
+3. **ETON S6:** original FY2023–25 SEC US-GAAP balance sheet/revenue/inventory and positive stock-option proceeds yield actual diagnostic components **RSST −0.1103205596866**, ΔREC 0.0760355926461, ΔINV 0.0022230543816 and conditional full logistic `F_D=1.498935724922842580218...` in the untouched frozen 70-point numerical interval. Individual STI/LTI and preferred-equity classifications, audited cash issuance review and independent WC/NCO/FIN decomposition are not yet source-bound, so actual S6 **N/A**. Source-pinned companyfacts and 65-digit Decimal private offline replay SHA `523c8d48babf4c080e1bef13e3b74d308d4e4ba682a8c6ad4c0bce656e5e321d`; details `docs/SCORING_V10_EXTENSION_S6.md`.
+
+All extra private receipts live exclusively under `E:/M10/.scoring_v10_private/extension_s8`, `extension_peers` and `extension_s6` with independent SHA-256 sidecar seals. No live API calls from any extension. The ETON model creates a **candidate research diagnostic**, never an S6 score and never a canonical PIT claim.
+
 ### C. Master Tasks 9–18
 
 | Task | V10 state | Acceptance gap for genuine DONE |
@@ -72,11 +82,11 @@ INOD B_Q LVGI numerator and denominator **do not become proven TOTAL_DEBT** just
 | 17 — Five-company model comparison | PARTIAL | 17 originals preserved; other full model acceptances remain missing |
 | 18 — Windows Personal Edition | PARTIAL | Staging separately tested; **no production installation/approval** |
 
-**End-to-end DONE Master Task count: 0 / 10.** The source-backed DEPI, S10 TCA and new SEC year-zero evidence are real subtask achievements; none is falsely counted as an entire completed scoring model.
+**End-to-end DONE Master Task count: 0 / 10.** The source-backed DEPI, INOD EBIT/FFO constraints, S10 TCA/sector-peer inventory, ETON partial S6 and new SEC year-zero evidence are real subtask achievements; none is falsely counted as an entire completed scoring model.
 
 ## V10 validation, source replay and safety
 
-Official sources were inspected from sealed private paths without copying raw SEC HTML/JSON into Git. No invented SEC fact; no paid API, no bypass or retry of SEC 403/429, no fake S13 signature. Original V9 sealed **17-score** report was replayed through existing `app.scoring_v9_report.load_v9_report` with unchanged source-pinned receipts. V10 isolated Windows Qt offscreen staging **PASS**, 5 stocks, 15 columns, 17 genuine Research scores; S8/S10/S14 N/A, INOD true S11 zero, S16-C 0/22. Receipt: `E:/M10/.scoring_v10_private/windows_smoke/v10_baseline17.json` (**staging only**). **Windows original-private-source validation: 28/28 new V10 tests PASS, and 71/71 V9/V8 focused regression tests PASS (99/99 local tests).** A new V10 score UI column is deliberately not added without a new accepted model score.
+Official sources were inspected from sealed private paths without copying raw SEC HTML/JSON into Git. No invented SEC fact; no paid API, no bypass or retry of SEC 403/429, no fake S13 signature. Original V9 sealed **17-score** report was replayed through existing `app.scoring_v9_report.load_v9_report` with unchanged source-pinned receipts. V10 isolated Windows Qt offscreen staging **PASS**, 5 stocks, 15 columns, 17 genuine Research scores; S8/S10/S14 N/A, INOD true S11 zero, S16-C 0/22. Receipt: `E:/M10/.scoring_v10_private/windows_smoke/v10_baseline17.json` (**staging only**). **Windows original-private-source validation: 43/43 V10 tests PASS (28 initial + 15 extension); V9/V8 previously reported 71/71 focused regression PASS.** A new V10 score UI column is deliberately not added without a new accepted model score.
 
 The installed Personal Edition 1.0.6, live `operational.db`, ~9.2GB historical DB, backups, Hermes, former V1–V9 caches, frozen model source, main `E:/M10` worktree and previous PRs #170–183 are unchanged. No merge or EXE distribution. Human S13 decisions, S16-E production activation and installed Personal Edition deployment still require separate explicit authorization.
 
@@ -88,6 +98,10 @@ E:/M10/.venv/Scripts/python.exe scripts/scoring_v10_s10.py --verify-only
 E:/M10/.venv/Scripts/python.exe scripts/scoring_v10_quality.py
 E:/M10/.venv/Scripts/python.exe scripts/scoring_v10_windows_smoke.py
 E:/M10/.venv/Scripts/python.exe -m unittest tests.test_scoring_v10_s8 tests.test_scoring_v10_s10 tests.test_scoring_v10_quality -q
+E:/M10/.venv/Scripts/python.exe scripts/scoring_v10_extension_s8.py --verify E:/M10/.scoring_v10_private/extension_s8/inod_fy2025_v10_extension_v2.json
+E:/M10/.venv/Scripts/python.exe scripts/scoring_v10_extension_peers.py --verify-only
+E:/M10/.venv/Scripts/python.exe scripts/scoring_v10_extension_s6.py --verify
+E:/M10/.venv/Scripts/python.exe -m unittest discover -s tests -p 'test_scoring_v10*.py' -q
 ```
 
 GitHub CI intentionally cannot access the original private Windows SEC data: public runner tests that require it explicitly **SKIP**, not PASS. Windows private-source tests and CI runnable pure math tests must be reported separately. Any new full Research score in the future requires 11/11 frozen source, correct accounting concept, dates, units, gates, independent math, original receipt replay and UI checks before acceptance.
