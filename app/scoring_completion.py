@@ -760,6 +760,73 @@ def attach_task9_jones_real_score(report, receipt_path, sec_cache):
     return report
 
 
+def attach_v6_jones_real_score(report, receipt_path, sec_cache, runtime, *, ticker):
+    """Accept separately replayed SIC2834 S11 into five-stock Research."""
+    from app.scoring_v6_jones_acceptance import (
+        verify_crmd_jones_receipt, verify_eton_jones_receipt,
+    )
+    from app.recovered_quality import _result
+    if ticker not in ('CRMD','ETON'):
+        raise ValueError('Unsupported V6 Jones score promotion')
+    verifier=(verify_crmd_jones_receipt if ticker=='CRMD'
+              else verify_eton_jones_receipt)
+    verified=verifier(Path(receipt_path),cache=Path(sec_cache),
+                      runtime=Path(runtime))
+    if (verified['score_status']!='REAL_SCORE_ACCEPTED_RESEARCH'
+            or len(report.get('stocks',[]))!=5
+            or [s['ticker'] for s in report['stocks']]!=list(TICKERS)
+            or report.get('canonical_securities')!=0 or report.get('canonical_dates')!=0):
+        raise ValueError('V6 S11 requires original five-stock Research staging')
+    stock=report['stocks'][2 if ticker=='CRMD' else 4]
+    model=next((m for m in stock['models'] if m['model']=='S11'),None)
+    frozen_s14=next((m for m in stock['models'] if m['model']=='S14'),None)
+    if (not model or model['score'] is not None or not frozen_s14
+            or frozen_s14['score'] is not None or stock.get('v6_jones_research')):
+        raise ValueError('V6 S11/S14 must not be overwritten')
+    q=stock['quality']
+    if (q['S7']['score'] is None or
+            (q['S12']['score'] is None)!=(ticker=='ETON') or
+            any(q[k]['score'] is not None for k in ('B_Q','S6','S11','S13'))):
+        raise ValueError('V6 frozen quality baseline changed')
+    at=datetime.fromisoformat(stock['as_of'])
+    scored=_result('S11',at,score=verified['score'],period='2025-12-31',
+                   missing=[],components=verified['components'],status='VERIFIED_DONE')
+    scored['evidence']['independently_replayed_official_sec']=verified
+    evidence_payload={'model':'S11','as_of':at.isoformat(),'score':scored['score'],
+                      'version':scored['version'],'evidence':scored['evidence'],
+                      'components':scored['components']}
+    scored['evidence_hash']=sha256(json.dumps(evidence_payload,sort_keys=True).encode()).hexdigest()
+    q['S11']=scored
+    model.update(score=verified['score'],status='REAL_SCORE_ACCEPTED_RESEARCH',
+                 version=scored['version'],evidence=scored['evidence'],missing=[],
+                 coverage_pct=100.0,present=8,required=8,
+                 research_as_of=verified['as_of'],historical_pit_accepted=False,
+                 canonical_accepted=False)
+    legs={k:r['score'] for k,r in q.items()}
+    s14_score,s14_components=s14(legs)
+    expected_coverage=3 if ticker=='CRMD' else 2
+    if s14_score is not None or sum(x is not None for x in legs.values())!=expected_coverage:
+        raise ValueError('V6 frozen S14 completeness violated')
+    frozen_s14.update(score=None,status='DATA_MISSING',present=expected_coverage,
+                       coverage_pct=100*expected_coverage/6,
+                       missing=[k for k,x in legs.items() if x is None],
+                       evidence={'engine_executed':True,'legs':q,
+                                 'components':s14_components})
+    stock['v6_jones_research']=verified
+    stock['full_model_count']=sum(m['score'] is not None for m in stock['models'])
+    report['full_model_count']=sum(x['full_model_count'] for x in report['stocks'])
+    report['full_score_securities']=sum(x['full_model_count']>0 for x in report['stocks'])
+    if (stock['full_model_count']!=expected_coverage or
+            report['full_model_count']!=(12 if ticker=='CRMD' else 11)):
+        raise ValueError('V6 S11 count must add exactly one full score')
+    return report
+
+
+def attach_v6_eton_jones_real_score(report, receipt_path, sec_cache, runtime):
+    return attach_v6_jones_real_score(report, receipt_path, sec_cache, runtime,
+                                     ticker='ETON')
+
+
 def save_report(report,path):
     path=Path(path)
     if path.exists() or path.is_symlink() or "scoring_completion" not in {p.casefold() for p in path.resolve().parts}:
@@ -801,9 +868,11 @@ def load_report(path, source, phase28):
         for m in s["models"]:
             if m["score"] is not None:
                 if m["model"]=='S11':
-                    packet=s.get('task9_jones_research')
+                    packet=(s.get('task9_jones_research') if s['ticker']=='INOD'
+                            else s.get('v6_jones_research') if s['ticker'] in ('CRMD','ETON')
+                            else None)
                     q11=s['quality']['S11']
-                    if (s['ticker']!='INOD' or not packet
+                    if (not packet
                         or packet.get('canonical_accepted') is not False
                         or packet.get('historical_pit_accepted') is not False
                         or m['score']!=packet.get('score')
@@ -819,10 +888,20 @@ def load_report(path, source, phase28):
                             'evidence':q11['evidence'],
                             'components':q11['components']},sort_keys=True).encode()).hexdigest()):
                         raise ValueError('Jones research source hash or model input changed')
-                    independently=__import__('app.task9_jones_acceptance',
-                        fromlist=['verify_jones_task9_receipt']).verify_jones_task9_receipt(
-                            Path(packet['private_receipt_path']),
-                            cache=Path(packet['cache_path']))
+                    if s['ticker']=='INOD':
+                        independently=__import__('app.task9_jones_acceptance',
+                            fromlist=['verify_jones_task9_receipt']).verify_jones_task9_receipt(
+                                Path(packet['private_receipt_path']),
+                                cache=Path(packet['cache_path']))
+                    else:
+                        module=__import__('app.scoring_v6_jones_acceptance',
+                            fromlist=['verify_crmd_jones_receipt','verify_eton_jones_receipt'])
+                        verifier=(module.verify_crmd_jones_receipt if s['ticker']=='CRMD'
+                                  else module.verify_eton_jones_receipt)
+                        independently=verifier(
+                                Path(packet['private_receipt_path']),
+                                cache=Path(packet['cache_path']),
+                                runtime=Path(packet['runtime_path']))
                     if independently!=packet:
                         raise ValueError('Jones independent SEC peer replay changed')
                     continue
@@ -842,6 +921,17 @@ def load_report(path, source, phase28):
                 or model14['score'] is not None or
                 any(s['quality'][k]['score'] is not None for k in ('B_Q','S6','S13'))):
                 raise ValueError('Frozen S14 completeness must remain at 3/6')
+        if s.get('v6_jones_research'):
+            expected_present=sum(s['quality'][k]['score'] is not None
+                                 for k in ('B_Q','S6','S7','S11','S12','S13'))
+            model14=next(m for m in s['models'] if m['model']=='S14')
+            expected=3 if s['ticker']=='CRMD' else 2
+            if (s['ticker'] not in ('CRMD','ETON') or expected_present!=expected
+                    or model14['present']!=expected or model14['score'] is not None
+                    or any(s['quality'][k]['score'] is not None
+                           for k in ('B_Q','S6','S13'))
+                    or (s['quality']['S12']['score'] is None)!=(s['ticker']=='ETON')):
+                raise ValueError('V6 S14 missing legs must remain N/A')
     if report["full_model_count"]!=sum(s["full_model_count"] for s in report["stocks"]):
         raise ValueError("Score count mismatch")
     if report["full_score_securities"]!=sum(s["full_model_count"]>0 for s in report["stocks"]):

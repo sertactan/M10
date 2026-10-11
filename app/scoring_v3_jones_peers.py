@@ -113,13 +113,17 @@ def cached_archive_companyfacts(archive_file: Path, cik: str) -> tuple[bytes | N
     }
 
 
-def _submission_accession(payload: dict, fiscal_year: int, *, at: datetime):
+def _submission_accession(payload: dict, fiscal_year: int, *, at: datetime,
+                          anchor_end: str | None = None):
     """Find exactly one annual 10-K with matching reportDate and SEC acceptance."""
     recent = (payload.get("filings") or {}).get("recent") or {}
     fields = ("accessionNumber", "form", "reportDate", "filingDate", "acceptanceDateTime")
     arrays = [recent.get(field) for field in fields]
     if not all(isinstance(a, list) for a in arrays) or len({len(a) for a in arrays}) != 1:
         return None, "SEC_SUBMISSIONS_INDEX_MISSING_OR_MISALIGNED"
+    anchor = date.fromisoformat(anchor_end) if anchor_end else date(fiscal_year, 12, 31)
+    if anchor.year != fiscal_year:
+        raise ValueError("Fiscal anchor and year disagree")
     hits = []
     amended = False
     for values in zip(*arrays):
@@ -133,7 +137,7 @@ def _submission_accession(payload: dict, fiscal_year: int, *, at: datetime):
         except (TypeError, ValueError):
             continue
         if (period.year != fiscal_year
-                or abs((period - date(fiscal_year, 12, 31)).days)
+                or abs((period - anchor).days)
                 > MAX_FISCAL_END_GAP_DAYS or not when or when > at):
             continue
         if form == "10-K/A":
@@ -252,6 +256,8 @@ def extract_company_year(
     companyfacts_observed_at: datetime,
     dated_industry: Mapping | None = None,
     fiscal_year: int = 2025,
+    revenue_tag: str = "RevenueFromContractWithCustomerExcludingAssessedTax",
+    fiscal_anchor_end: str | None = None,
 ) -> tuple[dict | None, dict]:
     """Prepare the eight exact S11 fields and independently dated industry.
 
@@ -265,6 +271,9 @@ def extract_company_year(
     if not all(isinstance(t, datetime) and t.tzinfo is not None for t in
                (as_of, submissions_observed_at, companyfacts_observed_at)):
         raise ValueError("All timestamps must be timezone-aware")
+    if revenue_tag not in {"RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues"}:
+        raise ValueError("Only audited standard GAAP revenue tags are supported")
+    selected_tags = {**_TAGS, "REVENUE": revenue_tag}
     at = as_of.astimezone(timezone.utc)
     sub_time = submissions_observed_at.astimezone(timezone.utc)
     facts_time = companyfacts_observed_at.astimezone(timezone.utc)
@@ -291,7 +300,8 @@ def extract_company_year(
         return None, evidence
     evidence["reported_sec_sic_current_snapshot"] = submissions.get("sic")
     evidence["sic_snapshot_historical_fy_classification"] = False
-    accession, error = _submission_accession(submissions, fiscal_year, at=at)
+    accession, error = _submission_accession(submissions, fiscal_year, at=at,
+                                             anchor_end=fiscal_anchor_end)
     if error:
         evidence["missing"].append(error)
         return None, evidence
@@ -301,7 +311,7 @@ def extract_company_year(
     rows = []
     annual_end = accession["report_date"]
     current_revenue, issue = _select_record(
-        taxonomy, _TAGS["REVENUE"], accession["accession"],
+        taxonomy, selected_tags["REVENUE"], accession["accession"],
         annual_end, "__FULL_YEAR__",
     )
     if issue:
@@ -310,7 +320,7 @@ def extract_company_year(
     period_start = current_revenue["start"]
     prior_end = (date.fromisoformat(period_start) - timedelta(days=1)).isoformat()
     previous_revenue, issue = _select_record(
-        taxonomy, _TAGS["REVENUE"], accession["accession"],
+        taxonomy, selected_tags["REVENUE"], accession["accession"],
         prior_end, "__FULL_YEAR__",
     )
     if issue:
@@ -328,7 +338,7 @@ def extract_company_year(
     for metric, window in selections:
         end = ends[window]
         start = None if metric in INSTANT else starts[window]
-        tag = _TAGS[metric]
+        tag = selected_tags[metric]
         record, problem = _select_record(taxonomy, tag, accession["accession"], end, start)
         if problem:
             evidence["missing"].append(f"{metric}_{end}_{problem}")

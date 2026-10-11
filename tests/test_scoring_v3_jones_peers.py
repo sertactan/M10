@@ -14,7 +14,8 @@ import zipfile
 
 from app.recovered_jones import compute_s11
 from app.scoring_v3_jones_peers import (
-    cached_archive_companyfacts, extract_company_year, read_universe, scan_available,
+    _submission_accession, cached_archive_companyfacts, extract_company_year,
+    read_universe, scan_available,
 )
 from tests.test_recovered_jones import issuer as synthetic_jones_issuer
 
@@ -91,6 +92,20 @@ def parse(idx, header=True):
 
 
 class CompanyfactsJonesIngestTests(unittest.TestCase):
+    def test_noncalendar_fiscal_anchor_requires_matching_annual_filing(self):
+        payload = {"filings": {"recent": {
+            "accessionNumber": [ACCESSION], "form": ["10-K"],
+            "reportDate": ["2025-08-29"], "filingDate": ["2025-10-21"],
+            "acceptanceDateTime": ["2025-10-22T00:12:05Z"],
+        }}}
+        row, error = _submission_accession(payload, 2025, at=AT)
+        self.assertIsNone(row)
+        self.assertEqual(error, "FY2025_10K_ACCEPTANCE_MISSING")
+        row, error = _submission_accession(
+            payload, 2025, at=AT, anchor_end="2025-08-29")
+        self.assertIsNone(error)
+        self.assertEqual(row["report_date"], "2025-08-29")
+
     def test_eight_exact_sec_fields_with_real_pinned_source_hashes(self):
         packet, receipt = parse(29)
         self.assertEqual(len(packet["facts"]), 8)

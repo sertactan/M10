@@ -188,12 +188,12 @@ class SECCache:
         return raw, meta
 
 
-def sic_listing(sec: SECCache, *, pages=6, count=100):
+def sic_listing(sec: SECCache, *, pages=6, count=100, sic=SIC):
     """Official SEC SIC directory; de-duplicate CIKs while retaining page hashes."""
     entries, seen, sources = [], set(), []
     for page in range(pages):
         url = SOURCE_ROOT + "/cgi-bin/browse-edgar?" + urlencode({
-            "company": "", "SIC": SIC, "owner": "exclude",
+            "company": "", "SIC": sic, "owner": "exclude",
             "action": "getcompany", "count": count, "start": page * count,
         })
         raw, receipt = sec.load(url, limit=1_200_000)
@@ -209,14 +209,14 @@ def sic_listing(sec: SECCache, *, pages=6, count=100):
                 continue
             seen.add(cik)
             entries.append({"cik": cik, "name": unescape(re.sub(
-                r"<[^>]+>", "", name)).strip(), "listed_sec_sic": SIC,
+                r"<[^>]+>", "", name)).strip(), "listed_sec_sic": sic,
                 "directory_source_sha256": receipt["sha256"]})
         if len(matches) < count:
             break
     return entries, sources
 
 
-def _find_fy2025_facts(raw: bytes):
+def _find_fy2025_facts(raw: bytes, *, anchor_end: str = "2025-12-31"):
     """Fast ZIP screening with exact 10-K accession, FY current/prior windows.
 
     This is candidate ranking only. Final eligibility is checked by the
@@ -237,7 +237,7 @@ def _find_fy2025_facts(raw: bytes):
             start = date.fromisoformat(row["start"])
         except (ValueError, TypeError, KeyError):
             continue
-        if (end.year == FY and abs((end-date(FY, 12, 31)).days) <= FY_WINDOW
+        if (end.year == FY and abs((end-date.fromisoformat(anchor_end)).days) <= FY_WINDOW
                 and 330 <= (end-start).days+1 <= 400):
             possible.append((row["accn"], end.isoformat(), start.isoformat()))
     if not possible:
@@ -491,7 +491,9 @@ def independent_decimal_reference(target, peers, coefficients, result):
 
 def scan_task9(
     sec: SECCache, *, runtime: Path, max_pages=6, max_candidates=100,
-    as_of=None,
+    as_of=None, target_cik=TARGET_CIK, target_ticker="INOD", sic=SIC,
+    target_revenue_tag="RevenueFromContractWithCustomerExcludingAssessedTax",
+    anchor_end="2025-12-31",
 ):
     """Run cache-first official SIC list + ZIP screen + headers and Jones."""
     at = as_of or sec.clock()
@@ -503,9 +505,9 @@ def scan_task9(
     for row in universe:
         if row["cik"] and row["cik"] not in by_cik:
             by_cik[row["cik"]]=row
-    target_identity = by_cik.get(TARGET_CIK)
-    if not target_identity or target_identity["ticker"] != "INOD":
-        raise ValueError("INOD CIK identity missing from local universe")
+    target_identity = by_cik.get(target_cik)
+    if not target_identity or target_identity["ticker"] != target_ticker:
+        raise ValueError("Target CIK/ticker identity missing from local universe")
     events=[]
     ranked=[]
     candidates=[]
@@ -524,15 +526,15 @@ def scan_task9(
                 return None,None
             raw=z.read(info)
             return raw, digest(raw)
-        target_raw,target_sha=pull(TARGET_CIK)
+        target_raw,target_sha=pull(target_cik)
         if not target_raw:
-            raise ValueError("INOD official Companyfacts absent from cached ZIP")
-        directory, directory_receipts=sic_listing(sec,pages=max_pages)
+            raise ValueError("Target official Companyfacts absent from cached ZIP")
+        directory, directory_receipts=sic_listing(sec,pages=max_pages,sic=sic)
         # SEC browse directory contains current SIC membership; treat as
         # DISCOVERY only, not as proof it held at FY2025.
         for pos,item in enumerate(directory):
             cik=item["cik"]
-            if cik == TARGET_CIK:
+            if cik == target_cik:
                 continue
             record={"cik":cik,"name":item["name"],"listing_position":pos,
                     "directory_source_sha256":item["directory_source_sha256"],
@@ -541,7 +543,7 @@ def scan_task9(
             if not raw:
                 record["status"]="COMPANYFACTS_ZIP_CIK_NOT_PRESENT"
                 ranked.append(record);continue
-            fields,error=_find_fy2025_facts(raw)
+            fields,error=_find_fy2025_facts(raw,anchor_end=anchor_end)
             record.update(companyfacts_sha256=sha,
                           ticker=by_cik[cik]["ticker"] if cik in by_cik else "CIK"+cik,
                           issuer_identity_source=("LOCAL_UNIVERSE" if cik in by_cik
@@ -557,7 +559,7 @@ def scan_task9(
             -r.get("exact_field_count",0), r.get("status")!="PRECHECK_EXACT_8_OF_8",
             r["listing_position"],
         ))
-        def evidence_for(cik, identity, raw, claimed_sha, *, expected_sic=SIC):
+        def evidence_for(cik, identity, raw, claimed_sha, *, expected_sic=sic):
             nonlocal stop_reason
             subraw, subreceipt=private_cached_submissions(sec,runtime,cik)
             if not subraw:
@@ -565,7 +567,8 @@ def scan_task9(
                               "source":subreceipt}
             try:
                 sub=json.loads(subraw)
-                acceptance, err=_submission_accession(sub,FY,at=at)
+                acceptance, err=_submission_accession(sub,FY,at=at,
+                                                      anchor_end=anchor_end)
             except (ValueError,KeyError,TypeError):
                 return None,{"status":"INVALID_SEC_SUBMISSIONS"}
             amendments=[]
@@ -578,7 +581,8 @@ def scan_task9(
                                  "amendments":amendments,
                                  "original_submissions_sha256":digest(subraw)}
                 sub=json.loads(reviewed)
-                acceptance,err=_submission_accession(sub,FY,at=sec.clock())
+                acceptance,err=_submission_accession(sub,FY,at=sec.clock(),
+                                                     anchor_end=anchor_end)
                 if not err:
                     filtered_submissions_sha256=digest(reviewed)
                     subraw=reviewed
@@ -599,6 +603,9 @@ def scan_task9(
                 submissions_observed_at=_iso(subreceipt["observed_at"]) or at,
                 companyfacts_observed_at=observation_clock,
                 dated_industry=header,
+                revenue_tag=(target_revenue_tag if cik==target_cik else
+                             "RevenueFromContractWithCustomerExcludingAssessedTax"),
+                fiscal_anchor_end=anchor_end,
             )
             actual_sic=(packet or {}).get("industry",{}).get("code") if packet else None
             details={
@@ -620,12 +627,12 @@ def scan_task9(
                 details["original_submissions_sha256"]=original_submissions_hash
                 details["analytical_selection_sha256"]=filtered_submissions_sha256
             if expected_sic and actual_sic!=expected_sic:
-                details["status"]="HISTORICAL_SIC_NOT_7374"
+                details["status"]="HISTORICAL_SIC_NOT_"+expected_sic
                 return None,details
             return packet if not receipt["missing"] else None,details
         try:
             target_row,target_receipt=evidence_for(
-                TARGET_CIK,target_identity,target_raw,target_sha)
+                target_cik,target_identity,target_raw,target_sha)
         except SECStop as err:
             stop_reason=str(err)
         if target_row is not None and not stop_reason:
@@ -658,8 +665,10 @@ def scan_task9(
         independent=independent_decimal_reference(
             valid_target,peer_rows,result["components"]["OLS_coefficients"],result)
     final={
-        "schema":"TASK9_JONES_FY2025_SEC_SIC7374_V4",
-        "as_of":completed_at.isoformat(),"ticker":"INOD","target_cik":TARGET_CIK,
+        "schema":("TASK9_JONES_FY2025_SEC_SIC7374_V4" if
+                  target_cik==TARGET_CIK and sic==SIC else
+                  "SCORING_V6_JONES_FY2025_SEC_SIC"+sic),
+        "as_of":completed_at.isoformat(),"ticker":target_ticker,"target_cik":target_cik,
         "target_financial_companyfacts_sha256":target_sha,
         "target":target_receipt,"source":"SEC_EDGAR",
         "universe":universe_info,
@@ -685,4 +694,10 @@ def scan_task9(
         "canonical_accepted":False,"historical_pit_accepted":False,
         "status":"VERIFIED_RESEARCH" if result["score"] is not None else "DATA_MISSING",
     }
+    if target_cik!=TARGET_CIK or target_ticker!="INOD" or sic!=SIC:
+        # Only the new V6 private receipt needs these facts for source replay.
+        # Existing Task9 receipt shape remains unchanged.
+        final["target_observation"]=valid_target
+        final["peer_observations"]=peer_rows
+        final["fiscal_anchor_end"]=anchor_end
     return final
