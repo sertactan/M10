@@ -71,6 +71,19 @@ a = Analysis(
     noarchive=False,
 )
 
+# A Poppler runtime on the build host's PATH can be mistaken for a Qt
+# dependency. Its unversioned ICU DLL shadows Qt's own libraries and makes
+# the packaged GUI fail while importing PySide6.QtWidgets.
+for binary in a.binaries:
+    if os.path.basename(binary[0]).lower() == "icuuc.dll":
+        if "poppler" not in str(binary[1]).lower():
+            raise RuntimeError(f"Unexpected icuuc.dll source: {binary[1]}")
+a.binaries = [
+    binary for binary in a.binaries
+    if not (os.path.basename(binary[0]).lower() == "icuuc.dll"
+            and "poppler" in str(binary[1]).lower())
+]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
