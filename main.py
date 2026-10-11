@@ -421,6 +421,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="S15.3 Research Terminal")
     parser.add_argument("--ui", action="store_true", help="Launch the desktop UI")
     parser.add_argument("--doctor", action="store_true", help="Validate architecture")
+    parser.add_argument("--scoring-ui-selftest", action="store_true", help="Run isolated packaged scoring UI acceptance")
+    parser.add_argument("--selftest-out", help="Private JSON result path for --scoring-ui-selftest")
 
     parser.add_argument("--sync-universe", action="store_true", help="Sync US universe")
     parser.add_argument("--as-of", help="Universe PIT date YYYY-MM-DD; default=today")
@@ -456,6 +458,11 @@ def main() -> int:
     if args.ui:
         from app.ui.launcher import launch_ui
         return launch_ui(root)
+    if args.scoring_ui_selftest:
+        if not args.selftest_out:
+            parser.error("--scoring-ui-selftest requires --selftest-out")
+        from app.ui.v13_packaged_acceptance import run
+        return run(Path(args.selftest_out))
     if args.doctor:
         return doctor(root)
     if args.sync_universe:
