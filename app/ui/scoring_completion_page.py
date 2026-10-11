@@ -36,7 +36,14 @@ class ScoringCompletionPage(QWidget):
         # Clear first: a bad or changed source must not leave yesterday's scores visible.
         self.report=None;self.v4_rsst=None;self.comparison.setRowCount(0);self.models.setRowCount(0);self.details.clear()
         try:
-            self.report=load_report(self.report_path,self.source,self.phase28)
+            # V9 snapshots replay their newly completed private SEC receipts
+            # through a dedicated acceptance gate; all older V1-V8 paths
+            # continue using the original source-replaying loader.
+            from app.scoring_v9_report import NEW_REPORT, load_v9_report
+            if self.report_path.resolve() == NEW_REPORT.resolve():
+                self.report=load_v9_report(self.report_path,self.source,self.phase28)
+            else:
+                self.report=load_report(self.report_path,self.source,self.phase28)
             receipt=os.environ.get('M10_SCORING_V4_RSST_RECEIPT')
             if receipt:
                 required=('M10_SCORING_V4_COMPANYFACTS_ZIP','M10_SCORING_V4_MODEL_SOURCE',
@@ -99,6 +106,8 @@ class ScoringCompletionPage(QWidget):
             evidence['task9_jones_research']=stock['task9_jones_research']
         if stock.get('v7_s9_research'):
             evidence['v7_s9_research']=stock['v7_s9_research']
+        if stock.get('v9_s9_research'):
+            evidence['v9_s9_research']=stock['v9_s9_research']
         if stock['ticker']=='INOD' and self.v4_rsst:
             evidence['v4_rsst_research_candidate']={k:self.v4_rsst[k] for k in
                 ('RSST_decimal','delta_usd','average_assets_usd','RSST_frozen_accepted','missing',
