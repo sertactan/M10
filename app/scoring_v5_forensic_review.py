@@ -23,6 +23,11 @@ def unsigned_form(packet_path: Path) -> dict:
         raise ValueError('UNEXPECTED_FORENSIC_PACKET')
     if set(packet['blocks']) != set(BLOCKS) or packet.get('completed_risk_decisions') != 0:
         raise ValueError('FORENSIC_DECISION_STATE_CHANGED')
+    if (packet.get('filing_bodies_verified') != 7
+            or len(packet.get('all_14_official_body_sha256', {})) != 14
+            or sum(len(packet['blocks'][name]['preserved_findings']) for name in BLOCKS) != 27
+            or packet.get('S13') is not None or packet.get('S14') is not None):
+        raise ValueError('FORENSIC_EVIDENCE_COUNT_OR_SCORE_CHANGED')
     blocks = {}
     for name in BLOCKS:
         item = packet['blocks'][name]

@@ -52,7 +52,8 @@ zero, the original positive-denominator requirement makes LVGI a
 B_Q remain `DATA_MISSING` (5/7). Pure depreciation remains unseparated from
 amortization, so DEPI is also missing. No frozen formula was changed.
 
-The hash-sealed V4 forensic packet still has 27 findings from 14 SEC bodies and
+The hash-sealed V4 forensic packet still has 27 findings citing seven SEC bodies,
+with 14 original SEC body hashes checked in the broader evidence inventory, and
 0/7 independent numeric decisions. V5 creates an **unsigned** private expert
 form with seven sections, each carrying source accession, section, hash,
 mitigating/adverse context, and explicit blank materiality, risk, serious-flag,
