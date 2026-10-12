@@ -30,6 +30,7 @@ from app.ui.data_control_center_dialog import DataControlCenterDialog
 from app.ui.model_page import ModelPage
 from app.ui.research_backtest_page import ResearchBacktestPage
 from app.ui.phase27_current_page import Phase27CurrentPage
+from app.ui.personal_research_page import PersonalResearchPage
 from app.ui.scanner_dialog import MarketScannerDialog
 from app.ui.view_models import ComparisonView
 
@@ -81,6 +82,8 @@ class ResearchTerminalWindow(QMainWindow):
         self.tabs.addTab(self.s16_ea_page, "S16-EA")
         self.tabs.addTab(self.compare_page, "COMPARE")
         self.tabs.addTab(self.research_backtest_page, "RESEARCH BACKTEST")
+        self.personal_research_page = PersonalResearchPage()
+        self.tabs.addTab(self.personal_research_page, "PERSONAL AI RESEARCH")
         stage = os.environ.get("M10_PHASE27_STAGING_DB")
         if stage:
             archive = os.environ.get("M10_PHASE27_HISTORICAL_ARCHIVE")
@@ -113,7 +116,8 @@ class ResearchTerminalWindow(QMainWindow):
 
     def _refresh_research_tab(self, index: int) -> None:
         backtest = self.tabs.widget(index) is self.research_backtest_page
-        research = backtest or self.tabs.widget(index) is getattr(self, "scoring_completion_page", None)
+        research = (backtest or self.tabs.widget(index) is getattr(self, "scoring_completion_page", None)
+                    or self.tabs.widget(index) is self.personal_research_page)
         self.stock_header.setVisible(not research)
         self.context_panel.setVisible(not research)
         if backtest:
